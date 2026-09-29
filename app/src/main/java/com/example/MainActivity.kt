@@ -170,29 +170,33 @@ class MainActivity : ComponentActivity() {
                                 NavigationBarItem(
                                     selected = selectedTab == 0,
                                     onClick = { selectedTab = 0 },
-                                    icon = { Icon(Icons.Default.CalendarMonth, contentDescription = "تقویم") },
-                                    label = { Text("تقویم", fontSize = 11.sp) },
+                                    icon = { Icon(Icons.Default.CalendarMonth, contentDescription = "تقویم", modifier = Modifier.size(20.dp)) },
+                                    label = { Text("تقویم", fontSize = 10.sp, maxLines = 1) },
+                                    alwaysShowLabel = true,
                                     modifier = Modifier.testTag("nav_calendar")
                                 )
                                 NavigationBarItem(
                                     selected = selectedTab == 1,
                                     onClick = { selectedTab = 1 },
-                                    icon = { Icon(Icons.Default.Checklist, contentDescription = "وظایف") },
-                                    label = { Text("وظایف", fontSize = 11.sp) },
+                                    icon = { Icon(Icons.Default.Checklist, contentDescription = "وظایف", modifier = Modifier.size(20.dp)) },
+                                    label = { Text("وظایف", fontSize = 10.sp, maxLines = 1) },
+                                    alwaysShowLabel = true,
                                     modifier = Modifier.testTag("nav_tasks")
                                 )
                                 NavigationBarItem(
                                     selected = selectedTab == 2,
                                     onClick = { selectedTab = 2 },
-                                    icon = { Icon(Icons.Default.NoteAlt, contentDescription = "یادداشت‌ها") },
-                                    label = { Text("یادداشت", fontSize = 11.sp) },
+                                    icon = { Icon(Icons.Default.NoteAlt, contentDescription = "یادداشت‌ها", modifier = Modifier.size(20.dp)) },
+                                    label = { Text("یادداشت", fontSize = 10.sp, maxLines = 1) },
+                                    alwaysShowLabel = true,
                                     modifier = Modifier.testTag("nav_notes")
                                 )
                                 NavigationBarItem(
                                     selected = selectedTab == 3,
                                     onClick = { selectedTab = 3 },
-                                    icon = { Icon(Icons.Default.SmartToy, contentDescription = "دستیار AI") },
-                                    label = { Text("دستیار AI", fontSize = 11.sp) },
+                                    icon = { Icon(Icons.Default.SmartToy, contentDescription = "دستیار AI", modifier = Modifier.size(20.dp)) },
+                                    label = { Text("دستیار AI", fontSize = 10.sp, maxLines = 1) },
+                                    alwaysShowLabel = true,
                                     modifier = Modifier.testTag("nav_chat")
                                 )
                                 NavigationBarItem(
@@ -206,17 +210,19 @@ class MainActivity : ComponentActivity() {
                                                 }
                                             }
                                         ) {
-                                            Icon(Icons.Default.Sync, contentDescription = "همگام‌سازی")
+                                            Icon(Icons.Default.Sync, contentDescription = "همگام‌سازی", modifier = Modifier.size(20.dp))
                                         }
                                     },
-                                    label = { Text("همگام", fontSize = 11.sp) },
+                                    label = { Text("همگام", fontSize = 10.sp, maxLines = 1) },
+                                    alwaysShowLabel = true,
                                     modifier = Modifier.testTag("nav_sync")
                                 )
                                 NavigationBarItem(
                                     selected = selectedTab == 5,
                                     onClick = { selectedTab = 5 },
-                                    icon = { Icon(Icons.Default.Settings, contentDescription = "تنظیمات") },
-                                    label = { Text("تنظیمات", fontSize = 11.sp) },
+                                    icon = { Icon(Icons.Default.Settings, contentDescription = "تنظیمات", modifier = Modifier.size(20.dp)) },
+                                    label = { Text("تنظیمات", fontSize = 10.sp, maxLines = 1) },
+                                    alwaysShowLabel = true,
                                     modifier = Modifier.testTag("nav_settings")
                                 )
                             }

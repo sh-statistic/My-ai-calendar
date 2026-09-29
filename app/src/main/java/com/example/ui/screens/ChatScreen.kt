@@ -21,8 +21,10 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.Send
 import androidx.compose.material.icons.filled.AutoAwesome
@@ -586,35 +588,50 @@ fun ApiKeySetupDialog(
             Icon(Icons.Default.Key, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
         },
         title = {
-            Text("تنظیم کلید Gemini API", fontWeight = FontWeight.Bold)
+            Text("تنظیم کلید Gemini API", fontWeight = FontWeight.Bold, style = MaterialTheme.typography.titleMedium)
         },
         text = {
             Column(
-                modifier = Modifier.fillMaxWidth(),
-                verticalArrangement = Arrangement.spacedBy(10.dp)
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .verticalScroll(rememberScrollState()),
+                verticalArrangement = Arrangement.spacedBy(8.dp)
             ) {
                 Text(
-                    text = "جهت فعال‌سازی چت‌بات و مدل‌های پیشرفته جمینای، لطفاً کلید API اختصاصی خود را وارد کنید:",
+                    text = "جهت فعال‌سازی هوش مصنوعی، لطفاً کلید اختصاصی Gemini API خود را وارد کنید (این کادر در ابتدا کاملاً خالی است):",
                     style = MaterialTheme.typography.bodySmall,
+                    fontSize = 11.sp,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
 
                 OutlinedTextField(
                     value = keyText,
                     onValueChange = { keyText = it },
-                    placeholder = { Text("AIzaSy...") },
+                    placeholder = { Text("کلید API خود را اینجا بنویسید (مانند AIzaSy...)", fontSize = 11.sp) },
                     singleLine = true,
                     modifier = Modifier
                         .fillMaxWidth()
                         .testTag("api_key_input_field")
                 )
 
+                if (keyText.isNotBlank()) {
+                    TextButton(
+                        onClick = {
+                            keyText = ""
+                            onSave("")
+                        },
+                        modifier = Modifier.align(Alignment.End)
+                    ) {
+                        Text("پاک‌سازی و خالی کردن کلید", color = MaterialTheme.colorScheme.error, fontSize = 10.sp)
+                    }
+                }
+
                 Card(
-                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
+                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.6f)),
                     shape = RoundedCornerShape(8.dp),
                     modifier = Modifier.fillMaxWidth()
                 ) {
-                    Column(modifier = Modifier.padding(10.dp)) {
+                    Column(modifier = Modifier.padding(8.dp)) {
                         Text(
                             text = "💡 نحوه دریافت کلید رایگان:",
                             style = MaterialTheme.typography.labelSmall,
@@ -622,11 +639,11 @@ fun ApiKeySetupDialog(
                             color = MaterialTheme.colorScheme.primary
                         )
                         Text(
-                            text = "می‌توانید کلید رایگان خود را از درگاه Google AI Studio (aistudio.google.com) تهیه نموده و در این قسمت قرار دهید، یا آن را در پنل Secrets در محیط AI Studio تنظیم کنید.",
+                            text = "کلید رایگان خود را از aistudio.google.com تهیه نموده و در این قسمت قرار دهید. کلید فقط در حافظه آفلاین دستگاه ذخیره می‌شود.",
                             style = MaterialTheme.typography.bodySmall,
-                            fontSize = 11.sp,
+                            fontSize = 10.sp,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            lineHeight = 16.sp
+                            lineHeight = 15.sp
                         )
                     }
                 }
@@ -637,12 +654,12 @@ fun ApiKeySetupDialog(
                 onClick = { onSave(keyText.trim()) },
                 modifier = Modifier.testTag("btn_save_api_key")
             ) {
-                Text("ذخیره کلید")
+                Text("ذخیره کلید", fontSize = 12.sp)
             }
         },
         dismissButton = {
             TextButton(onClick = onDismiss) {
-                Text("انصراف")
+                Text("انصراف", fontSize = 12.sp)
             }
         }
     )
