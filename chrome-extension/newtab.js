@@ -49,8 +49,19 @@ document.addEventListener("DOMContentLoaded", async () => {
   const savedUrl = await SyncClient.getServerUrl();
   inputServerIp.value = savedUrl;
 
+  const dashQrImg = document.getElementById("dashQrImg");
+  const dashQrUrl = document.getElementById("dashQrUrl");
+  function updateQrDisplay() {
+    if (dashQrImg && inputServerIp.value) {
+      dashQrImg.src = `https://api.qrserver.com/v1/create-qr-code/?size=140x140&data=${encodeURIComponent(inputServerIp.value)}`;
+      if (dashQrUrl) dashQrUrl.textContent = inputServerIp.value;
+    }
+  }
+  updateQrDisplay();
+
   inputServerIp.addEventListener("change", async () => {
     await SyncClient.setServerUrl(inputServerIp.value);
+    updateQrDisplay();
     checkServerConnection();
   });
 

@@ -27,6 +27,7 @@ import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.AutoAwesome
 import androidx.compose.material.icons.filled.CalendarToday
 import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.Event
 import androidx.compose.material.icons.filled.Schedule
 import androidx.compose.material.icons.filled.Star
@@ -62,6 +63,7 @@ import com.example.calendar.PersianOccasionsHelper
 import com.example.data.EventEntity
 import com.example.ui.MainViewModel
 import com.example.ui.components.AddEventDialog
+import com.example.ui.components.EditEventDialog
 import com.example.ui.components.PrayerTimesCard
 import com.example.ui.components.parseColor
 
@@ -77,6 +79,7 @@ fun CalendarScreen(
     val tasks by viewModel.activeTasks.collectAsState()
 
     var showAddEventDialog by remember { mutableStateOf(false) }
+    var eventToEdit by remember { mutableStateOf<EventEntity?>(null) }
 
     val today = PersianCalendarHelper.getCurrentJalaliDate()
     val daysInMonth = PersianCalendarHelper.getDaysInJalaliMonth(viewYear, viewMonth)
@@ -405,6 +408,8 @@ fun CalendarScreen(
                     Box(modifier = Modifier.padding(horizontal = 10.dp)) {
                         EventItemCard(
                             event = event,
+                            onClick = { eventToEdit = event },
+                            onEdit = { eventToEdit = event },
                             onDelete = { viewModel.deleteEvent(event.id) }
                         )
                     }
@@ -423,18 +428,48 @@ fun CalendarScreen(
             }
         )
     }
+
+    eventToEdit?.let { event ->
+        EditEventDialog(
+            initialEvent = event,
+            onDismiss = { eventToEdit = null },
+            onConfirm = { title, desc, pDate, start, end, cat, col ->
+                viewModel.updateEvent(
+                    event.copy(
+                        title = title,
+                        description = desc,
+                        persianDate = pDate,
+                        startTime = start,
+                        endTime = end,
+                        category = cat,
+                        colorHex = col,
+                        updatedAt = System.currentTimeMillis()
+                    )
+                )
+                eventToEdit = null
+            },
+            onDelete = {
+                viewModel.deleteEvent(event.id)
+                eventToEdit = null
+            }
+        )
+    }
 }
 
 @Composable
 fun EventItemCard(
     event: EventEntity,
+    onClick: () -> Unit,
+    onEdit: () -> Unit,
     onDelete: () -> Unit
 ) {
     Card(
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
         shape = RoundedCornerShape(10.dp),
         border = androidx.compose.foundation.BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
-        modifier = Modifier.fillMaxWidth()
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable { onClick() }
     ) {
         Row(
             modifier = Modifier
@@ -482,8 +517,13 @@ fun EventItemCard(
                                 tint = MaterialTheme.colorScheme.primary
                             )
                             Spacer(modifier = Modifier.width(3.dp))
+                            val timeStr = if (event.endTime.isNotBlank()) {
+                                "${PersianCalendarHelper.toPersianDigits(event.startTime)} تا ${PersianCalendarHelper.toPersianDigits(event.endTime)}"
+                            } else {
+                                PersianCalendarHelper.toPersianDigits(event.startTime)
+                            }
                             Text(
-                                text = "${PersianCalendarHelper.toPersianDigits(event.startTime)} تا ${PersianCalendarHelper.toPersianDigits(event.endTime)}",
+                                text = timeStr,
                                 fontSize = 10.sp,
                                 color = MaterialTheme.colorScheme.primary
                             )
@@ -505,13 +545,24 @@ fun EventItemCard(
                 }
             }
 
-            IconButton(onClick = onDelete, modifier = Modifier.size(28.dp)) {
-                Icon(
-                    Icons.Default.Delete,
-                    contentDescription = "حذف رویداد",
-                    tint = MaterialTheme.colorScheme.error.copy(alpha = 0.7f),
-                    modifier = Modifier.size(16.dp)
-                )
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                IconButton(onClick = onEdit, modifier = Modifier.size(28.dp)) {
+                    Icon(
+                        Icons.Default.Edit,
+                        contentDescription = "ویرایش رویداد",
+                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.size(15.dp)
+                    )
+                }
+
+                IconButton(onClick = onDelete, modifier = Modifier.size(28.dp)) {
+                    Icon(
+                        Icons.Default.Delete,
+                        contentDescription = "حذف رویداد",
+                        tint = MaterialTheme.colorScheme.error.copy(alpha = 0.7f),
+                        modifier = Modifier.size(15.dp)
+                    )
+                }
             }
         }
     }

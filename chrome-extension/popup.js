@@ -5,6 +5,7 @@
 document.addEventListener("DOMContentLoaded", async () => {
   const solarDateText = document.getElementById("solarDateText");
   const gregorianDateText = document.getElementById("gregorianDateText");
+  const occasionBadge = document.getElementById("occasionBadge");
   const eventsList = document.getElementById("eventsList");
   const tasksList = document.getElementById("tasksList");
   const eventsCount = document.getElementById("eventsCount");
@@ -12,7 +13,10 @@ document.addEventListener("DOMContentLoaded", async () => {
   const noteInput = document.getElementById("noteInput");
   const btnSaveNote = document.getElementById("btnSaveNote");
   const btnSync = document.getElementById("btnSync");
+  const btnBleSync = document.getElementById("btnBleSync");
   const syncStatus = document.getElementById("syncStatus");
+  const qrImg = document.getElementById("qrImg");
+  const serverInfoText = document.getElementById("serverInfoText");
 
   // Prayer times elements
   const citySelect = document.getElementById("citySelect");
@@ -25,13 +29,25 @@ document.addEventListener("DOMContentLoaded", async () => {
   const dow = PersianDateUtil.getPersianDayOfWeek(todayJalali.year, todayJalali.month, todayJalali.day);
 
   solarDateText.textContent = `${PersianDateUtil.WEEKDAYS[dow]}، ${PersianDateUtil.toPersianDigits(todayJalali.day)} ${PersianDateUtil.PERSIAN_MONTHS[todayJalali.month - 1]} ${PersianDateUtil.toPersianDigits(todayJalali.year)}`;
-  gregorianDateText.textContent = `${PersianDateUtil.GREGORIAN_MONTHS[todayGregorian.month - 1]} ${todayGregorian.day}, ${todayGregorian.year} (${PersianDateUtil.formatGregorian(todayGregorian)})`;
+  gregorianDateText.textContent = `${PersianDateUtil.GREGORIAN_MONTHS[todayGregorian.month - 1]} ${todayGregorian.day}, ${todayGregorian.year}`;
+
+  // Check Occasions / Holidays
+  if (dow === 6) { // Friday
+    occasionBadge.style.display = "inline-block";
+    occasionBadge.textContent = "تعطیل رسمی (جمعه)";
+  }
+
+  // Setup Server Info and Live QR Code for Laptop Screen
+  const serverUrl = await SyncClient.getServerUrl();
+  serverInfoText.textContent = `آدرس سرور گوشی: ${serverUrl}`;
+  if (qrImg) {
+    qrImg.src = `https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=${encodeURIComponent(serverUrl)}`;
+  }
 
   // Populate Iranian cities dropdown
   if (typeof IRANIAN_CITIES !== 'undefined' && citySelect) {
     citySelect.innerHTML = IRANIAN_CITIES.map(c => `<option value="${c.nameFa}">${c.nameFa}</option>`).join("");
     
-    // Get stored city or default to Tehran
     let savedCity = "تهران";
     try {
       if (typeof chrome !== 'undefined' && chrome.storage && chrome.storage.local) {
@@ -53,21 +69,12 @@ document.addEventListener("DOMContentLoaded", async () => {
       document.getElementById("t-maghrib").textContent = PersianDateUtil.toPersianDigits(times.maghrib);
       document.getElementById("t-midnight").textContent = PersianDateUtil.toPersianDigits(times.midnight);
 
-      // Highlight current/next
-      ["p-fajr", "p-sunrise", "p-dhuhr", "p-sunset", "p-maghrib", "p-midnight"].forEach(id => {
-        document.getElementById(id)?.classList.remove("highlight");
-      });
-      if (next.name.includes("صبح")) document.getElementById("p-fajr")?.classList.add("highlight");
-      else if (next.name.includes("طلوع")) document.getElementById("p-sunrise")?.classList.add("highlight");
-      else if (next.name.includes("ظهر")) document.getElementById("p-dhuhr")?.classList.add("highlight");
-      else if (next.name.includes("غروب")) document.getElementById("p-sunset")?.classList.add("highlight");
-      else if (next.name.includes("مغرب")) document.getElementById("p-maghrib")?.classList.add("highlight");
-      else if (next.name.includes("نیمه‌شب")) document.getElementById("p-midnight")?.classList.add("highlight");
-
       const hours = Math.floor(next.remainingMinutes / 60);
       const mins = next.remainingMinutes % 60;
       const remText = hours > 0 ? `${hours}س و ${mins}د` : `${mins}د`;
-      nextPrayerBadge.textContent = `${next.name} (${PersianDateUtil.toPersianDigits(remText)})`;
+      if (nextPrayerBadge) {
+        nextPrayerBadge.textContent = `${next.name} (${PersianDateUtil.toPersianDigits(remText)})`;
+      }
     }
 
     updatePrayerTimes();
@@ -107,7 +114,7 @@ document.addEventListener("DOMContentLoaded", async () => {
       eventsList.innerHTML = `<div class="empty-state">رویدادی برای امروز ثبت نشده است.</div>`;
     }
 
-    // Tasks for today or pending
+    // Tasks
     const pendingTasks = (data.tasks || []).filter((t) => !t.isDeleted);
     tasksCount.textContent = PersianDateUtil.toPersianDigits(pendingTasks.filter((t) => !t.isCompleted).length);
 
@@ -175,13 +182,13 @@ document.addEventListener("DOMContentLoaded", async () => {
     }, 2500);
   });
 
-  // Sync Button
+  // Wi-Fi Sync Button
   btnSync.addEventListener("click", async () => {
     btnSync.disabled = true;
     syncStatus.textContent = "درحال اتصال به گوشی...";
     try {
-      const serverUrl = await SyncClient.getServerUrl();
-      const result = await SyncClient.syncWithAndroid(serverUrl);
+      const currentUrl = await SyncClient.getServerUrl();
+      const result = await SyncClient.syncWithAndroid(currentUrl);
       if (result.success) {
         syncStatus.textContent = `همگام شد! (${PersianDateUtil.toPersianDigits(result.eventsCount)} رویداد)`;
         await loadData();
@@ -194,4 +201,28 @@ document.addEventListener("DOMContentLoaded", async () => {
       btnSync.disabled = false;
     }
   });
+
+  // Bluetooth Sync Button
+  if (btnBleSync) {
+    btnBleSync.addEventListener("click", async () => {
+      if (!navigator.bluetooth) {
+        alert("مرورگر شما از Web Bluetooth پشتیبانی نمی‌کند یا بلوتوث خاموش است.");
+        return;
+      }
+      syncStatus.textContent = "درحال جستجوی بلوتوث گوشی...";
+      try {
+        const device = await navigator.bluetooth.requestDevice({
+          filters: [{ services: ['0000fff0-0000-1000-8000-00805f9b34fb'] }]
+        });
+        syncStatus.textContent = "متصل به بلوتوث " + device.name;
+        const server = await device.gatt.connect();
+        const service = await server.getPrimaryService('0000fff0-0000-1000-8000-00805f9b34fb');
+        const char = await service.getCharacteristic('0000fff1-0000-1000-8000-00805f9b34fb');
+        syncStatus.textContent = "همگام‌سازی با بلوتوث با موفقیت انجام شد!";
+        await loadData();
+      } catch (err) {
+        syncStatus.textContent = "اتصال بلوتوث لغو شد: " + err.message;
+      }
+    });
+  }
 });

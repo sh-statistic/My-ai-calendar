@@ -8,9 +8,9 @@
 <body>
   <header>
     <div class="logo-area">
-      <div class="logo-symbol">☀</div>
+      <div class="logo-symbol">☀️</div>
       <div class="logo-text">
-        <h1>همگام (Hamgam)</h1>
+        <h1>همگام</h1>
         <p>تقویم خورشیدی، اوقات شرعی و همگام‌ساز آفلاین محلی (Zero-Cost Serverless)</p>
       </div>
     </div>
@@ -21,7 +21,7 @@
       <span style="font-size: 11px; color: var(--text-muted)">آدرس گوشی:</span>
       <input type="text" id="inputServerIp" class="ip-input" value="http://192.168.1.100:8080" placeholder="http://192.168.x.x:8080">
       <button id="btnSyncNow" class="btn-primary">همگام‌سازی فوری ⟳</button>
-      <button id="btnBleSync" class="btn-secondary" title="همگام‌سازی از طریق بلوتوث">بلوتوث BLE</button>
+      <button id="btnBleSync" class="btn-secondary" title="همگام‌سازی از طریق بلوتوث">📡 بلوتوث BLE</button>
     </div>
   </header>
 
@@ -64,8 +64,18 @@
       </div>
     </section>
 
-    <!-- Right Column: Prayer Times, Tasks & Sticky Notes -->
+    <!-- Right Column: Prayer Times, QR Scanner Box, Tasks & Sticky Notes -->
     <div class="side-column">
+      <!-- QR Code Pairing Card for Mobile Scanning -->
+      <div class="card" style="background: #FFFDF9; border: 1px dashed var(--primary); text-align: center; padding: 14px;">
+        <h4 style="font-size: 13px; font-weight: bold; color: var(--primary); margin-bottom: 6px;">📱 اسکن با دوربین گوشی برای همگام‌سازی</h4>
+        <p style="font-size: 11px; color: var(--text-muted); margin-bottom: 8px;">بارکد زیر را با گوشی اسکن کنید تا تقویم و داده‌ها مستقیماً همگام شوند:</p>
+        <div style="display: flex; justify-content: center; margin-bottom: 6px;">
+          <img id="dashQrImg" style="width: 140px; height: 140px; border-radius: 8px; border: 1px solid var(--border-color);" alt="QR Code">
+        </div>
+        <code id="dashQrUrl" style="font-size: 11px; font-weight: bold; color: var(--primary);"></code>
+      </div>
+
       <!-- Ultra-Lightweight Offline Prayer Times Card -->
       <div class="prayer-dashboard-card">
         <div class="prayer-dash-header">

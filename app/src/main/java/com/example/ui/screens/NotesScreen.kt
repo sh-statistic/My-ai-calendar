@@ -1,5 +1,6 @@
 package com.example.ui.screens
 
+import android.widget.Toast
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -21,6 +22,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.Note
 import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.CalendarMonth
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.PushPin
@@ -43,6 +45,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -50,6 +53,7 @@ import androidx.compose.ui.unit.sp
 import com.example.data.NoteEntity
 import com.example.ui.MainViewModel
 import com.example.ui.components.AddNoteDialog
+import com.example.ui.components.AddToCalendarFromNoteDialog
 import com.example.ui.components.EditNoteDialog
 import com.example.ui.components.parseColor
 
@@ -58,10 +62,12 @@ fun NotesScreen(
     viewModel: MainViewModel,
     modifier: Modifier = Modifier
 ) {
+    val context = LocalContext.current
     val notes by viewModel.activeNotes.collectAsState()
     var searchQuery by remember { mutableStateOf("") }
     var showAddNoteDialog by remember { mutableStateOf(false) }
     var noteToEdit by remember { mutableStateOf<NoteEntity?>(null) }
+    var noteToAddToCalendar by remember { mutableStateOf<NoteEntity?>(null) }
 
     val filteredNotes = if (searchQuery.isBlank()) {
         notes
@@ -140,6 +146,7 @@ fun NotesScreen(
                             note = note,
                             onClick = { noteToEdit = note },
                             onEdit = { noteToEdit = note },
+                            onAddToCalendar = { noteToAddToCalendar = note },
                             onDelete = { viewModel.deleteNote(note.id) }
                         )
                     }
@@ -176,6 +183,26 @@ fun NotesScreen(
             }
         )
     }
+
+    noteToAddToCalendar?.let { note ->
+        AddToCalendarFromNoteDialog(
+            note = note,
+            onDismiss = { noteToAddToCalendar = null },
+            onConfirm = { title, desc, pDate, startTime, category, colorHex ->
+                viewModel.addEvent(
+                    title = title,
+                    description = desc,
+                    persianDate = pDate,
+                    startTime = startTime,
+                    endTime = "",
+                    category = category,
+                    colorHex = colorHex
+                )
+                noteToAddToCalendar = null
+                Toast.makeText(context, "یادداشت به عنوان رویداد و یادآور در تقویم ثبت شد ✓", Toast.LENGTH_LONG).show()
+            }
+        )
+    }
 }
 
 @Composable
@@ -183,6 +210,7 @@ fun NoteCard(
     note: NoteEntity,
     onClick: () -> Unit,
     onEdit: () -> Unit,
+    onAddToCalendar: () -> Unit,
     onDelete: () -> Unit
 ) {
     val cardColor = parseColor(note.colorHex)
@@ -244,6 +272,18 @@ fun NoteCard(
                 )
 
                 Row(verticalAlignment = Alignment.CenterVertically) {
+                    IconButton(
+                        onClick = onAddToCalendar,
+                        modifier = Modifier.size(24.dp)
+                    ) {
+                        Icon(
+                            Icons.Default.CalendarMonth,
+                            contentDescription = "افزودن به تقویم و یادآور",
+                            tint = Color(0xFF2563EB),
+                            modifier = Modifier.size(16.dp)
+                        )
+                    }
+
                     IconButton(
                         onClick = onEdit,
                         modifier = Modifier.size(24.dp)

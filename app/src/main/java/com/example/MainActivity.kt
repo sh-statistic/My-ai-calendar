@@ -18,6 +18,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -102,11 +103,13 @@ class MainActivity : ComponentActivity() {
                         modifier = Modifier.fillMaxSize(),
                         topBar = {
                             if (selectedTab == 0) {
-                                // COMBINED Space-Saving Top Bar for Calendar (Zero wasted vertical space)
+                                // COMBINED Space-Saving Top Bar for Calendar (Zero wasted vertical space, safe from status bar overlap)
                                 Surface(
                                     color = MaterialTheme.colorScheme.surface,
                                     shadowElevation = 2.dp,
-                                    modifier = Modifier.fillMaxWidth()
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .statusBarsPadding()
                                 ) {
                                     Column(
                                         modifier = Modifier
