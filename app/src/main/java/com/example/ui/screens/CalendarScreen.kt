@@ -106,75 +106,10 @@ fun CalendarScreen(
                 .fillMaxSize()
                 .padding(innerPadding)
                 .testTag("calendar_scrollable_container"),
-            contentPadding = PaddingValues(bottom = 80.dp),
+            contentPadding = PaddingValues(top = 6.dp, bottom = 80.dp),
             verticalArrangement = Arrangement.spacedBy(8.dp)
         ) {
-            // 1. Header: Month Navigation + Today Button
-            item {
-                Card(
-                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
-                    shape = RoundedCornerShape(bottomStart = 16.dp, bottomEnd = 16.dp),
-                    modifier = Modifier.fillMaxWidth()
-                ) {
-                    Column(modifier = Modifier.padding(10.dp)) {
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.SpaceBetween,
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            IconButton(onClick = { viewModel.nextMonth() }, modifier = Modifier.size(36.dp)) {
-                                Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "ماه بعد")
-                            }
-
-                            Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                                Text(
-                                    text = "${PersianCalendarHelper.PERSIAN_MONTH_NAMES[viewMonth - 1]} ${PersianCalendarHelper.toPersianDigits(viewYear.toString())}",
-                                    style = MaterialTheme.typography.titleMedium,
-                                    fontWeight = FontWeight.Bold,
-                                    color = MaterialTheme.colorScheme.primary
-                                )
-                                val firstGDate = PersianCalendarHelper.jalaliToGregorian(viewYear, viewMonth, 1)
-                                val lastGDate = PersianCalendarHelper.jalaliToGregorian(viewYear, viewMonth, daysInMonth)
-                                Text(
-                                    text = "${firstGDate.monthName} ${firstGDate.day} - ${lastGDate.monthName} ${lastGDate.day}, ${firstGDate.year}",
-                                    style = MaterialTheme.typography.bodySmall,
-                                    fontSize = 10.sp,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                                )
-                            }
-
-                            IconButton(onClick = { viewModel.previousMonth() }, modifier = Modifier.size(36.dp)) {
-                                Icon(Icons.AutoMirrored.Filled.ArrowForward, contentDescription = "ماه قبل")
-                            }
-                        }
-
-                        // Quick Jump to Today
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.Center
-                        ) {
-                            AssistChip(
-                                onClick = { viewModel.setToday() },
-                                label = {
-                                    Text(
-                                        "امروز: ${today.formattedPersian} (${PersianCalendarHelper.getCurrentGregorianDate().formatted})",
-                                        fontSize = 10.sp
-                                    )
-                                },
-                                leadingIcon = {
-                                    Icon(Icons.Default.CalendarToday, contentDescription = null, modifier = Modifier.size(12.dp))
-                                },
-                                colors = AssistChipDefaults.assistChipColors(
-                                    containerColor = MaterialTheme.colorScheme.primaryContainer,
-                                    labelColor = MaterialTheme.colorScheme.onPrimaryContainer
-                                )
-                            )
-                        }
-                    }
-                }
-            }
-
-            // 2. Calendar Grid Card (with national & religious holidays marked)
+            // 1. Calendar Grid Card (with national & religious holidays marked)
             item {
                 Card(
                     colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),

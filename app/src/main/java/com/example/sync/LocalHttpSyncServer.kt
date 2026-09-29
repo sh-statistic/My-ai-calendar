@@ -117,7 +117,7 @@ class LocalHttpSyncServer(
 
                 when {
                     // Chrome Extension / Web Dashboard Widget Page
-                    (path == "/" && acceptsHtml) || path == "/widget" -> {
+                    (path == "/" && acceptsHtml) || path == "/widget" || path == "/extension/popup.html" -> {
                         val events = repository.allActiveEvents.first()
                         val tasks = repository.allActiveTasks.first()
                         val notes = repository.allActiveNotes.first()
