@@ -1,0 +1,334 @@
+<!DOCTYPE html>
+<html lang="fa" dir="rtl">
+<head>
+  <meta charset="UTF-8">
+  <title>همگام (Hamgam)</title>
+  <style>
+    :root {
+      /* Soft Light / Eye-Friendly Palette */
+      --bg: #F7F7F5;             /* Warm cream / off-white background */
+      --surface: #FAF8F5;        /* Soothing soft card surface */
+      --surface-hover: #EFECE4;
+      --surface-border: #DFD9CD; /* Gentle soft border */
+      --text: #2D3748;           /* Gentle, high-contrast dark-gray text */
+      --text-muted: #64748B;
+      --primary: #D97706;        /* Warm solar amber */
+      --primary-dark: #B45309;
+      --primary-pastel: #FEF3C7; /* Soft amber pastel */
+      --secondary: #0D9488;      /* Persian teal */
+      --secondary-pastel: #CCFBF1;
+      --sky: #0284C7;
+      --sky-pastel: #E0F2FE;
+    }
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+      font-family: -apple-system, BlinkMacSystemFont, "Vazirmatn", "Segoe UI", Roboto, Tahoma, sans-serif;
+    }
+    body {
+      width: 370px;
+      min-height: 520px;
+      background: var(--bg);
+      color: var(--text);
+      padding: 14px;
+      font-size: 13px;
+      line-height: 1.4;
+    }
+    header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding-bottom: 10px;
+      border-bottom: 1px solid var(--surface-border);
+      margin-bottom: 10px;
+    }
+    .brand {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .brand-icon {
+      width: 28px;
+      height: 28px;
+      background: linear-gradient(135deg, var(--primary), var(--primary-dark));
+      border-radius: 8px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-weight: bold;
+      color: #FFFBEB;
+      font-size: 14px;
+      box-shadow: 0 2px 6px rgba(217, 119, 6, 0.25);
+    }
+    .brand-title {
+      font-size: 15px;
+      font-weight: 700;
+      color: var(--text);
+    }
+    .sync-btn {
+      background: var(--surface);
+      border: 1px solid var(--surface-border);
+      color: var(--primary-dark);
+      padding: 5px 10px;
+      border-radius: 8px;
+      cursor: pointer;
+      font-size: 11px;
+      font-weight: 600;
+      display: flex;
+      align-items: center;
+      gap: 5px;
+      transition: all 0.2s;
+    }
+    .sync-btn:hover {
+      background: var(--primary-pastel);
+      border-color: var(--primary);
+    }
+    .date-card {
+      background: var(--surface);
+      border-radius: 12px;
+      padding: 10px;
+      text-align: center;
+      margin-bottom: 10px;
+      border: 1px solid var(--surface-border);
+    }
+    .date-solar {
+      font-size: 16px;
+      font-weight: 800;
+      color: var(--primary-dark);
+      margin-bottom: 3px;
+    }
+    .date-gregorian {
+      font-size: 11px;
+      color: var(--text-muted);
+    }
+
+    /* Prayer Times Widget */
+    .prayer-card {
+      background: var(--surface);
+      border: 1px solid var(--surface-border);
+      border-radius: 12px;
+      padding: 10px;
+      margin-bottom: 10px;
+    }
+    .prayer-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 8px;
+    }
+    .city-select {
+      background: #FDFBF7;
+      border: 1px solid var(--surface-border);
+      color: var(--text);
+      font-size: 11px;
+      font-weight: 600;
+      border-radius: 6px;
+      padding: 3px 6px;
+      outline: none;
+      cursor: pointer;
+    }
+    .next-prayer-badge {
+      font-size: 10px;
+      font-weight: 700;
+      color: var(--primary);
+      background: var(--primary-pastel);
+      padding: 2px 8px;
+      border-radius: 12px;
+    }
+    .prayer-grid {
+      display: grid;
+      grid-template-columns: repeat(6, 1fr);
+      gap: 4px;
+      text-align: center;
+    }
+    .prayer-cell {
+      background: #FDFBF7;
+      border: 1px solid var(--surface-border);
+      border-radius: 6px;
+      padding: 4px 2px;
+    }
+    .prayer-cell.highlight {
+      background: var(--primary-pastel);
+      border-color: var(--primary);
+    }
+    .prayer-name {
+      font-size: 9px;
+      color: var(--text-muted);
+      margin-bottom: 2px;
+    }
+    .prayer-time {
+      font-size: 10px;
+      font-weight: 700;
+      color: var(--text);
+    }
+    .prayer-cell.highlight .prayer-time {
+      color: var(--primary-dark);
+    }
+
+    .section-title {
+      font-size: 11px;
+      font-weight: 700;
+      color: var(--text-muted);
+      margin: 8px 0 4px;
+      display: flex;
+      justify-content: space-between;
+    }
+    .items-list {
+      display: flex;
+      flex-direction: column;
+      gap: 5px;
+      max-height: 90px;
+      overflow-y: auto;
+      margin-bottom: 8px;
+    }
+    .item-card {
+      background: var(--surface);
+      border-radius: 8px;
+      padding: 6px 10px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      border: 1px solid var(--surface-border);
+      border-right: 3px solid var(--primary);
+    }
+    .task-item {
+      border-right-color: var(--sky);
+    }
+    .task-item.completed span {
+      text-decoration: line-through;
+      color: var(--text-muted);
+    }
+    .empty-state {
+      text-align: center;
+      color: var(--text-muted);
+      font-size: 11px;
+      padding: 8px;
+      background: var(--surface);
+      border-radius: 8px;
+      border: 1px dashed var(--surface-border);
+    }
+    .quick-note {
+      background: var(--surface);
+      border-radius: 10px;
+      padding: 8px;
+      border: 1px solid var(--surface-border);
+    }
+    .quick-note textarea {
+      width: 100%;
+      height: 40px;
+      background: #FDFBF7;
+      border: 1px solid var(--surface-border);
+      border-radius: 6px;
+      color: var(--text);
+      padding: 5px 8px;
+      font-size: 12px;
+      resize: none;
+      outline: none;
+      margin-bottom: 5px;
+    }
+    .quick-note textarea:focus {
+      border-color: var(--primary);
+    }
+    .quick-note button {
+      background: var(--primary);
+      color: #FFFBEB;
+      border: none;
+      padding: 5px 12px;
+      border-radius: 6px;
+      font-weight: 700;
+      font-size: 11px;
+      cursor: pointer;
+      width: 100%;
+      transition: background 0.2s;
+    }
+    .quick-note button:hover {
+      background: var(--primary-dark);
+    }
+    .status-bar {
+      font-size: 10px;
+      color: var(--text-muted);
+      text-align: center;
+      margin-top: 8px;
+      display: flex;
+      justify-content: space-between;
+    }
+    .open-newtab-link {
+      color: var(--primary-dark);
+      text-decoration: none;
+      font-weight: 600;
+      cursor: pointer;
+    }
+    .open-newtab-link:hover {
+      text-decoration: underline;
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <div class="brand">
+      <div class="brand-icon">☀</div>
+      <div class="brand-title">همگام</div>
+    </div>
+    <button id="btnSync" class="sync-btn" title="همگام‌سازی فوری با اندروید">
+      <span>⟳</span> همگام‌سازی
+    </button>
+  </header>
+
+  <div class="date-card">
+    <div class="date-solar" id="solarDateText">امروز</div>
+    <div class="date-gregorian" id="gregorianDateText">میلادی</div>
+  </div>
+
+  <!-- Ultra-Lightweight Offline Prayer Times Card -->
+  <div class="prayer-card">
+    <div class="prayer-header">
+      <div style="display: flex; align-items: center; gap: 4px;">
+        <span style="font-size: 12px;">🕌</span>
+        <select id="citySelect" class="city-select" title="انتخاب شهر"></select>
+      </div>
+      <div id="nextPrayerBadge" class="next-prayer-badge">محاسبه اوقات...</div>
+    </div>
+    <div class="prayer-grid" id="prayerGrid">
+      <div class="prayer-cell" id="p-fajr"><div class="prayer-name">صبح</div><div class="prayer-time" id="t-fajr">--:--</div></div>
+      <div class="prayer-cell" id="p-sunrise"><div class="prayer-name">طلوع</div><div class="prayer-time" id="t-sunrise">--:--</div></div>
+      <div class="prayer-cell" id="p-dhuhr"><div class="prayer-name">ظهر</div><div class="prayer-time" id="t-dhuhr">--:--</div></div>
+      <div class="prayer-cell" id="p-sunset"><div class="prayer-name">غروب</div><div class="prayer-time" id="t-sunset">--:--</div></div>
+      <div class="prayer-cell" id="p-maghrib"><div class="prayer-name">مغرب</div><div class="prayer-time" id="t-maghrib">--:--</div></div>
+      <div class="prayer-cell" id="p-midnight"><div class="prayer-name">نیمه‌شب</div><div class="prayer-time" id="t-midnight">--:--</div></div>
+    </div>
+  </div>
+
+  <div class="section-title">
+    <span>رویدادهای امروز</span>
+    <span id="eventsCount">۰</span>
+  </div>
+  <div class="items-list" id="eventsList">
+    <div class="empty-state">رویدادی برای امروز ثبت نشده است.</div>
+  </div>
+
+  <div class="section-title">
+    <span>وظایف و کارهای امروز</span>
+    <span id="tasksCount">۰</span>
+  </div>
+  <div class="items-list" id="tasksList">
+    <div class="empty-state">کاری برای امروز ثبت نشده است.</div>
+  </div>
+
+  <div class="section-title">یادداشت سریع</div>
+  <div class="quick-note">
+    <textarea id="noteInput" placeholder="متن یادداشت فوری..."></textarea>
+    <button id="btnSaveNote">ذخیره یادداشت آفلاین</button>
+  </div>
+
+  <div class="status-bar">
+    <span id="syncStatus">آماده همگام‌سازی محلی</span>
+    <a href="newtab.html" target="_blank" class="open-newtab-link">داشبورد کامل ↗</a>
+  </div>
+
+  <script src="persian-date.js"></script>
+  <script src="prayer-times.js"></script>
+  <script src="sync-client.js"></script>
+  <script src="popup.js"></script>
+</body>
+</html>

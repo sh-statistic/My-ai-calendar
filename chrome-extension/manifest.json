@@ -1,0 +1,27 @@
+{
+  "manifest_version": 3,
+  "name": "همگام - تقویم خورشیدی و همگام‌ساز آفلاین",
+  "short_name": "Hamgam",
+  "version": "1.0.0",
+  "description": "همگام‌سازی آفلاین و رایگان تقویم هجری شمسی، وظایف و یادداشت‌ها با دستگاه اندروید روی شبکه محلی و هات‌اسپات (بدون سرور ابری)",
+  "permissions": [
+    "storage",
+    "alarms"
+  ],
+  "optional_permissions": [
+    "bluetooth"
+  ],
+  "host_permissions": [
+    "http://*/*"
+  ],
+  "background": {
+    "service_worker": "background.js"
+  },
+  "action": {
+    "default_popup": "popup.html",
+    "default_title": "همگام (نمای سریع امروز)"
+  },
+  "chrome_url_overrides": {
+    "newtab": "newtab.html"
+  }
+}

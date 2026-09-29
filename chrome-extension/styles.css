@@ -1,0 +1,433 @@
+:root {
+  /* Calming, elegant Soft Light Palette (Eye-Friendly, Warm Cream) */
+  --bg-main: #F7F5F0;             /* Warm cream / off-white (no blinding white, no dark) */
+  --bg-card: #FAF8F5;             /* Soothing card surface */
+  --bg-card-hover: #F2EFE8;
+  --border-color: #DFD9CD;        /* Soft stone border */
+  --text-main: #2D3748;           /* Gentle, high-contrast dark-gray text */
+  --text-muted: #64748B;          /* Soft secondary slate */
+  --primary: #D97706;             /* Warm solar amber */
+  --primary-hover: #B45309;
+  --primary-light: #FEF3C7;       /* Soft amber pastel */
+  --secondary: #0D9488;           /* Persian teal */
+  --secondary-light: #CCFBF1;
+  --sky: #0284C7;                 /* Persian blue */
+  --sky-light: #E0F2FE;
+  --success: #16A34A;
+  --success-light: #DCFCE7;
+  --danger: #DC2626;
+  --danger-light: #FEE2E2;
+}
+
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+  font-family: -apple-system, BlinkMacSystemFont, "Vazirmatn", "Segoe UI", Roboto, Tahoma, sans-serif;
+}
+
+body {
+  background: var(--bg-main);
+  color: var(--text-main);
+  min-height: 100vh;
+  direction: rtl;
+  display: flex;
+  flex-direction: column;
+}
+
+header {
+  background: rgba(250, 248, 245, 0.92);
+  backdrop-filter: blur(12px);
+  border-bottom: 1px solid var(--border-color);
+  padding: 14px 28px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  position: sticky;
+  top: 0;
+  z-index: 100;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.02);
+}
+
+.logo-area {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.logo-symbol {
+  width: 38px;
+  height: 38px;
+  background: linear-gradient(135deg, var(--primary), var(--primary-hover));
+  border-radius: 10px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 20px;
+  font-weight: 900;
+  color: #FFFBEB;
+  box-shadow: 0 3px 10px rgba(217, 119, 6, 0.25);
+}
+
+.logo-text h1 {
+  font-size: 18px;
+  font-weight: 800;
+  color: var(--text-main);
+}
+
+.logo-text p {
+  font-size: 11px;
+  color: var(--text-muted);
+}
+
+.sync-bar {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  background: #EFECE4;
+  border: 1px solid var(--border-color);
+  border-radius: 30px;
+  padding: 5px 14px;
+}
+
+.ip-input {
+  background: transparent;
+  border: none;
+  color: var(--primary-hover);
+  font-size: 12px;
+  font-weight: 600;
+  outline: none;
+  width: 170px;
+  direction: ltr;
+  text-align: center;
+  font-family: monospace;
+}
+
+.btn-primary {
+  background: linear-gradient(135deg, var(--primary), var(--primary-hover));
+  color: #FFFBEB;
+  border: none;
+  font-weight: 700;
+  padding: 6px 14px;
+  border-radius: 20px;
+  cursor: pointer;
+  font-size: 12px;
+  transition: opacity 0.2s;
+  box-shadow: 0 2px 6px rgba(217, 119, 6, 0.2);
+}
+
+.btn-primary:hover {
+  opacity: 0.92;
+}
+
+.btn-secondary {
+  background: var(--bg-card);
+  border: 1px solid var(--border-color);
+  color: var(--text-main);
+  padding: 6px 12px;
+  border-radius: 20px;
+  cursor: pointer;
+  font-size: 11px;
+  font-weight: 600;
+  transition: all 0.2s;
+}
+
+.btn-secondary:hover {
+  background: var(--bg-card-hover);
+  border-color: var(--text-muted);
+}
+
+.status-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--danger);
+  display: inline-block;
+}
+
+.status-dot.online {
+  background: var(--success);
+  box-shadow: 0 0 6px var(--success);
+}
+
+main {
+  flex: 1;
+  padding: 24px 28px;
+  display: grid;
+  grid-template-columns: 1.55fr 1fr;
+  gap: 24px;
+  max-width: 1600px;
+  margin: 0 auto;
+  width: 100%;
+}
+
+.card {
+  background: var(--bg-card);
+  border: 1px solid var(--border-color);
+  border-radius: 16px;
+  padding: 20px;
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.03);
+}
+
+.card-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 16px;
+}
+
+.card-title {
+  font-size: 16px;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--text-main);
+}
+
+/* Calendar Grid */
+.calendar-nav {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.nav-arrow {
+  background: var(--bg-card);
+  border: 1px solid var(--border-color);
+  color: var(--text-main);
+  width: 32px;
+  height: 32px;
+  border-radius: 8px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: background 0.15s;
+}
+
+.nav-arrow:hover {
+  background: var(--bg-card-hover);
+}
+
+.calendar-grid {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  gap: 6px;
+  text-align: center;
+}
+
+.weekday-header {
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--text-muted);
+  padding: 6px 0;
+}
+
+.weekday-header.friday {
+  color: var(--danger);
+}
+
+.calendar-cell {
+  background: var(--bg-main);
+  border: 1.5px solid transparent;
+  border-radius: 10px;
+  padding: 8px 4px;
+  min-height: 56px;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  cursor: pointer;
+  transition: all 0.15s ease-in-out;
+  position: relative;
+}
+
+.calendar-cell:hover {
+  background: var(--bg-card-hover);
+  border-color: var(--border-color);
+}
+
+.calendar-cell.selected {
+  background: var(--primary-light);
+  border-color: var(--primary);
+}
+
+.calendar-cell.today {
+  border-color: var(--secondary);
+  background: var(--secondary-light);
+}
+
+.solar-day {
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--text-main);
+}
+
+.calendar-cell.selected .solar-day {
+  color: var(--primary-hover);
+}
+
+.gregorian-day {
+  font-size: 10px;
+  color: var(--text-muted);
+  margin-top: 2px;
+}
+
+.event-dot {
+  width: 5px;
+  height: 5px;
+  background: var(--primary);
+  border-radius: 50%;
+  margin-top: 3px;
+}
+
+/* Tasks & Notes Column */
+.side-column {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.task-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  max-height: 220px;
+  overflow-y: auto;
+}
+
+.task-row {
+  background: var(--bg-main);
+  border: 1px solid var(--border-color);
+  border-radius: 8px;
+  padding: 10px 12px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  border-right: 3px solid var(--sky);
+}
+
+.task-row.done span {
+  text-decoration: line-through;
+  color: var(--text-muted);
+}
+
+.notes-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+  max-height: 240px;
+  overflow-y: auto;
+}
+
+.sticky-note {
+  background: #FEF3C7;
+  color: #2D3748;
+  border: 1px solid #E2D9C8;
+  border-radius: 10px;
+  padding: 12px;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.04);
+  font-size: 12px;
+  line-height: 1.4;
+}
+
+.sticky-note strong {
+  display: block;
+  margin-bottom: 4px;
+  color: #1E293B;
+}
+
+.quick-inputs {
+  display: flex;
+  gap: 8px;
+  margin-top: 10px;
+}
+
+.quick-inputs input {
+  flex: 1;
+  background: var(--bg-main);
+  border: 1px solid var(--border-color);
+  border-radius: 8px;
+  padding: 8px 12px;
+  color: var(--text-main);
+  outline: none;
+  font-size: 12px;
+}
+
+.quick-inputs input:focus {
+  border-color: var(--primary);
+}
+
+/* Prayer Times Card Styling */
+.prayer-dashboard-card {
+  background: var(--bg-card);
+  border: 1px solid var(--border-color);
+  border-radius: 16px;
+  padding: 16px 20px;
+  margin-bottom: 20px;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.02);
+}
+
+.prayer-dash-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 12px;
+}
+
+.city-dash-select {
+  background: var(--bg-main);
+  border: 1px solid var(--border-color);
+  color: var(--text-main);
+  padding: 6px 12px;
+  border-radius: 8px;
+  font-size: 12px;
+  font-weight: 700;
+  outline: none;
+  cursor: pointer;
+}
+
+.prayer-dash-grid {
+  display: grid;
+  grid-template-columns: repeat(6, 1fr);
+  gap: 8px;
+}
+
+.prayer-dash-cell {
+  background: var(--bg-main);
+  border: 1.5px solid transparent;
+  border-radius: 10px;
+  padding: 8px;
+  text-align: center;
+}
+
+.prayer-dash-cell.active {
+  background: var(--primary-light);
+  border-color: var(--primary);
+}
+
+.prayer-dash-cell .p-title {
+  font-size: 11px;
+  color: var(--text-muted);
+  margin-bottom: 4px;
+}
+
+.prayer-dash-cell .p-val {
+  font-size: 13px;
+  font-weight: 800;
+  color: var(--text-main);
+}
+
+.prayer-dash-cell.active .p-val {
+  color: var(--primary-hover);
+}
+
+footer {
+  text-align: center;
+  padding: 14px;
+  font-size: 11px;
+  color: var(--text-muted);
+  border-top: 1px solid var(--border-color);
+  background: var(--bg-card);
+}

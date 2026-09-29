@@ -1,0 +1,137 @@
+<!DOCTYPE html>
+<html lang="fa" dir="rtl">
+<head>
+  <meta charset="UTF-8">
+  <title>همگام - تقویم خورشیدی و همگام‌ساز آفلاین</title>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <header>
+    <div class="logo-area">
+      <div class="logo-symbol">☀</div>
+      <div class="logo-text">
+        <h1>همگام (Hamgam)</h1>
+        <p>تقویم خورشیدی، اوقات شرعی و همگام‌ساز آفلاین محلی (Zero-Cost Serverless)</p>
+      </div>
+    </div>
+
+    <!-- Direct Peer-to-Peer Wi-Fi / Hotspot Connection Bar -->
+    <div class="sync-bar">
+      <span class="status-dot" id="serverStatusDot" title="وضعیت ارتباط"></span>
+      <span style="font-size: 11px; color: var(--text-muted)">آدرس گوشی:</span>
+      <input type="text" id="inputServerIp" class="ip-input" value="http://192.168.1.100:8080" placeholder="http://192.168.x.x:8080">
+      <button id="btnSyncNow" class="btn-primary">همگام‌سازی فوری ⟳</button>
+      <button id="btnBleSync" class="btn-secondary" title="همگام‌سازی از طریق بلوتوث">بلوتوث BLE</button>
+    </div>
+  </header>
+
+  <main>
+    <!-- Left Column: Solar Hijri Calendar & Selected Day Events -->
+    <section class="card">
+      <div class="card-header">
+        <div class="card-title">
+          <span>📅 تقویم هجری شمسی</span>
+          <span id="headerMonthTitle" style="color: var(--primary); font-size: 18px; margin-right: 10px;">فروردین ۱۴۰۵</span>
+          <span id="headerGregorianSpan" style="color: var(--text-muted); font-size: 11px;">(Mar - Apr 2026)</span>
+        </div>
+        <div class="calendar-nav">
+          <button id="btnPrevMonth" class="nav-arrow" title="ماه قبل">◀</button>
+          <button id="btnToday" class="btn-secondary">امروز</button>
+          <button id="btnNextMonth" class="nav-arrow" title="ماه بعد">▶</button>
+        </div>
+      </div>
+
+      <!-- Calendar Grid -->
+      <div class="calendar-grid" id="calendarGrid">
+        <!-- Weekday Headers and Day Cells rendered by JS -->
+      </div>
+
+      <!-- Selected Day Details & Events -->
+      <div style="margin-top: 24px; border-top: 1px solid var(--border-color); padding-top: 16px;">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
+          <h3 id="selectedDateTitle" style="font-size: 14px; color: var(--text-main);">رویدادهای تاریخ انتخاب‌شده</h3>
+          <span id="selectedGregorianDate" style="font-size: 11px; color: var(--text-muted);"></span>
+        </div>
+        <div id="dayEventsList" style="display: flex; flex-direction: column; gap: 8px;">
+          <p style="color: var(--text-muted); font-size: 12px;">رویدادی برای این روز ثبت نشده است.</p>
+        </div>
+
+        <div class="quick-inputs">
+          <input type="text" id="newEventTitle" placeholder="افزودن رویداد جدید به این تاریخ...">
+          <input type="time" id="newEventTime" value="10:00" style="max-width: 100px;">
+          <button id="btnAddEvent" class="btn-primary">افزودن رویداد</button>
+        </div>
+      </div>
+    </section>
+
+    <!-- Right Column: Prayer Times, Tasks & Sticky Notes -->
+    <div class="side-column">
+      <!-- Ultra-Lightweight Offline Prayer Times Card -->
+      <div class="prayer-dashboard-card">
+        <div class="prayer-dash-header">
+          <div style="display: flex; align-items: center; gap: 8px;">
+            <span style="font-size: 16px;">🕌</span>
+            <span style="font-weight: 700; font-size: 13px;">اوقات شرعی آفلاین</span>
+            <select id="dashCitySelect" class="city-dash-select" title="انتخاب شهر"></select>
+          </div>
+          <span id="dashNextPrayerBadge" style="font-size: 11px; background: var(--primary-light); color: var(--primary-hover); padding: 3px 10px; border-radius: 12px; font-weight: 700;">محاسبه...</span>
+        </div>
+        <div class="prayer-dash-grid">
+          <div class="prayer-dash-cell" id="dc-fajr"><div class="p-title">اذان صبح</div><div class="p-val" id="dt-fajr">--:--</div></div>
+          <div class="prayer-dash-cell" id="dc-sunrise"><div class="p-title">طلوع آفتاب</div><div class="p-val" id="dt-sunrise">--:--</div></div>
+          <div class="prayer-dash-cell" id="dc-dhuhr"><div class="p-title">اذان ظهر</div><div class="p-val" id="dt-dhuhr">--:--</div></div>
+          <div class="prayer-dash-cell" id="dc-sunset"><div class="p-title">غروب آفتاب</div><div class="p-val" id="dt-sunset">--:--</div></div>
+          <div class="prayer-dash-cell" id="dc-maghrib"><div class="p-title">اذان مغرب</div><div class="p-val" id="dt-maghrib">--:--</div></div>
+          <div class="prayer-dash-cell" id="dc-midnight"><div class="p-title">نیمه‌شب</div><div class="p-val" id="dt-midnight">--:--</div></div>
+        </div>
+      </div>
+
+      <!-- Tasks Card -->
+      <section class="card">
+        <div class="card-header">
+          <div class="card-title">
+            <span>✓ فهرست وظایف (Tasks)</span>
+          </div>
+          <span id="pendingCountBadge" style="font-size: 11px; background: rgba(56, 189, 248, 0.2); color: var(--sky); padding: 2px 8px; border-radius: 10px;">۰ کار</span>
+        </div>
+
+        <div class="task-list" id="newtabTaskList">
+          <!-- Rendered by JS -->
+        </div>
+
+        <div class="quick-inputs">
+          <input type="text" id="newTaskInput" placeholder="کار یا وظیفه جدید...">
+          <button id="btnAddTask" class="btn-primary">ثبت کار</button>
+        </div>
+      </section>
+
+      <!-- Sticky Notes Card -->
+      <section class="card">
+        <div class="card-header">
+          <div class="card-title">
+            <span>📝 یادداشت‌های سریع</span>
+          </div>
+        </div>
+
+        <div class="notes-grid" id="newtabNotesGrid">
+          <!-- Rendered by JS -->
+        </div>
+
+        <div class="quick-inputs">
+          <input type="text" id="newNoteInput" placeholder="یادداشت فوری جدید...">
+          <button id="btnAddNote" class="btn-primary">ثبت یادداشت</button>
+        </div>
+      </section>
+    </div>
+  </main>
+
+  <footer>
+    معماری ۱۰۰٪ بدون سرور و آفلاین (Zero-Cost Serverless) • محاسبات اوقات شرعی موسسه ژئوفیزیک دانشگاه تهران • تقویم هجری شمسی و میلادی
+  </footer>
+
+  <script src="persian-date.js"></script>
+  <script src="prayer-times.js"></script>
+  <script src="sync-client.js"></script>
+  <script src="newtab.js"></script>
+</body>
+</html>

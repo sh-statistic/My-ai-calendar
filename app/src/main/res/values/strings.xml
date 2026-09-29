@@ -1,0 +1,9 @@
+<resources>
+    <string name="app_name">همگام (Hamgam)</string>
+    <string name="tab_calendar">تقویم</string>
+    <string name="tab_tasks">وظایف</string>
+    <string name="tab_notes">یادداشت‌ها</string>
+    <string name="tab_chat">دستیار هوشمند</string>
+    <string name="tab_sync">همگام‌سازی</string>
+    <string name="tab_settings">تنظیمات</string>
+</resources>

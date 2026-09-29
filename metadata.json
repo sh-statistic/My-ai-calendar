@@ -1,0 +1,6 @@
+{
+  "name": "Hamgam - Solar Sync",
+  "description": "Zero-Cost serverless offline local sync between Android and Chrome extension with Persian Solar Hijri calendar, tasks, notes, and local Wi-Fi/Hotspot HTTP server.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
