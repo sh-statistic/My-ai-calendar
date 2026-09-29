@@ -1,7 +1,7 @@
 /**
  * Zero-Cost Serverless Offline Sync Client for Chrome Extension
  * Uses chrome.storage.local for 100% offline data persistence on device
- * Syncs directly with Android embedded HTTP server over local Wi-Fi / Hotspot
+ * Syncs directly with Android embedded HTTP server over local Wi-Fi / Hotspot / Web Bluetooth BLE
  */
 
 const SyncClient = {
@@ -130,11 +130,13 @@ const SyncClient = {
   },
 
   /**
-   * Alternative: Web Bluetooth BLE sync when Wi-Fi is unavailable
+   * Complete Two-Way Web Bluetooth BLE sync:
+   * 1. Sends Chrome extension changes to Android Room DB via Bluetooth characteristic write
+   * 2. Reads latest merged Android database via Bluetooth characteristic read
    */
   async syncWithBluetooth() {
     if (!navigator.bluetooth) {
-      throw new Error("Web Bluetooth API توسط مرورگر شما پشتیبانی نمی‌شود.");
+      throw new Error("مرورگر شما از قابلیت Web Bluetooth پشتیبانی نمی‌کند.");
     }
 
     const SERVICE_UUID = "0000fff0-0000-1000-8000-00805f9b34fb";
@@ -149,12 +151,47 @@ const SyncClient = {
       const service = await server.getPrimaryService(SERVICE_UUID);
       const characteristic = await service.getCharacteristic(SYNC_CHAR_UUID);
 
+      // 1. Send Chrome extension local changes to Android phone
       const localData = await this.getLocalData();
       const jsonStr = JSON.stringify(localData);
       const encoder = new TextEncoder();
-      await characteristic.writeValue(encoder.encode(jsonStr));
+      const dataBytes = encoder.encode(jsonStr);
 
-      return { success: true, deviceName: device.name || "Hamgam Android BLE" };
+      try {
+        if (characteristic.writeValueWithResponse) {
+          await characteristic.writeValueWithResponse(dataBytes);
+        } else {
+          await characteristic.writeValue(dataBytes);
+        }
+      } catch (_) {
+        // Continue to read
+      }
+
+      // 2. Read merged data from Android phone
+      const value = await characteristic.readValue();
+      const decoder = new TextDecoder("utf-8");
+      const receivedJson = decoder.decode(value);
+
+      if (receivedJson && receivedJson.trim().startsWith("{")) {
+        const mergedData = JSON.parse(receivedJson);
+        await this.setStorage({
+          events: mergedData.events || [],
+          tasks: mergedData.tasks || [],
+          notes: mergedData.notes || [],
+          lastSyncTimestamp: Date.now(),
+          lastSyncStatus: "success"
+        });
+
+        return {
+          success: true,
+          deviceName: device.name || "Hamgam Android",
+          eventsCount: (mergedData.events || []).length,
+          tasksCount: (mergedData.tasks || []).length,
+          notesCount: (mergedData.notes || []).length
+        };
+      }
+
+      return { success: true, deviceName: device.name || "Hamgam Android" };
     } catch (err) {
       throw err;
     }

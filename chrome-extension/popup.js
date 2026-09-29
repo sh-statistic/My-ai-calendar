@@ -205,23 +205,16 @@ document.addEventListener("DOMContentLoaded", async () => {
   // Bluetooth Sync Button
   if (btnBleSync) {
     btnBleSync.addEventListener("click", async () => {
-      if (!navigator.bluetooth) {
-        alert("مرورگر شما از Web Bluetooth پشتیبانی نمی‌کند یا بلوتوث خاموش است.");
-        return;
-      }
       syncStatus.textContent = "درحال جستجوی بلوتوث گوشی...";
       try {
-        const device = await navigator.bluetooth.requestDevice({
-          filters: [{ services: ['0000fff0-0000-1000-8000-00805f9b34fb'] }]
-        });
-        syncStatus.textContent = "متصل به بلوتوث " + device.name;
-        const server = await device.gatt.connect();
-        const service = await server.getPrimaryService('0000fff0-0000-1000-8000-00805f9b34fb');
-        const char = await service.getCharacteristic('0000fff1-0000-1000-8000-00805f9b34fb');
-        syncStatus.textContent = "همگام‌سازی با بلوتوث با موفقیت انجام شد!";
+        btnBleSync.disabled = true;
+        const res = await SyncClient.syncWithBluetooth();
+        syncStatus.textContent = `همگام‌سازی دوطرفه بلوتوث با موفقیت انجام شد ✓`;
         await loadData();
       } catch (err) {
-        syncStatus.textContent = "اتصال بلوتوث لغو شد: " + err.message;
+        syncStatus.textContent = "اتصال بلوتوث ناموفق: " + err.message;
+      } finally {
+        btnBleSync.disabled = false;
       }
     });
   }

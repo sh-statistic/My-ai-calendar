@@ -27,6 +27,7 @@ import com.example.prayer.IranianCity
 import com.example.prayer.NextPrayerInfo
 import com.example.prayer.PrayerTimes
 import com.example.prayer.PrayerTimesCalculator
+import com.example.alarm.EventAlarmScheduler
 import java.util.Calendar
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
@@ -415,8 +416,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         title: String,
         description: String,
         persianDate: String,
-        startTime: String,
-        endTime: String,
+        time: String,
         category: String,
         colorHex: String
     ) {
@@ -426,25 +426,28 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             description = description,
             persianDate = persianDate,
             gregorianDate = gDate?.formatted ?: "",
-            startTime = startTime,
-            endTime = endTime,
+            startTime = time,
+            endTime = "",
             category = category,
             colorHex = colorHex
         )
         viewModelScope.launch {
             repository.insertEvent(event)
-            logMessage("رویداد جدید افزوده شد: $title")
+            EventAlarmScheduler.scheduleEventAlarm(getApplication(), event)
+            logMessage("رویداد جدید افزوده و زنگ یادآور تنظیم شد: $title")
         }
     }
 
     fun updateEvent(event: EventEntity) {
         viewModelScope.launch {
             repository.updateEvent(event)
+            EventAlarmScheduler.scheduleEventAlarm(getApplication(), event)
         }
     }
 
     fun deleteEvent(id: String) {
         viewModelScope.launch {
+            EventAlarmScheduler.cancelEventAlarm(getApplication(), id)
             repository.deleteEvent(id)
             logMessage("رویداد حذف شد")
         }

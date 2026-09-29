@@ -14,12 +14,22 @@ import android.bluetooth.le.BluetoothLeAdvertiser
 import android.content.Context
 import android.os.ParcelUuid
 import com.example.data.AppRepository
+import com.example.data.EventEntity
+import com.example.data.NoteEntity
+import com.example.data.SyncData
+import com.example.data.TaskEntity
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
+import org.json.JSONArray
+import org.json.JSONObject
 import java.nio.charset.StandardCharsets
 import java.util.UUID
 
+/**
+ * Robust Two-Way Bluetooth Low Energy (BLE) Synchronization Server.
+ * Exposes a GATT Service with read/write characteristics for Chrome Extension Web Bluetooth.
+ */
 class BleSyncServer(
     private val context: Context,
     private val repository: AppRepository,
@@ -41,15 +51,22 @@ class BleSyncServer(
     var isAdvertising: Boolean = false
         private set
 
+    // In-memory buffer for outgoing sync payload
+    @Volatile
+    private var cachedSyncBytes: ByteArray = ByteArray(0)
+
+    // Write buffer for incoming data chunks from Chrome
+    private val incomingBuffer = StringBuilder()
+
     private val advertiseCallback = object : AdvertiseCallback() {
         override fun onStartSuccess(settingsInEffect: AdvertiseSettings?) {
             isAdvertising = true
-            onLog("انتشار بلوتوث LE با موفقیت آغاز شد (شناسه سرویس: Hamgam-Sync)")
+            onLog("سرویس بلوتوث همگام‌سازی فعال شد (GATT: Hamgam-BLE)")
         }
 
         override fun onStartFailure(errorCode: Int) {
             isAdvertising = false
-            onLog("عدم موفقیت در انتشار بلوتوث (کد: $errorCode)")
+            onLog("خطا در انتشار بلوتوث (کد: $errorCode)")
         }
     }
 
@@ -60,15 +77,37 @@ class BleSyncServer(
             offset: Int,
             characteristic: BluetoothGattCharacteristic?
         ) {
-            try {
-                if (characteristic?.uuid == STATUS_CHAR_UUID) {
-                    val statusText = "HAMGAM_BLE_ONLINE".toByteArray(StandardCharsets.UTF_8)
-                    gattServer?.sendResponse(device, requestId, BluetoothGatt.GATT_SUCCESS, offset, statusText)
-                } else {
-                    gattServer?.sendResponse(device, requestId, BluetoothGatt.GATT_SUCCESS, offset, byteArrayOf(1))
+            scope.launch {
+                try {
+                    when (characteristic?.uuid) {
+                        STATUS_CHAR_UUID -> {
+                            val statusText = "HAMGAM_BLE_ONLINE".toByteArray(StandardCharsets.UTF_8)
+                            val slice = if (offset < statusText.size) statusText.copyOfRange(offset, statusText.size) else ByteArray(0)
+                            gattServer?.sendResponse(device, requestId, BluetoothGatt.GATT_SUCCESS, offset, slice)
+                        }
+                        SYNC_CHAR_UUID -> {
+                            // Prepare latest full sync payload from Room database
+                            val syncData = repository.getFullSyncData("Android-BLE-Host")
+                            val jsonString = serializeSyncData(syncData)
+                            cachedSyncBytes = jsonString.toByteArray(StandardCharsets.UTF_8)
+
+                            val total = cachedSyncBytes.size
+                            val slice = if (offset < total) {
+                                val end = minOf(total, offset + 512)
+                                cachedSyncBytes.copyOfRange(offset, end)
+                            } else {
+                                ByteArray(0)
+                            }
+                            gattServer?.sendResponse(device, requestId, BluetoothGatt.GATT_SUCCESS, offset, slice)
+                            onLog("ارسال داده‌های تقویم به اکستنشن کروم از طریق بلوتوث (${slice.size} بایت)")
+                        }
+                        else -> {
+                            gattServer?.sendResponse(device, requestId, BluetoothGatt.GATT_FAILURE, 0, null)
+                        }
+                    }
+                } catch (e: Exception) {
+                    gattServer?.sendResponse(device, requestId, BluetoothGatt.GATT_FAILURE, 0, null)
                 }
-            } catch (e: Exception) {
-                gattServer?.sendResponse(device, requestId, BluetoothGatt.GATT_FAILURE, 0, null)
             }
         }
 
@@ -88,25 +127,172 @@ class BleSyncServer(
             }
 
             if (value != null && value.isNotEmpty()) {
-                val receivedStr = String(value, StandardCharsets.UTF_8)
-                onLog("داده‌ای از طریق بلوتوث دریافت شد: ${value.size} بایت")
-                scope.launch {
-                    repository.recordLog("بلوتوث BLE", "دریافت داده از طریق Web Bluetooth", 1, true)
+                val chunk = String(value, StandardCharsets.UTF_8)
+                incomingBuffer.append(chunk)
+
+                // Try parsing complete JSON payload
+                val fullStr = incomingBuffer.toString().trim()
+                if (fullStr.startsWith("{") && fullStr.endsWith("}")) {
+                    scope.launch {
+                        try {
+                            val syncData = parseSyncData(fullStr)
+                            val merged = repository.mergeSyncData(syncData, "Chrome-Extension-BLE")
+                            incomingBuffer.setLength(0) // Clear buffer
+                            onLog("همگام‌سازی دوطرفه بلوتوث موفق! (${merged.events.size} رویداد، ${merged.tasks.size} کار، ${merged.notes.size} یادداشت)")
+                        } catch (e: Exception) {
+                            // Chunk not yet complete or parse error
+                        }
+                    }
                 }
             }
         }
     }
 
+    private fun serializeSyncData(data: SyncData): String {
+        val root = JSONObject()
+        root.put("deviceId", data.deviceId)
+        root.put("timestamp", data.timestamp)
+
+        val eventsArr = JSONArray()
+        for (e in data.events) {
+            val obj = JSONObject()
+            obj.put("id", e.id)
+            obj.put("title", e.title)
+            obj.put("description", e.description)
+            obj.put("persianDate", e.persianDate)
+            obj.put("gregorianDate", e.gregorianDate)
+            obj.put("startTime", e.startTime)
+            obj.put("endTime", e.endTime)
+            obj.put("category", e.category)
+            obj.put("colorHex", e.colorHex)
+            obj.put("updatedAt", e.updatedAt)
+            obj.put("isDeleted", e.isDeleted)
+            eventsArr.put(obj)
+        }
+        root.put("events", eventsArr)
+
+        val tasksArr = JSONArray()
+        for (t in data.tasks) {
+            val obj = JSONObject()
+            obj.put("id", t.id)
+            obj.put("title", t.title)
+            obj.put("isCompleted", t.isCompleted)
+            obj.put("persianDueDate", t.persianDueDate)
+            obj.put("gregorianDueDate", t.gregorianDueDate)
+            obj.put("priority", t.priority)
+            obj.put("category", t.category)
+            obj.put("updatedAt", t.updatedAt)
+            obj.put("isDeleted", t.isDeleted)
+            tasksArr.put(obj)
+        }
+        root.put("tasks", tasksArr)
+
+        val notesArr = JSONArray()
+        for (n in data.notes) {
+            val obj = JSONObject()
+            obj.put("id", n.id)
+            obj.put("title", n.title)
+            obj.put("content", n.content)
+            obj.put("persianDate", n.persianDate)
+            obj.put("colorHex", n.colorHex)
+            obj.put("isPinned", n.isPinned)
+            obj.put("updatedAt", n.updatedAt)
+            obj.put("isDeleted", n.isDeleted)
+            notesArr.put(obj)
+        }
+        root.put("notes", notesArr)
+
+        return root.toString()
+    }
+
+    private fun parseSyncData(jsonStr: String): SyncData {
+        val root = JSONObject(jsonStr)
+        val deviceId = root.optString("deviceId", "Chrome-Extension")
+        val timestamp = root.optLong("timestamp", System.currentTimeMillis())
+
+        val eventsList = mutableListOf<EventEntity>()
+        val eventsArr = root.optJSONArray("events")
+        if (eventsArr != null) {
+            for (i in 0 until eventsArr.length()) {
+                val obj = eventsArr.getJSONObject(i)
+                eventsList.add(
+                    EventEntity(
+                        id = obj.optString("id", UUID.randomUUID().toString()),
+                        title = obj.optString("title", ""),
+                        description = obj.optString("description", ""),
+                        persianDate = obj.optString("persianDate", ""),
+                        gregorianDate = obj.optString("gregorianDate", ""),
+                        startTime = obj.optString("startTime", ""),
+                        endTime = obj.optString("endTime", ""),
+                        category = obj.optString("category", "کاری"),
+                        colorHex = obj.optString("colorHex", "#3B82F6"),
+                        updatedAt = obj.optLong("updatedAt", System.currentTimeMillis()),
+                        isDeleted = obj.optBoolean("isDeleted", false)
+                    )
+                )
+            }
+        }
+
+        val tasksList = mutableListOf<TaskEntity>()
+        val tasksArr = root.optJSONArray("tasks")
+        if (tasksArr != null) {
+            for (i in 0 until tasksArr.length()) {
+                val obj = tasksArr.getJSONObject(i)
+                tasksList.add(
+                    TaskEntity(
+                        id = obj.optString("id", UUID.randomUUID().toString()),
+                        title = obj.optString("title", ""),
+                        isCompleted = obj.optBoolean("isCompleted", false),
+                        persianDueDate = obj.optString("persianDueDate", ""),
+                        gregorianDueDate = obj.optString("gregorianDueDate", ""),
+                        priority = obj.optString("priority", "متوسط"),
+                        category = obj.optString("category", "عمومی"),
+                        updatedAt = obj.optLong("updatedAt", System.currentTimeMillis()),
+                        isDeleted = obj.optBoolean("isDeleted", false)
+                    )
+                )
+            }
+        }
+
+        val notesList = mutableListOf<NoteEntity>()
+        val notesArr = root.optJSONArray("notes")
+        if (notesArr != null) {
+            for (i in 0 until notesArr.length()) {
+                val obj = notesArr.getJSONObject(i)
+                notesList.add(
+                    NoteEntity(
+                        id = obj.optString("id", UUID.randomUUID().toString()),
+                        title = obj.optString("title", ""),
+                        content = obj.optString("content", ""),
+                        persianDate = obj.optString("persianDate", ""),
+                        colorHex = obj.optString("colorHex", "#FEF3C7"),
+                        isPinned = obj.optBoolean("isPinned", false),
+                        updatedAt = obj.optLong("updatedAt", System.currentTimeMillis()),
+                        isDeleted = obj.optBoolean("isDeleted", false)
+                    )
+                )
+            }
+        }
+
+        return SyncData(
+            deviceId = deviceId,
+            timestamp = timestamp,
+            events = eventsList,
+            tasks = tasksList,
+            notes = notesList
+        )
+    }
+
     fun startAdvertising(): Boolean {
         if (bluetoothAdapter == null || !bluetoothAdapter.isEnabled) {
-            onLog("بلوتوث در دستگاه فعال نیست")
+            onLog("بلوتوث دستگاه خاموش است")
             return false
         }
 
         try {
             advertiser = bluetoothAdapter.bluetoothLeAdvertiser
             if (advertiser == null) {
-                onLog("دستگاه از انتشار BLE پشتیبانی نمی‌کند")
+                onLog("دستگاه از انتشار بلوتوث LE پشتیبانی نمی‌کند")
                 return false
             }
 
@@ -118,6 +304,7 @@ class BleSyncServer(
                 SYNC_CHAR_UUID,
                 BluetoothGattCharacteristic.PROPERTY_READ or
                         BluetoothGattCharacteristic.PROPERTY_WRITE or
+                        BluetoothGattCharacteristic.PROPERTY_WRITE_NO_RESPONSE or
                         BluetoothGattCharacteristic.PROPERTY_NOTIFY,
                 BluetoothGattCharacteristic.PERMISSION_READ or BluetoothGattCharacteristic.PERMISSION_WRITE
             )
@@ -146,7 +333,7 @@ class BleSyncServer(
             advertiser?.startAdvertising(settings, data, advertiseCallback)
             return true
         } catch (e: SecurityException) {
-            onLog("مجوز دسترسی به بلوتوث اعطا نشده است")
+            onLog("دسترسی به بلوتوث اعطا نشده است")
             return false
         } catch (e: Exception) {
             onLog("خطا در راه‌اندازی بلوتوث: ${e.message}")

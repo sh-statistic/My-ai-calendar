@@ -6,6 +6,8 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -18,32 +20,29 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Add
-import androidx.compose.material.icons.filled.Alarm
 import androidx.compose.material.icons.filled.CalendarMonth
-import androidx.compose.material.icons.filled.CalendarToday
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.ContentCopy
 import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.NotificationsActive
-import androidx.compose.material.icons.filled.QrCode
-import androidx.compose.material.icons.filled.Remove
 import androidx.compose.material.icons.filled.Schedule
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
-import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
+import androidx.compose.material3.TimePicker
+import androidx.compose.material3.rememberTimePickerState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
@@ -68,155 +67,109 @@ import com.example.data.NoteEntity
 import com.example.data.TaskEntity
 
 /**
- * Persian Interactive Time Picker.
- * Provides intuitive stepper buttons and presets so users NEVER have to type or mess with colons.
+ * Super Simple & Clean Persian Time Selector.
+ * Touching the card opens the standard Material 3 Clock Dial TimePicker Dialog.
  */
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun PersianTimePicker(
     initialHour: Int = 10,
     initialMinute: Int = 0,
     onTimeChange: (hour: Int, minute: Int, formatted: String) -> Unit,
-    label: String = "ساعت رویداد"
+    label: String = "ساعت برگزاری رویداد"
 ) {
     var hour by remember { mutableIntStateOf(initialHour) }
     var minute by remember { mutableIntStateOf(initialMinute) }
+    var showTimePickerDialog by remember { mutableStateOf(false) }
 
     val formattedTime = String.format("%02d:%02d", hour, minute)
     val persianDisplay = PersianCalendarHelper.toPersianDigits(formattedTime)
 
-    Column(
+    // Main Clickable Time Card
+    Surface(
+        color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.7f),
+        shape = RoundedCornerShape(12.dp),
         modifier = Modifier
             .fillMaxWidth()
-            .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f), RoundedCornerShape(12.dp))
-            .padding(10.dp)
+            .clickable { showTimePickerDialog = true }
+            .border(1.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.3f), RoundedCornerShape(12.dp))
     ) {
         Row(
-            modifier = Modifier.fillMaxWidth(),
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 14.dp, vertical = 12.dp),
             horizontalArrangement = Arrangement.SpaceBetween,
             verticalAlignment = Alignment.CenterVertically
         ) {
             Row(verticalAlignment = Alignment.CenterVertically) {
-                Icon(Icons.Default.Schedule, contentDescription = null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(16.dp))
-                Spacer(modifier = Modifier.width(6.dp))
-                Text(label, style = MaterialTheme.typography.labelMedium, fontWeight = FontWeight.Bold)
+                Icon(
+                    Icons.Default.Schedule,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.primary,
+                    modifier = Modifier.size(22.dp)
+                )
+                Spacer(modifier = Modifier.width(10.dp))
+                Column {
+                    Text(label, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    Text("ساعت $persianDisplay", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
+                }
             }
+
             Surface(
                 color = MaterialTheme.colorScheme.primary,
                 shape = RoundedCornerShape(8.dp)
             ) {
-                Text(
-                    text = persianDisplay,
-                    fontSize = 14.sp,
-                    fontWeight = FontWeight.Bold,
-                    color = MaterialTheme.colorScheme.onPrimary,
-                    modifier = Modifier.padding(horizontal = 8.dp, vertical = 2.dp)
-                )
-            }
-        }
-
-        Spacer(modifier = Modifier.height(8.dp))
-
-        // Hour & Minute Stepper Controls
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.SpaceEvenly,
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            // Hour Stepper
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                IconButton(
-                    onClick = {
-                        hour = if (hour > 0) hour - 1 else 23
-                        onTimeChange(hour, minute, String.format("%02d:%02d", hour, minute))
-                    },
-                    modifier = Modifier.size(30.dp)
+                Row(
+                    modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp),
+                    verticalAlignment = Alignment.CenterVertically
                 ) {
-                    Icon(Icons.Default.Remove, contentDescription = "کاهش ساعت", modifier = Modifier.size(16.dp))
-                }
-
-                Text(
-                    text = "${PersianCalendarHelper.toPersianDigits(String.format("%02d", hour))} ساعت",
-                    fontWeight = FontWeight.Bold,
-                    fontSize = 12.sp,
-                    modifier = Modifier.padding(horizontal = 6.dp)
-                )
-
-                IconButton(
-                    onClick = {
-                        hour = (hour + 1) % 24
-                        onTimeChange(hour, minute, String.format("%02d:%02d", hour, minute))
-                    },
-                    modifier = Modifier.size(30.dp)
-                ) {
-                    Icon(Icons.Default.Add, contentDescription = "افزایش ساعت", modifier = Modifier.size(16.dp))
-                }
-            }
-
-            Text(":", fontWeight = FontWeight.Bold, fontSize = 16.sp, color = MaterialTheme.colorScheme.primary)
-
-            // Minute Stepper (5-minute increments)
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                IconButton(
-                    onClick = {
-                        minute = if (minute >= 5) minute - 5 else 55
-                        onTimeChange(hour, minute, String.format("%02d:%02d", hour, minute))
-                    },
-                    modifier = Modifier.size(30.dp)
-                ) {
-                    Icon(Icons.Default.Remove, contentDescription = "کاهش دقیقه", modifier = Modifier.size(16.dp))
-                }
-
-                Text(
-                    text = "${PersianCalendarHelper.toPersianDigits(String.format("%02d", minute))} دقیقه",
-                    fontWeight = FontWeight.Bold,
-                    fontSize = 12.sp,
-                    modifier = Modifier.padding(horizontal = 6.dp)
-                )
-
-                IconButton(
-                    onClick = {
-                        minute = (minute + 5) % 60
-                        onTimeChange(hour, minute, String.format("%02d:%02d", hour, minute))
-                    },
-                    modifier = Modifier.size(30.dp)
-                ) {
-                    Icon(Icons.Default.Add, contentDescription = "افزایش دقیقه", modifier = Modifier.size(16.dp))
-                }
-            }
-        }
-
-        Spacer(modifier = Modifier.height(6.dp))
-
-        // Quick Presets
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.SpaceBetween
-        ) {
-            listOf("۰۹:۰۰" to (9 to 0), "۱۲:۰۰" to (12 to 0), "۱۶:۰۰" to (16 to 0), "۱۹:۰۰" to (19 to 0), "۲۱:۰۰" to (21 to 0)).forEach { (labelStr, pair) ->
-                Surface(
-                    color = if (hour == pair.first && minute == pair.second) MaterialTheme.colorScheme.primary.copy(alpha = 0.2f) else MaterialTheme.colorScheme.surface,
-                    shape = RoundedCornerShape(6.dp),
-                    modifier = Modifier
-                        .clickable {
-                            hour = pair.first
-                            minute = pair.second
-                            onTimeChange(hour, minute, String.format("%02d:%02d", hour, minute))
-                        }
-                        .border(0.5.dp, MaterialTheme.colorScheme.outlineVariant, RoundedCornerShape(6.dp))
-                ) {
-                    Text(
-                        text = labelStr,
-                        fontSize = 10.sp,
-                        fontWeight = FontWeight.SemiBold,
-                        color = MaterialTheme.colorScheme.primary,
-                        modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
-                    )
+                    Icon(Icons.Default.Edit, contentDescription = null, tint = MaterialTheme.colorScheme.onPrimary, modifier = Modifier.size(14.dp))
+                    Spacer(modifier = Modifier.width(4.dp))
+                    Text("تنظیم ساعت", fontSize = 11.sp, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onPrimary)
                 }
             }
         }
     }
+
+    // Material 3 Clock TimePicker Dialog
+    if (showTimePickerDialog) {
+        val timePickerState = rememberTimePickerState(
+            initialHour = hour,
+            initialMinute = minute,
+            is24Hour = true
+        )
+
+        AlertDialog(
+            onDismissRequest = { showTimePickerDialog = false },
+            title = { Text("انتخاب ساعت رویداد", fontWeight = FontWeight.Bold) },
+            text = {
+                Box(modifier = Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
+                    TimePicker(state = timePickerState)
+                }
+            },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        hour = timePickerState.hour
+                        minute = timePickerState.minute
+                        val formatted = String.format("%02d:%02d", hour, minute)
+                        onTimeChange(hour, minute, formatted)
+                        showTimePickerDialog = false
+                    }
+                ) {
+                    Text("تأیید ساعت")
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showTimePickerDialog = false }) {
+                    Text("انصراف")
+                }
+            }
+        )
+    }
 }
 
+@OptIn(ExperimentalLayoutApi::class)
 @Composable
 fun AddEventDialog(
     initialDate: JalaliDate,
@@ -225,8 +178,7 @@ fun AddEventDialog(
         title: String,
         description: String,
         persianDate: String,
-        startTime: String,
-        endTime: String,
+        time: String,
         category: String,
         colorHex: String
     ) -> Unit
@@ -235,15 +187,13 @@ fun AddEventDialog(
     var description by remember { mutableStateOf("") }
     var persianDate by remember { mutableStateOf(initialDate.formatted) }
     var isAllDay by remember { mutableStateOf(false) }
-    var startTime by remember { mutableStateOf("10:00") }
-    var endTime by remember { mutableStateOf("11:00") }
-    var showEndTime by remember { mutableStateOf(false) }
-    var reminderOption by remember { mutableStateOf("همزمان با شروع") }
+    var eventTime by remember { mutableStateOf("10:00") }
+    var reminderOption by remember { mutableStateOf("همزمان با رویداد") }
     var category by remember { mutableStateOf("کاری") }
     var selectedColor by remember { mutableStateOf("#3B82F6") }
 
     val categories = listOf("کاری", "شخصی", "مهم", "جلسه", "یادآوری")
-    val reminderOptions = listOf("بدون زنگ", "همزمان با شروع", "۱۰ دقیقه قبل", "۳۰ دقیقه قبل", "۱ ساعت قبل", "۱ روز قبل")
+    val reminderOptions = listOf("بدون زنگ", "همزمان با رویداد", "۵ دقیقه قبل", "۱۰ دقیقه قبل", "۱۵ دقیقه قبل", "۳۰ دقیقه قبل", "۱ ساعت قبل", "۱ روز قبل")
     val colors = listOf("#3B82F6", "#10B981", "#F59E0B", "#EF4444", "#8B5CF6")
 
     AlertDialog(
@@ -297,7 +247,7 @@ fun AddEventDialog(
                     horizontalArrangement = Arrangement.SpaceBetween,
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    Text("رویداد تمام‌روز (بدون ساعت مشخص)", fontSize = 12.sp, fontWeight = FontWeight.SemiBold)
+                    Text("رویداد تمام‌روز (بدون ساعت خاص)", fontSize = 12.sp, fontWeight = FontWeight.SemiBold)
                     Switch(
                         checked = isAllDay,
                         onCheckedChange = { isAllDay = it }
@@ -305,61 +255,28 @@ fun AddEventDialog(
                 }
 
                 if (!isAllDay) {
-                    // Easy Persian Time Picker for Start Time
+                    // Simple Clean Persian Time Picker
                     PersianTimePicker(
                         initialHour = 10,
                         initialMinute = 0,
-                        onTimeChange = { _, _, formatted -> startTime = formatted },
-                        label = "ساعت شروع رویداد"
+                        onTimeChange = { _, _, formatted -> eventTime = formatted },
+                        label = "ساعت برگزاری رویداد"
                     )
 
-                    // Option for End Time
-                    Row(
+                    // Reminder Alarm Selection
+                    Text("⏰ زنگ و زمان یادآوری هشدار:", style = MaterialTheme.typography.bodySmall, fontWeight = FontWeight.Bold)
+                    FlowRow(
                         modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically
+                        horizontalArrangement = Arrangement.spacedBy(4.dp),
+                        verticalArrangement = Arrangement.spacedBy(4.dp)
                     ) {
-                        Text("مشخص کردن ساعت پایان", fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                        Switch(
-                            checked = showEndTime,
-                            onCheckedChange = { showEndTime = it }
-                        )
-                    }
-
-                    if (showEndTime) {
-                        PersianTimePicker(
-                            initialHour = 11,
-                            initialMinute = 0,
-                            onTimeChange = { _, _, formatted -> endTime = formatted },
-                            label = "ساعت پایان رویداد"
-                        )
-                    }
-                }
-
-                // Alarm / Reminder Section
-                Text("⏰ زنگ و هشدار یادآوری:", style = MaterialTheme.typography.bodySmall, fontWeight = FontWeight.Bold)
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(4.dp)
-                ) {
-                    reminderOptions.take(3).forEach { option ->
-                        FilterChip(
-                            selected = reminderOption == option,
-                            onClick = { reminderOption = option },
-                            label = { Text(option, fontSize = 10.sp) }
-                        )
-                    }
-                }
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(4.dp)
-                ) {
-                    reminderOptions.drop(3).forEach { option ->
-                        FilterChip(
-                            selected = reminderOption == option,
-                            onClick = { reminderOption = option },
-                            label = { Text(option, fontSize = 10.sp) }
-                        )
+                        reminderOptions.forEach { option ->
+                            FilterChip(
+                                selected = reminderOption == option,
+                                onClick = { reminderOption = option },
+                                label = { Text(option, fontSize = 10.sp) }
+                            )
+                        }
                     }
                 }
 
@@ -408,9 +325,13 @@ fun AddEventDialog(
             Button(
                 onClick = {
                     if (title.isNotBlank()) {
-                        val finalStart = if (isAllDay) "" else startTime
-                        val finalEnd = if (isAllDay || !showEndTime) "" else endTime
-                        onConfirm(title.trim(), description.trim(), persianDate.trim(), finalStart, finalEnd, category, selectedColor)
+                        val finalTime = if (isAllDay) "" else eventTime
+                        val descWithReminder = if (isAllDay || reminderOption == "بدون زنگ") {
+                            description.trim()
+                        } else {
+                            if (description.isNotBlank()) "${description.trim()}\n[یادآوری: $reminderOption]" else "[یادآوری: $reminderOption]"
+                        }
+                        onConfirm(title.trim(), descWithReminder, persianDate.trim(), finalTime, category, selectedColor)
                     }
                 },
                 enabled = title.isNotBlank(),
@@ -425,6 +346,7 @@ fun AddEventDialog(
     )
 }
 
+@OptIn(ExperimentalLayoutApi::class)
 @Composable
 fun EditEventDialog(
     initialEvent: EventEntity,
@@ -433,26 +355,26 @@ fun EditEventDialog(
         title: String,
         description: String,
         persianDate: String,
-        startTime: String,
-        endTime: String,
+        time: String,
         category: String,
         colorHex: String
     ) -> Unit,
     onDelete: () -> Unit
 ) {
     var title by remember { mutableStateOf(initialEvent.title) }
-    var description by remember { mutableStateOf(initialEvent.description) }
+    var description by remember { mutableStateOf(initialEvent.description.replace(Regex("\\[یادآوری:[^\\]]+\\]"), "").trim()) }
     var persianDate by remember { mutableStateOf(initialEvent.persianDate) }
     var isAllDay by remember { mutableStateOf(initialEvent.startTime.isBlank()) }
-    var startTime by remember { mutableStateOf(if (initialEvent.startTime.isNotBlank()) initialEvent.startTime else "10:00") }
-    var endTime by remember { mutableStateOf(if (initialEvent.endTime.isNotBlank()) initialEvent.endTime else "11:00") }
-    var showEndTime by remember { mutableStateOf(initialEvent.endTime.isNotBlank()) }
-    var reminderOption by remember { mutableStateOf("همزمان با شروع") }
+    var eventTime by remember { mutableStateOf(if (initialEvent.startTime.isNotBlank()) initialEvent.startTime else "10:00") }
+    var reminderOption by remember {
+        val match = Regex("\\[یادآوری:([^\\]]+)\\]").find(initialEvent.description)
+        mutableStateOf(match?.groupValues?.getOrNull(1)?.trim() ?: "همزمان با رویداد")
+    }
     var category by remember { mutableStateOf(initialEvent.category) }
     var selectedColor by remember { mutableStateOf(initialEvent.colorHex) }
 
     val categories = listOf("کاری", "شخصی", "مهم", "جلسه", "یادآوری")
-    val reminderOptions = listOf("بدون زنگ", "همزمان با شروع", "۱۰ دقیقه قبل", "۳۰ دقیقه قبل", "۱ ساعت قبل", "۱ روز قبل")
+    val reminderOptions = listOf("بدون زنگ", "همزمان با رویداد", "۵ دقیقه قبل", "۱۰ دقیقه قبل", "۱۵ دقیقه قبل", "۳۰ دقیقه قبل", "۱ ساعت قبل", "۱ روز قبل")
     val colors = listOf("#3B82F6", "#10B981", "#F59E0B", "#EF4444", "#8B5CF6")
 
     AlertDialog(
@@ -500,7 +422,7 @@ fun EditEventDialog(
                     modifier = Modifier.fillMaxWidth()
                 )
 
-                // All-day toggle
+                // All-day switch
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
@@ -509,56 +431,37 @@ fun EditEventDialog(
                     horizontalArrangement = Arrangement.SpaceBetween,
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    Text("رویداد تمام‌روز", fontSize = 12.sp, fontWeight = FontWeight.SemiBold)
+                    Text("رویداد تمام‌روز (بدون ساعت خاص)", fontSize = 12.sp, fontWeight = FontWeight.SemiBold)
                     Switch(checked = isAllDay, onCheckedChange = { isAllDay = it })
                 }
 
                 if (!isAllDay) {
                     val (h, m) = try {
-                        val parts = startTime.split(":")
+                        val parts = eventTime.split(":")
                         (parts[0].toIntOrNull() ?: 10) to (parts.getOrNull(1)?.toIntOrNull() ?: 0)
                     } catch (_: Exception) { 10 to 0 }
 
                     PersianTimePicker(
                         initialHour = h,
                         initialMinute = m,
-                        onTimeChange = { _, _, formatted -> startTime = formatted },
-                        label = "ساعت شروع رویداد"
+                        onTimeChange = { _, _, formatted -> eventTime = formatted },
+                        label = "ساعت برگزاری رویداد"
                     )
 
-                    Row(
+                    // Reminder Alarm Selection
+                    Text("⏰ زمان زنگ و یادآوری هشدار:", style = MaterialTheme.typography.bodySmall, fontWeight = FontWeight.Bold)
+                    FlowRow(
                         modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically
+                        horizontalArrangement = Arrangement.spacedBy(4.dp),
+                        verticalArrangement = Arrangement.spacedBy(4.dp)
                     ) {
-                        Text("مشخص کردن ساعت پایان", fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                        Switch(checked = showEndTime, onCheckedChange = { showEndTime = it })
-                    }
-
-                    if (showEndTime) {
-                        val (eh, em) = try {
-                            val parts = endTime.split(":")
-                            (parts[0].toIntOrNull() ?: 11) to (parts.getOrNull(1)?.toIntOrNull() ?: 0)
-                        } catch (_: Exception) { 11 to 0 }
-
-                        PersianTimePicker(
-                            initialHour = eh,
-                            initialMinute = em,
-                            onTimeChange = { _, _, formatted -> endTime = formatted },
-                            label = "ساعت پایان رویداد"
-                        )
-                    }
-                }
-
-                // Alarm options
-                Text("⏰ زنگ و یادآوری:", style = MaterialTheme.typography.bodySmall, fontWeight = FontWeight.Bold)
-                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(4.dp)) {
-                    reminderOptions.take(3).forEach { option ->
-                        FilterChip(
-                            selected = reminderOption == option,
-                            onClick = { reminderOption = option },
-                            label = { Text(option, fontSize = 10.sp) }
-                        )
+                        reminderOptions.forEach { option ->
+                            FilterChip(
+                                selected = reminderOption == option,
+                                onClick = { reminderOption = option },
+                                label = { Text(option, fontSize = 10.sp) }
+                            )
+                        }
                     }
                 }
 
@@ -594,9 +497,13 @@ fun EditEventDialog(
             Button(
                 onClick = {
                     if (title.isNotBlank()) {
-                        val finalStart = if (isAllDay) "" else startTime
-                        val finalEnd = if (isAllDay || !showEndTime) "" else endTime
-                        onConfirm(title.trim(), description.trim(), persianDate.trim(), finalStart, finalEnd, category, selectedColor)
+                        val finalTime = if (isAllDay) "" else eventTime
+                        val descWithReminder = if (isAllDay || reminderOption == "بدون زنگ") {
+                            description.trim()
+                        } else {
+                            if (description.isNotBlank()) "${description.trim()}\n[یادآوری: $reminderOption]" else "[یادآوری: $reminderOption]"
+                        }
+                        onConfirm(title.trim(), descWithReminder, persianDate.trim(), finalTime, category, selectedColor)
                     }
                 },
                 enabled = title.isNotBlank()
@@ -613,6 +520,7 @@ fun EditEventDialog(
 /**
  * Dialog to directly schedule/convert a Note into a Calendar Event / Reminder
  */
+@OptIn(ExperimentalLayoutApi::class)
 @Composable
 fun AddToCalendarFromNoteDialog(
     note: NoteEntity,
@@ -621,7 +529,7 @@ fun AddToCalendarFromNoteDialog(
         title: String,
         description: String,
         persianDate: String,
-        startTime: String,
+        time: String,
         category: String,
         colorHex: String
     ) -> Unit
@@ -630,9 +538,12 @@ fun AddToCalendarFromNoteDialog(
     var title by remember { mutableStateOf(note.title) }
     var description by remember { mutableStateOf(note.content) }
     var persianDate by remember { mutableStateOf(today.formatted) }
-    var startTime by remember { mutableStateOf("10:00") }
+    var eventTime by remember { mutableStateOf("10:00") }
+    var reminderOption by remember { mutableStateOf("همزمان با رویداد") }
     var category by remember { mutableStateOf("یادآوری") }
     var selectedColor by remember { mutableStateOf(note.colorHex) }
+
+    val reminderOptions = listOf("بدون زنگ", "همزمان با رویداد", "۵ دقیقه قبل", "۱۰ دقیقه قبل", "۱۵ دقیقه قبل", "۳۰ دقیقه قبل", "۱ ساعت قبل", "۱ روز قبل")
 
     AlertDialog(
         onDismissRequest = onDismiss,
@@ -677,16 +588,37 @@ fun AddToCalendarFromNoteDialog(
                 PersianTimePicker(
                     initialHour = 10,
                     initialMinute = 0,
-                    onTimeChange = { _, _, formatted -> startTime = formatted },
-                    label = "زمان هشدار و زنگ یادآوری"
+                    onTimeChange = { _, _, formatted -> eventTime = formatted },
+                    label = "ساعت رویداد و یادآور"
                 )
+
+                // Reminder alarm options
+                Text("⏰ زنگ و هشدار یادآوری:", style = MaterialTheme.typography.bodySmall, fontWeight = FontWeight.Bold)
+                FlowRow(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(4.dp),
+                    verticalArrangement = Arrangement.spacedBy(4.dp)
+                ) {
+                    reminderOptions.forEach { option ->
+                        FilterChip(
+                            selected = reminderOption == option,
+                            onClick = { reminderOption = option },
+                            label = { Text(option, fontSize = 10.sp) }
+                        )
+                    }
+                }
             }
         },
         confirmButton = {
             Button(
                 onClick = {
                     if (title.isNotBlank()) {
-                        onConfirm(title.trim(), description.trim(), persianDate.trim(), startTime.trim(), category, selectedColor)
+                        val descWithReminder = if (reminderOption == "بدون زنگ") {
+                            description.trim()
+                        } else {
+                            if (description.isNotBlank()) "${description.trim()}\n[یادآوری: $reminderOption]" else "[یادآوری: $reminderOption]"
+                        }
+                        onConfirm(title.trim(), descWithReminder, persianDate.trim(), eventTime.trim(), category, selectedColor)
                     }
                 }
             ) {
@@ -1083,7 +1015,7 @@ fun PairingInfoDialog(
         onDismissRequest = onDismiss,
         title = {
             Row(verticalAlignment = Alignment.CenterVertically) {
-                Icon(Icons.Default.QrCode, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
+                Icon(Icons.Default.Schedule, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
                 Spacer(modifier = Modifier.width(8.dp))
                 Text("اتصال به افزونه مرورگر کروم", fontWeight = FontWeight.Bold)
             }
@@ -1104,7 +1036,7 @@ fun PairingInfoDialog(
                     style = MaterialTheme.typography.bodySmall
                 )
                 Text(
-                    "۲. در افزونه کروم روی لپ‌تاپ، آدرس زیر را باز کنید:",
+                    "۲. آدرس زیر را در مرورگر لپ‌تاپ باز کنید یا در افزونه کروم وارد نمایید:",
                     style = MaterialTheme.typography.bodySmall
                 )
 
@@ -1131,19 +1063,8 @@ fun PairingInfoDialog(
                     }
                 }
 
-                // Live Scannable QR Code
-                Box(
-                    modifier = Modifier.fillMaxWidth(),
-                    contentAlignment = Alignment.Center
-                ) {
-                    QrCodeView(
-                        data = url,
-                        size = 150.dp
-                    )
-                }
-
                 Text(
-                    "۳. با دوربین گوشی، کد QR روی صفحه مانیتور لپ‌تاپ را اسکن کنید تا تقویم و اطلاعات فوراً همگام‌سازی شوند.",
+                    "۳. بارکد QR اتصال به صورت خودکار روی صفحه مانیتور لپ‌تاپ نمایش داده می‌شود و می‌توانید با دوربین گوشی آن را اسکن کنید.",
                     style = MaterialTheme.typography.bodySmall,
                     fontSize = 11.sp
                 )

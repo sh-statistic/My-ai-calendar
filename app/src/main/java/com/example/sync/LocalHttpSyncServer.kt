@@ -426,7 +426,7 @@ class LocalHttpSyncServer(
 
               const elEvents = document.getElementById('eventsList');
               elEvents.innerHTML = eventsData.length ? eventsData.map(e =>
-                '<div class="list-item"><div><strong>' + e.title + '</strong><br><small style="color:var(--text-muted);">' + (e.persianDate || 'امروز') + ' ' + (e.startTime ? (e.startTime + ' تا ' + e.endTime) : '') + '</small></div><span class="badge">' + (e.category || 'عمومی') + '</span></div>'
+                '<div class="list-item"><div><strong>' + e.title + '</strong><br><small style="color:var(--text-muted);">' + (e.persianDate || 'امروز') + ' ' + (e.startTime ? ('ساعت ' + e.startTime) : '') + '</small></div><span class="badge">' + (e.category || 'عمومی') + '</span></div>'
               ).join('') : '<p style="color:var(--text-muted); font-size:13px;">رویدادی ثبت نشده است.</p>';
 
               const elTasks = document.getElementById('tasksList');

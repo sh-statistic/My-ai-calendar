@@ -85,6 +85,18 @@ class MainActivity : ComponentActivity() {
             MyApplicationTheme {
                 // Ensure natural RTL layout for Persian language
                 CompositionLocalProvider(LocalLayoutDirection provides LayoutDirection.Rtl) {
+                    // Request notification permission on Android 13+ (TIRAMISU)
+                    val permissionLauncher = androidx.activity.compose.rememberLauncherForActivityResult(
+                        contract = androidx.activity.result.contract.ActivityResultContracts.RequestPermission(),
+                        onResult = { /* granted or denied handled gracefully */ }
+                    )
+
+                    androidx.compose.runtime.LaunchedEffect(Unit) {
+                        if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.TIRAMISU) {
+                            permissionLauncher.launch(android.Manifest.permission.POST_NOTIFICATIONS)
+                        }
+                    }
+
                     var selectedTab by remember { mutableIntStateOf(0) }
                     val isServerRunning by viewModel.isServerRunning.collectAsState()
                     val todayJalali = remember { PersianCalendarHelper.getCurrentJalaliDate() }

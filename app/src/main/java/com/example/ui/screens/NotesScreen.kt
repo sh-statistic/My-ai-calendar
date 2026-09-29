@@ -188,13 +188,12 @@ fun NotesScreen(
         AddToCalendarFromNoteDialog(
             note = note,
             onDismiss = { noteToAddToCalendar = null },
-            onConfirm = { title, desc, pDate, startTime, category, colorHex ->
+            onConfirm = { title, desc, pDate, time, category, colorHex ->
                 viewModel.addEvent(
                     title = title,
                     description = desc,
                     persianDate = pDate,
-                    startTime = startTime,
-                    endTime = "",
+                    time = time,
                     category = category,
                     colorHex = colorHex
                 )

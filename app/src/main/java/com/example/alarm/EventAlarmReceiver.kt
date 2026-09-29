@@ -1,4 +1,4 @@
-package com.example.prayer
+package com.example.alarm
 
 import android.app.NotificationChannel
 import android.app.NotificationManager
@@ -13,50 +13,38 @@ import android.os.PowerManager
 import androidx.core.app.NotificationCompat
 import com.example.MainActivity
 
-class FajrAlarmReceiver : BroadcastReceiver() {
+class EventAlarmReceiver : BroadcastReceiver() {
 
     companion object {
-        const val ACTION_FAJR_ALARM = "com.example.ACTION_FAJR_ALARM"
-        private const val CHANNEL_ID = "hamgam_fajr_alarm_channel"
-        private const val NOTIFICATION_ID = 9901
+        const val ACTION_EVENT_REMINDER = "com.example.ACTION_EVENT_REMINDER"
+        private const val CHANNEL_ID = "hamgam_event_alarm_channel"
     }
 
     override fun onReceive(context: Context, intent: Intent?) {
-        val action = intent?.action
+        if (intent?.action != ACTION_EVENT_REMINDER) return
 
-        if (action == Intent.ACTION_BOOT_COMPLETED || action == Intent.ACTION_MY_PACKAGE_REPLACED) {
-            // Reschedule alarm after device restart
-            FajrAlarmManager.scheduleFajrAlarm(context)
-            return
-        }
+        val title = intent.getStringExtra("event_title") ?: "یادآور رویداد"
+        val message = intent.getStringExtra("event_desc") ?: "زمان فرا رسیدن رویداد ثبت‌شده در تقویم"
+        val eventId = intent.getStringExtra("event_id") ?: "0"
 
-        if (action == ACTION_FAJR_ALARM) {
-            val cityName = intent.getStringExtra("cityName") ?: "شهر شما"
-            val offsetMinutes = intent.getIntExtra("offsetMinutes", 5)
+        // Wake screen
+        val powerManager = context.getSystemService(Context.POWER_SERVICE) as? PowerManager
+        val wakeLock = powerManager?.newWakeLock(
+            PowerManager.FULL_WAKE_LOCK or PowerManager.ACQUIRE_CAUSES_WAKEUP or PowerManager.ON_AFTER_RELEASE,
+            "Hamgam:EventAlarmWakeLock"
+        )
+        wakeLock?.acquire(30000L) // 30 seconds
 
-            // Wake up device screen and CPU so user is guaranteed to wake up
-            val powerManager = context.getSystemService(Context.POWER_SERVICE) as? PowerManager
-            val wakeLock = powerManager?.newWakeLock(
-                PowerManager.FULL_WAKE_LOCK or PowerManager.ACQUIRE_CAUSES_WAKEUP or PowerManager.ON_AFTER_RELEASE,
-                "Hamgam:FajrWakeLock"
-            )
-            wakeLock?.acquire(60000L) // 1 minute wake lock
-
-            showAlarmNotification(context, cityName, offsetMinutes)
-
-            // Automatically reschedule tomorrow's alarm dynamically
-            FajrAlarmManager.scheduleFajrAlarm(context)
-        }
+        showEventAlarmNotification(context, title, message, eventId.hashCode())
     }
 
-    private fun showAlarmNotification(context: Context, cityName: String, offsetMinutes: Int) {
+    private fun showEventAlarmNotification(context: Context, title: String, message: String, notificationId: Int) {
         val notificationManager = context.getSystemService(Context.NOTIFICATION_SERVICE) as? NotificationManager ?: return
 
         val soundUri = RingtoneManager.getDefaultUri(RingtoneManager.TYPE_ALARM)
             ?: RingtoneManager.getDefaultUri(RingtoneManager.TYPE_RINGTONE)
             ?: RingtoneManager.getDefaultUri(RingtoneManager.TYPE_NOTIFICATION)
 
-        // Create notification channel for Android O+ with strict ALARM audio attributes
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
             val audioAttributes = AudioAttributes.Builder()
                 .setContentType(AudioAttributes.CONTENT_TYPE_SONIFICATION)
@@ -65,12 +53,12 @@ class FajrAlarmReceiver : BroadcastReceiver() {
 
             val channel = NotificationChannel(
                 CHANNEL_ID,
-                "هشدار و بیدارباش اذان صبح",
+                "زنگ و یادآورهای رویدادها",
                 NotificationManager.IMPORTANCE_HIGH
             ).apply {
-                description = "یادآوری و بیدارباش هوشمند اذان صبح"
+                description = "هشدار و بیدارباش رویدادهای تقویم همگام"
                 enableVibration(true)
-                vibrationPattern = longArrayOf(0, 1000, 400, 1000, 400, 1500)
+                vibrationPattern = longArrayOf(0, 800, 300, 800, 300, 1000)
                 setSound(soundUri, audioAttributes)
                 lockscreenVisibility = NotificationCompat.VISIBILITY_PUBLIC
             }
@@ -82,32 +70,26 @@ class FajrAlarmReceiver : BroadcastReceiver() {
         }
         val pendingIntent = PendingIntent.getActivity(
             context,
-            0,
+            notificationId,
             openAppIntent,
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
         )
 
-        val message = if (offsetMinutes > 0) {
-            "$offsetMinutes دقیقه تا اذان صبح در $cityName باقی مانده است. وقت بیداری و مناجات سحرگاهی!"
-        } else {
-            "وقت اذان صبح به افق $cityName فرارسیده است. التماس دعا!"
-        }
-
         val notification = NotificationCompat.Builder(context, CHANNEL_ID)
             .setSmallIcon(android.R.drawable.ic_lock_idle_alarm)
-            .setContentTitle("⏰ بیدارباش هوشمند اذان صبح")
+            .setContentTitle("⏰ $title")
             .setContentText(message)
             .setStyle(NotificationCompat.BigTextStyle().bigText(message))
             .setPriority(NotificationCompat.PRIORITY_MAX)
             .setCategory(NotificationCompat.CATEGORY_ALARM)
             .setSound(soundUri)
-            .setVibrate(longArrayOf(0, 1000, 400, 1000, 400, 1500))
+            .setVibrate(longArrayOf(0, 800, 300, 800, 300, 1000))
             .setAutoCancel(true)
             .setContentIntent(pendingIntent)
             .setFullScreenIntent(pendingIntent, true)
             .setVisibility(NotificationCompat.VISIBILITY_PUBLIC)
             .build()
 
-        notificationManager.notify(NOTIFICATION_ID, notification)
+        notificationManager.notify(notificationId, notification)
     }
 }

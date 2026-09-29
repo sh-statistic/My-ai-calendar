@@ -422,8 +422,8 @@ fun CalendarScreen(
         AddEventDialog(
             initialDate = selectedDate,
             onDismiss = { showAddEventDialog = false },
-            onConfirm = { title, desc, pDate, start, end, cat, col ->
-                viewModel.addEvent(title, desc, pDate, start, end, cat, col)
+            onConfirm = { title, desc, pDate, time, cat, col ->
+                viewModel.addEvent(title, desc, pDate, time, cat, col)
                 showAddEventDialog = false
             }
         )
@@ -433,14 +433,14 @@ fun CalendarScreen(
         EditEventDialog(
             initialEvent = event,
             onDismiss = { eventToEdit = null },
-            onConfirm = { title, desc, pDate, start, end, cat, col ->
+            onConfirm = { title, desc, pDate, time, cat, col ->
                 viewModel.updateEvent(
                     event.copy(
                         title = title,
                         description = desc,
                         persianDate = pDate,
-                        startTime = start,
-                        endTime = end,
+                        startTime = time,
+                        endTime = "",
                         category = cat,
                         colorHex = col,
                         updatedAt = System.currentTimeMillis()
@@ -463,6 +463,13 @@ fun EventItemCard(
     onEdit: () -> Unit,
     onDelete: () -> Unit
 ) {
+    val reminderMatch = remember(event.description) {
+        Regex("\\[یادآوری:([^\\]]+)\\]").find(event.description)?.groupValues?.getOrNull(1)?.trim()
+    }
+    val cleanDescription = remember(event.description) {
+        event.description.replace(Regex("\\[یادآوری:[^\\]]+\\]"), "").trim()
+    }
+
     Card(
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
         shape = RoundedCornerShape(10.dp),
@@ -494,9 +501,9 @@ fun EventItemCard(
                     fontWeight = FontWeight.Bold
                 )
 
-                if (event.description.isNotBlank()) {
+                if (cleanDescription.isNotBlank()) {
                     Text(
-                        text = event.description,
+                        text = cleanDescription,
                         style = MaterialTheme.typography.bodySmall,
                         fontSize = 11.sp,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
@@ -505,7 +512,7 @@ fun EventItemCard(
 
                 Row(
                     verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    horizontalArrangement = Arrangement.spacedBy(6.dp),
                     modifier = Modifier.padding(top = 3.dp)
                 ) {
                     if (event.startTime.isNotBlank()) {
@@ -517,16 +524,31 @@ fun EventItemCard(
                                 tint = MaterialTheme.colorScheme.primary
                             )
                             Spacer(modifier = Modifier.width(3.dp))
-                            val timeStr = if (event.endTime.isNotBlank()) {
-                                "${PersianCalendarHelper.toPersianDigits(event.startTime)} تا ${PersianCalendarHelper.toPersianDigits(event.endTime)}"
-                            } else {
-                                PersianCalendarHelper.toPersianDigits(event.startTime)
-                            }
                             Text(
-                                text = timeStr,
+                                text = PersianCalendarHelper.toPersianDigits(event.startTime),
                                 fontSize = 10.sp,
+                                fontWeight = FontWeight.Bold,
                                 color = MaterialTheme.colorScheme.primary
                             )
+                        }
+                    }
+
+                    if (reminderMatch != null && reminderMatch != "بدون زنگ") {
+                        Surface(
+                            color = MaterialTheme.colorScheme.primaryContainer,
+                            shape = RoundedCornerShape(4.dp)
+                        ) {
+                            Row(
+                                modifier = Modifier.padding(horizontal = 4.dp, vertical = 1.dp),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Text(
+                                    text = "⏰ $reminderMatch",
+                                    fontSize = 9.sp,
+                                    fontWeight = FontWeight.SemiBold,
+                                    color = MaterialTheme.colorScheme.onPrimaryContainer
+                                )
+                            }
                         }
                     }
 

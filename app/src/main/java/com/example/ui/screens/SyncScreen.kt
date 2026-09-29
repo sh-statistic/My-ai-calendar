@@ -181,7 +181,7 @@ fun SyncScreen(
                                 Icon(Icons.Default.ContentCopy, contentDescription = "کپی آدرس")
                             }
                             IconButton(onClick = { showPairingDialog = true }) {
-                                Icon(Icons.Default.QrCode, contentDescription = "راهنمای اتصال")
+                                Icon(Icons.Default.Info, contentDescription = "راهنمای اتصال")
                             }
                         }
                     }
