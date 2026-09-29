@@ -1,6 +1,11 @@
 package com.example.ui.screens
 
+import android.app.Activity
+import android.content.Intent
+import android.speech.RecognizerIntent
 import android.widget.Toast
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -33,6 +38,7 @@ import androidx.compose.material.icons.filled.ClearAll
 import androidx.compose.material.icons.filled.ContentCopy
 import androidx.compose.material.icons.filled.Key
 import androidx.compose.material.icons.filled.KeyOff
+import androidx.compose.material.icons.filled.Mic
 import androidx.compose.material.icons.filled.Psychology
 import androidx.compose.material.icons.filled.SmartToy
 import androidx.compose.material.icons.filled.WbSunny
@@ -95,6 +101,32 @@ fun ChatScreen(
 
     val listState = rememberLazyListState()
 
+    // Voice Speech-to-Text Recognition Launcher
+    val speechLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.StartActivityForResult()
+    ) { result ->
+        if (result.resultCode == Activity.RESULT_OK) {
+            val spokenText = result.data?.getStringArrayListExtra(RecognizerIntent.EXTRA_RESULTS)?.firstOrNull()
+            if (!spokenText.isNullOrBlank()) {
+                inputText = spokenText
+                viewModel.sendChatMessage(spokenText)
+            }
+        }
+    }
+
+    val launchVoiceInput = {
+        val intent = Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH).apply {
+            putExtra(RecognizerIntent.EXTRA_LANGUAGE_MODEL, RecognizerIntent.LANGUAGE_MODEL_FREE_FORM)
+            putExtra(RecognizerIntent.EXTRA_LANGUAGE, "fa-IR")
+            putExtra(RecognizerIntent.EXTRA_PROMPT, "دستور یا سوال تقویمی خود را بگویید...")
+        }
+        try {
+            speechLauncher.launch(intent)
+        } catch (_: Exception) {
+            Toast.makeText(context, "سرویس ورودی گفتار در دسترس نیست", Toast.LENGTH_SHORT).show()
+        }
+    }
+
     // Auto-scroll to bottom on new message
     LaunchedEffect(messages.size, isGenerating) {
         if (messages.isNotEmpty()) {
@@ -104,10 +136,10 @@ fun ChatScreen(
 
     val suggestionChips = when (selectedRole) {
         ChatRole.GENERAL -> listOf(
-            "برنامه‌ریزی برای کارهای امروز",
-            "تبدیل تاریخ امروز به میلادی",
-            "چگونه وظایفم را اولویت‌بندی کنم؟",
-            "ایده برای یادداشت‌برداری موثر"
+            "🎙️ یک رویداد کاری برای فردا ساعت ۱۰ ثبت کن",
+            "🎙️ برنامه‌ها و کارهای امروز من چیست؟",
+            "🎙️ اوقات شرعی و اذان ظهر چه ساعتی است؟",
+            "چگونه وظایفم را اولویت‌بندی کنم؟"
         )
         ChatRole.COMPLEX_PLANNER -> listOf(
             "شکستن یک پروژه بزرگ به مراحل عملیاتی",
@@ -140,7 +172,7 @@ fun ChatScreen(
             shape = RoundedCornerShape(bottomStart = 16.dp, bottomEnd = 16.dp),
             modifier = Modifier.fillMaxWidth()
         ) {
-            Column(modifier = Modifier.padding(horizontal = 14.dp, vertical = 12.dp)) {
+            Column(modifier = Modifier.padding(12.dp)) {
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.SpaceBetween,
@@ -153,174 +185,139 @@ fun ChatScreen(
                         Surface(
                             shape = CircleShape,
                             color = MaterialTheme.colorScheme.primary.copy(alpha = 0.15f),
-                            modifier = Modifier.size(38.dp)
+                            modifier = Modifier.size(36.dp)
                         ) {
                             Box(contentAlignment = Alignment.Center) {
                                 Icon(
                                     getRoleIcon(selectedRole),
                                     contentDescription = null,
                                     tint = MaterialTheme.colorScheme.primary,
-                                    modifier = Modifier.size(22.dp)
+                                    modifier = Modifier.size(20.dp)
                                 )
                             }
                         }
-                        Spacer(modifier = Modifier.width(10.dp))
+
+                        Spacer(modifier = Modifier.width(8.dp))
+
                         Column {
+                            Text(
+                                text = "دستیار هوشمند تقویم",
+                                style = MaterialTheme.typography.titleMedium,
+                                fontWeight = FontWeight.Bold
+                            )
                             Row(verticalAlignment = Alignment.CenterVertically) {
-                                Text(
-                                    text = "دستیار هوشمند همگام",
-                                    style = MaterialTheme.typography.titleMedium,
-                                    fontWeight = FontWeight.Bold,
-                                    color = MaterialTheme.colorScheme.onSurface
-                                )
-                                Spacer(modifier = Modifier.width(6.dp))
                                 Surface(
-                                    color = MaterialTheme.colorScheme.primary.copy(alpha = 0.12f),
-                                    shape = RoundedCornerShape(6.dp)
+                                    shape = RoundedCornerShape(4.dp),
+                                    color = MaterialTheme.colorScheme.primary.copy(alpha = 0.15f)
                                 ) {
                                     Text(
                                         text = selectedRole.badge,
                                         fontSize = 10.sp,
                                         fontWeight = FontWeight.SemiBold,
                                         color = MaterialTheme.colorScheme.primary,
-                                        modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
+                                        modifier = Modifier.padding(horizontal = 4.dp, vertical = 1.dp)
                                     )
                                 }
+                                Spacer(modifier = Modifier.width(6.dp))
+                                Text(
+                                    text = if (isApiKeyConfigured) "آماده دریافت دستورات صوتی و متنی" else "نیاز به تنظیم کلید API",
+                                    fontSize = 10.sp,
+                                    color = if (isApiKeyConfigured) Color(0xFF15803D) else MaterialTheme.colorScheme.error
+                                )
                             }
-                            Text(
-                                text = selectedRole.description,
-                                style = MaterialTheme.typography.bodySmall,
-                                fontSize = 11.sp,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                maxLines = 1
-                            )
                         }
                     }
 
                     Row {
+                        // Voice trigger in header
+                        IconButton(
+                            onClick = launchVoiceInput,
+                            modifier = Modifier
+                                .size(34.dp)
+                                .testTag("btn_header_voice")
+                        ) {
+                            Icon(
+                                Icons.Default.Mic,
+                                contentDescription = "ورودی گفتار",
+                                tint = MaterialTheme.colorScheme.primary,
+                                modifier = Modifier.size(18.dp)
+                            )
+                        }
+
+                        // API Key Config Button
                         IconButton(
                             onClick = { showApiKeyDialog = true },
-                            modifier = Modifier.testTag("btn_configure_api_key")
+                            modifier = Modifier
+                                .size(34.dp)
+                                .testTag("btn_configure_api_key")
                         ) {
                             Icon(
                                 if (isApiKeyConfigured) Icons.Default.Key else Icons.Default.KeyOff,
                                 contentDescription = "تنظیم کلید API",
-                                tint = if (isApiKeyConfigured) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.error
+                                tint = if (isApiKeyConfigured) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.error,
+                                modifier = Modifier.size(18.dp)
                             )
                         }
+
+                        // Clear Chat Button
                         IconButton(
                             onClick = { viewModel.clearChatHistory() },
-                            modifier = Modifier.testTag("btn_clear_chat")
+                            modifier = Modifier.size(34.dp)
                         ) {
                             Icon(
                                 Icons.Default.ClearAll,
-                                contentDescription = "پاک‌سازی تاریخچه",
-                                tint = MaterialTheme.colorScheme.onSurfaceVariant
+                                contentDescription = "پاک‌سازی چت",
+                                tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                                modifier = Modifier.size(18.dp)
                             )
                         }
                     }
                 }
 
-                Spacer(modifier = Modifier.height(10.dp))
+                Spacer(modifier = Modifier.height(8.dp))
 
-                // Role Selector Chips (Specific Role System Instructions)
+                // Role Selector Chips
                 LazyRow(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    horizontalArrangement = Arrangement.spacedBy(6.dp),
+                    modifier = Modifier.fillMaxWidth()
                 ) {
-                    items(ChatRole.values()) { role ->
-                        val isSelected = role == selectedRole
+                    items(ChatRole.entries) { role ->
+                        val isSelected = selectedRole == role
                         FilterChip(
                             selected = isSelected,
                             onClick = { viewModel.selectRole(role) },
-                            label = {
-                                Text(
-                                    text = role.title,
-                                    fontSize = 11.sp,
-                                    fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal
-                                )
-                            },
+                            label = { Text(role.title, fontSize = 11.sp) },
                             leadingIcon = {
-                                Icon(
-                                    getRoleIcon(role),
-                                    contentDescription = null,
-                                    modifier = Modifier.size(14.dp),
-                                    tint = if (isSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant
-                                )
+                                Icon(getRoleIcon(role), contentDescription = null, modifier = Modifier.size(12.dp))
                             },
                             colors = FilterChipDefaults.filterChipColors(
-                                selectedContainerColor = MaterialTheme.colorScheme.primaryContainer,
-                                selectedLabelColor = MaterialTheme.colorScheme.onPrimaryContainer
+                                selectedContainerColor = MaterialTheme.colorScheme.primary,
+                                selectedLabelColor = MaterialTheme.colorScheme.onPrimary,
+                                selectedLeadingIconColor = MaterialTheme.colorScheme.onPrimary
                             ),
-                            modifier = Modifier.testTag("role_chip_${role.id}")
+                            modifier = Modifier.testTag("chip_role_${role.name}")
                         )
-                    }
-                }
-
-                // If API key is not configured, show prominent gentle alert banner
-                if (!isApiKeyConfigured) {
-                    Spacer(modifier = Modifier.height(8.dp))
-                    Card(
-                        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.errorContainer.copy(alpha = 0.75f)),
-                        shape = RoundedCornerShape(10.dp),
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .clickable { showApiKeyDialog = true }
-                            .testTag("banner_api_key_required")
-                    ) {
-                        Row(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(horizontal = 12.dp, vertical = 8.dp),
-                            horizontalArrangement = Arrangement.SpaceBetween,
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            Row(
-                                modifier = Modifier.weight(1f),
-                                verticalAlignment = Alignment.CenterVertically
-                            ) {
-                                Icon(
-                                    Icons.Default.Key,
-                                    contentDescription = null,
-                                    tint = MaterialTheme.colorScheme.onErrorContainer,
-                                    modifier = Modifier.size(18.dp)
-                                )
-                                Spacer(modifier = Modifier.width(8.dp))
-                                Text(
-                                    text = "کلید API جمینای تنظیم نشده است. لطفاً برای فعال‌سازی کلید خود را وارد کنید.",
-                                    fontSize = 11.sp,
-                                    fontWeight = FontWeight.SemiBold,
-                                    color = MaterialTheme.colorScheme.onErrorContainer
-                                )
-                            }
-                            Text(
-                                text = "وارد کردن ❯",
-                                fontSize = 11.sp,
-                                fontWeight = FontWeight.Bold,
-                                color = MaterialTheme.colorScheme.error
-                            )
-                        }
                     }
                 }
             }
         }
 
-        // Chat Messages Thread (Scrollable)
+        // Messages List
         LazyColumn(
             state = listState,
             modifier = Modifier
-                .weight(1f)
                 .fillMaxWidth()
-                .testTag("chat_messages_list"),
-            contentPadding = PaddingValues(horizontal = 14.dp, vertical = 12.dp),
+                .weight(1f)
+                .padding(horizontal = 12.dp),
+            contentPadding = PaddingValues(vertical = 8.dp),
             verticalArrangement = Arrangement.spacedBy(10.dp)
         ) {
-            items(messages, key = { it.id }) { msg ->
+            items(messages) { msg ->
                 ChatBubble(
                     message = msg,
                     onCopy = {
                         clipboardManager.setText(AnnotatedString(msg.text))
-                        Toast.makeText(context, "متن پیام کپی شد", Toast.LENGTH_SHORT).show()
+                        Toast.makeText(context, "متن در حافظه کپی شد", Toast.LENGTH_SHORT).show()
                     }
                 )
             }
@@ -328,22 +325,20 @@ fun ChatScreen(
             if (isGenerating) {
                 item {
                     Row(
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(8.dp),
                         modifier = Modifier
-                            .padding(8.dp)
-                            .clip(RoundedCornerShape(12.dp))
-                            .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f))
-                            .padding(horizontal = 12.dp, vertical = 8.dp)
+                            .fillMaxWidth()
+                            .padding(8.dp),
+                        verticalAlignment = Alignment.CenterVertically
                     ) {
                         CircularProgressIndicator(
+                            modifier = Modifier.size(18.dp),
                             strokeWidth = 2.dp,
-                            modifier = Modifier.size(16.dp),
                             color = MaterialTheme.colorScheme.primary
                         )
+                        Spacer(modifier = Modifier.width(8.dp))
                         Text(
-                            text = "همگام AI در حال پردازش و استدلال...",
-                            fontSize = 12.sp,
+                            text = "${selectedRole.title} در حال بررسی و پردازش...",
+                            fontSize = 11.sp,
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
                     }
@@ -351,34 +346,40 @@ fun ChatScreen(
             }
         }
 
-        // Quick Suggestion Chips for current role
+        // Suggestion Quick Prompt Chips
         LazyRow(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(horizontal = 12.dp, vertical = 4.dp),
+                .padding(horizontal = 10.dp, vertical = 4.dp),
             horizontalArrangement = Arrangement.spacedBy(6.dp)
         ) {
-            items(suggestionChips) { chip ->
-                FilterChip(
-                    selected = false,
-                    onClick = {
-                        inputText = chip
-                        viewModel.sendChatMessage(chip)
-                    },
-                    label = { Text(chip, fontSize = 11.sp) },
-                    leadingIcon = {
-                        Icon(
-                            Icons.Default.AutoAwesome,
-                            contentDescription = null,
-                            modifier = Modifier.size(12.dp),
-                            tint = MaterialTheme.colorScheme.primary
+            items(suggestionChips) { chipText ->
+                Surface(
+                    color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.6f),
+                    shape = RoundedCornerShape(16.dp),
+                    modifier = Modifier
+                        .clickable {
+                            val cleanText = chipText.replace("🎙️ ", "").trim()
+                            inputText = cleanText
+                            viewModel.sendChatMessage(cleanText)
+                        }
+                        .border(0.5.dp, MaterialTheme.colorScheme.outlineVariant, RoundedCornerShape(16.dp))
+                ) {
+                    Row(
+                        modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text(
+                            text = chipText,
+                            fontSize = 11.sp,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
                     }
-                )
+                }
             }
         }
 
-        // Bottom Input Row
+        // Bottom Input Row with Voice & Send Actions
         Surface(
             color = MaterialTheme.colorScheme.surface,
             tonalElevation = 2.dp,
@@ -387,26 +388,44 @@ fun ChatScreen(
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(horizontal = 12.dp, vertical = 10.dp),
+                    .padding(horizontal = 10.dp, vertical = 8.dp),
                 verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(8.dp)
+                horizontalArrangement = Arrangement.spacedBy(6.dp)
             ) {
                 OutlinedTextField(
                     value = inputText,
                     onValueChange = { inputText = it },
                     placeholder = {
                         Text(
-                            text = "پیام خود را به ${selectedRole.title} بنویسید...",
-                            fontSize = 13.sp
+                            text = "بنویسید یا با ویس بگویید...",
+                            fontSize = 12.sp
                         )
                     },
-                    maxLines = 4,
-                    shape = RoundedCornerShape(22.dp),
+                    maxLines = 3,
+                    shape = RoundedCornerShape(20.dp),
                     modifier = Modifier
                         .weight(1f)
                         .testTag("chat_input_field")
                 )
 
+                // Dedicated Microphone / Voice Button
+                IconButton(
+                    onClick = launchVoiceInput,
+                    modifier = Modifier
+                        .size(42.dp)
+                        .clip(CircleShape)
+                        .background(MaterialTheme.colorScheme.secondaryContainer)
+                        .testTag("btn_voice_input")
+                ) {
+                    Icon(
+                        Icons.Default.Mic,
+                        contentDescription = "ورودی گفتار / ویس",
+                        tint = MaterialTheme.colorScheme.onSecondaryContainer,
+                        modifier = Modifier.size(20.dp)
+                    )
+                }
+
+                // Send Button
                 IconButton(
                     onClick = {
                         if (inputText.isNotBlank() && !isGenerating) {
@@ -417,7 +436,7 @@ fun ChatScreen(
                     },
                     enabled = inputText.isNotBlank() && !isGenerating,
                     modifier = Modifier
-                        .size(46.dp)
+                        .size(42.dp)
                         .clip(CircleShape)
                         .background(
                             if (inputText.isNotBlank() && !isGenerating) MaterialTheme.colorScheme.primary
@@ -430,7 +449,7 @@ fun ChatScreen(
                         contentDescription = "ارسال پیام",
                         tint = if (inputText.isNotBlank() && !isGenerating) MaterialTheme.colorScheme.onPrimary
                         else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f),
-                        modifier = Modifier.size(20.dp)
+                        modifier = Modifier.size(18.dp)
                     )
                 }
             }
@@ -468,8 +487,8 @@ fun ChatBubble(
     val isUser = message.sender == ChatSender.USER
     val bubbleColor = when {
         message.isError -> MaterialTheme.colorScheme.errorContainer.copy(alpha = 0.6f)
-        isUser -> MaterialTheme.colorScheme.primaryContainer // Warm Amber Pastel
-        else -> MaterialTheme.colorScheme.surface // Soft Light Surface
+        isUser -> MaterialTheme.colorScheme.primaryContainer
+        else -> MaterialTheme.colorScheme.surface
     }
 
     val borderColor = when {
@@ -482,63 +501,35 @@ fun ChatBubble(
         modifier = Modifier.fillMaxWidth(),
         horizontalArrangement = if (isUser) Arrangement.End else Arrangement.Start
     ) {
-        Box(
+        Surface(
+            color = bubbleColor,
+            shape = RoundedCornerShape(
+                topStart = 14.dp,
+                topEnd = 14.dp,
+                bottomStart = if (isUser) 14.dp else 2.dp,
+                bottomEnd = if (isUser) 2.dp else 14.dp
+            ),
+            border = androidx.compose.foundation.BorderStroke(0.5.dp, borderColor),
             modifier = Modifier
                 .widthIn(max = 300.dp)
-                .clip(
-                    RoundedCornerShape(
-                        topStart = 16.dp,
-                        topEnd = 16.dp,
-                        bottomStart = if (isUser) 16.dp else 4.dp,
-                        bottomEnd = if (isUser) 4.dp else 16.dp
-                    )
-                )
-                .background(bubbleColor)
-                .border(
-                    width = 1.dp,
-                    color = borderColor,
-                    shape = RoundedCornerShape(
-                        topStart = 16.dp,
-                        topEnd = 16.dp,
-                        bottomStart = if (isUser) 16.dp else 4.dp,
-                        bottomEnd = if (isUser) 4.dp else 16.dp
-                    )
-                )
-                .padding(12.dp)
+                .clickable { onCopy() }
         ) {
-            Column {
+            Column(modifier = Modifier.padding(10.dp)) {
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.SpaceBetween,
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        Text(
-                            text = if (isUser) "شما" else "همگام AI",
-                            fontSize = 11.sp,
-                            fontWeight = FontWeight.Bold,
-                            color = if (isUser) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.secondary
-                        )
-                        if (!isUser && message.modelBadge != null) {
-                            Spacer(modifier = Modifier.width(6.dp))
-                            Surface(
-                                color = MaterialTheme.colorScheme.primary.copy(alpha = 0.1f),
-                                shape = RoundedCornerShape(4.dp)
-                            ) {
-                                Text(
-                                    text = message.modelBadge,
-                                    fontSize = 8.sp,
-                                    fontWeight = FontWeight.Medium,
-                                    color = MaterialTheme.colorScheme.primary,
-                                    modifier = Modifier.padding(horizontal = 4.dp, vertical = 1.dp)
-                                )
-                            }
-                        }
-                    }
+                    Text(
+                        text = if (isUser) "شما" else "دستیار هوشمند",
+                        fontSize = 11.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = if (isUser) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.secondary
+                    )
 
                     IconButton(
                         onClick = onCopy,
-                        modifier = Modifier.size(18.dp)
+                        modifier = Modifier.size(20.dp)
                     ) {
                         Icon(
                             Icons.Default.ContentCopy,
@@ -554,8 +545,9 @@ fun ChatBubble(
                 Text(
                     text = message.text,
                     style = MaterialTheme.typography.bodyMedium,
+                    fontSize = 12.sp,
                     color = if (message.isError) MaterialTheme.colorScheme.onErrorContainer else MaterialTheme.colorScheme.onSurface,
-                    lineHeight = 20.sp
+                    lineHeight = 18.sp
                 )
 
                 Spacer(modifier = Modifier.height(4.dp))

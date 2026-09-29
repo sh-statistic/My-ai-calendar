@@ -1,5 +1,5 @@
 <resources>
-    <string name="app_name">همگام (Hamgam)</string>
+    <string name="app_name">همگام</string>
     <string name="tab_calendar">تقویم</string>
     <string name="tab_tasks">وظایف</string>
     <string name="tab_notes">یادداشت‌ها</string>

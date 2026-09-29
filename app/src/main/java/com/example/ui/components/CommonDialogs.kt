@@ -514,9 +514,21 @@ fun PairingInfoDialog(
                     }
                 }
 
+                // Live Scannable QR Code
+                Box(
+                    modifier = Modifier.fillMaxWidth(),
+                    contentAlignment = Alignment.Center
+                ) {
+                    QrCodeView(
+                        data = url,
+                        size = 150.dp
+                    )
+                }
+
                 Text(
-                    "۳. دکمه همگام‌سازی را در افزونه یا برنامه بزنید. داده‌ها به صورت کاملاً آفلاین و رمزنگاری‌شده محلی تبادل می‌شوند.",
-                    style = MaterialTheme.typography.bodySmall
+                    "۳. با دوربین یا مرورگر، کد QR بالا را اسکن کنید، یا آدرس را در مرورگر باز نمایید تا ویجت تعاملی باز شود.",
+                    style = MaterialTheme.typography.bodySmall,
+                    fontSize = 11.sp
                 )
             }
         },

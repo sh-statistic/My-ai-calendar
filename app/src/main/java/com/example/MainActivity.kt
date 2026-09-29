@@ -93,20 +93,12 @@ class MainActivity : ComponentActivity() {
                             CenterAlignedTopAppBar(
                                 title = {
                                     Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                                        Row(verticalAlignment = Alignment.CenterVertically) {
-                                            Text(
-                                                text = "همگام",
-                                                style = MaterialTheme.typography.titleLarge,
-                                                fontWeight = FontWeight.Bold,
-                                                color = MaterialTheme.colorScheme.primary
-                                            )
-                                            Spacer(modifier = Modifier.width(6.dp))
-                                            Text(
-                                                text = "(Hamgam)",
-                                                fontSize = 12.sp,
-                                                color = MaterialTheme.colorScheme.onSurfaceVariant
-                                            )
-                                        }
+                                        Text(
+                                            text = "همگام",
+                                            style = MaterialTheme.typography.titleLarge,
+                                            fontWeight = FontWeight.Bold,
+                                            color = MaterialTheme.colorScheme.primary
+                                        )
                                         Text(
                                             text = todayJalali.formattedPersian,
                                             style = MaterialTheme.typography.bodySmall,
