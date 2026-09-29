@@ -24,10 +24,12 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.ArrowForward
 import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.AutoAwesome
 import androidx.compose.material.icons.filled.CalendarToday
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Event
 import androidx.compose.material.icons.filled.Schedule
+import androidx.compose.material.icons.filled.Star
 import androidx.compose.material3.AssistChip
 import androidx.compose.material3.AssistChipDefaults
 import androidx.compose.material3.Card
@@ -56,6 +58,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.calendar.JalaliDate
 import com.example.calendar.PersianCalendarHelper
+import com.example.calendar.PersianOccasionsHelper
 import com.example.data.EventEntity
 import com.example.ui.MainViewModel
 import com.example.ui.components.AddEventDialog
@@ -81,6 +84,8 @@ fun CalendarScreen(
 
     val selectedDayEvents = events.filter { it.persianDate == selectedDate.formatted }
     val selectedDayTasks = tasks.filter { it.persianDueDate == selectedDate.formatted }
+    val selectedDayOccasions = PersianOccasionsHelper.getOccasionsForDate(selectedDate.month, selectedDate.day)
+    val isSelectedDayHoliday = PersianOccasionsHelper.isHoliday(selectedDate.month, selectedDate.day)
 
     Scaffold(
         modifier = modifier.fillMaxSize(),
@@ -169,7 +174,7 @@ fun CalendarScreen(
                 }
             }
 
-            // 2. Calendar Grid Card
+            // 2. Calendar Grid Card (with national & religious holidays marked)
             item {
                 Card(
                     colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
@@ -220,6 +225,8 @@ fun CalendarScreen(
                                         val isSelected = cellJalali.formatted == selectedDate.formatted
                                         val isToday = cellJalali.formatted == today.formatted
                                         val isFriday = col == 6
+                                        val isHoliday = isFriday || PersianOccasionsHelper.isHoliday(viewMonth, dayNum)
+                                        val cellOccasions = PersianOccasionsHelper.getOccasionsForDate(viewMonth, dayNum)
 
                                         val hasEvents = events.any { it.persianDate == cellJalali.formatted }
                                         val hasTasks = tasks.any { it.persianDueDate == cellJalali.formatted }
@@ -252,14 +259,14 @@ fun CalendarScreen(
                                                 horizontalAlignment = Alignment.CenterHorizontally,
                                                 verticalArrangement = Arrangement.Center
                                             ) {
-                                                // Primary: Persian Day
+                                                // Primary: Persian Day (Red if holiday or Friday)
                                                 Text(
                                                     text = PersianCalendarHelper.toPersianDigits(dayNum.toString()),
                                                     fontSize = 12.sp,
-                                                    fontWeight = if (isSelected || isToday) FontWeight.Bold else FontWeight.Normal,
+                                                    fontWeight = if (isSelected || isToday || isHoliday) FontWeight.Bold else FontWeight.Normal,
                                                     color = when {
                                                         isSelected -> MaterialTheme.colorScheme.primary
-                                                        isFriday -> MaterialTheme.colorScheme.error
+                                                        isHoliday -> MaterialTheme.colorScheme.error
                                                         else -> MaterialTheme.colorScheme.onSurface
                                                     }
                                                 )
@@ -270,12 +277,20 @@ fun CalendarScreen(
                                                     color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f)
                                                 )
 
-                                                // Dot indicator
-                                                if (hasEvents || hasTasks) {
+                                                // Dot indicators (Events / Tasks / Occasions)
+                                                if (hasEvents || hasTasks || cellOccasions.isNotEmpty()) {
                                                     Row(
                                                         horizontalArrangement = Arrangement.spacedBy(2.dp),
                                                         modifier = Modifier.padding(top = 1.dp)
                                                     ) {
+                                                        if (cellOccasions.isNotEmpty()) {
+                                                            Box(
+                                                                modifier = Modifier
+                                                                    .size(3.dp)
+                                                                    .clip(CircleShape)
+                                                                    .background(if (isHoliday) MaterialTheme.colorScheme.error else Color(0xFF0D9488))
+                                                            )
+                                                        }
                                                         if (hasEvents) {
                                                             Box(
                                                                 modifier = Modifier
@@ -306,7 +321,7 @@ fun CalendarScreen(
                 }
             }
 
-            // 3. Ultra-Lightweight Offline Prayer Times & Fajr Alarm Card
+            // 3. Ultra-Lightweight Offline Prayer Times & Fajr Alarm Card (Dynamically updates with selectedDate!)
             item {
                 PrayerTimesCard(
                     viewModel = viewModel,
@@ -314,7 +329,78 @@ fun CalendarScreen(
                 )
             }
 
-            // 4. Selected Day Details Header
+            // 4. National & Religious Occasions Card for Selected Date
+            if (selectedDayOccasions.isNotEmpty()) {
+                item {
+                    Card(
+                        colors = CardDefaults.cardColors(
+                            containerColor = if (isSelectedDayHoliday) Color(0xFFFEE2E2) else Color(0xFFF0FDF4)
+                        ),
+                        shape = RoundedCornerShape(10.dp),
+                        border = androidx.compose.foundation.BorderStroke(
+                            1.dp,
+                            if (isSelectedDayHoliday) Color(0xFFFCA5A5) else Color(0xFFBBF7D0)
+                        ),
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 10.dp)
+                            .testTag("card_occasions")
+                    ) {
+                        Column(modifier = Modifier.padding(10.dp)) {
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Row(verticalAlignment = Alignment.CenterVertically) {
+                                    Icon(
+                                        Icons.Default.Star,
+                                        contentDescription = null,
+                                        tint = if (isSelectedDayHoliday) Color(0xFFDC2626) else Color(0xFF16A34A),
+                                        modifier = Modifier.size(16.dp)
+                                    )
+                                    Spacer(modifier = Modifier.width(6.dp))
+                                    Text(
+                                        text = "مناسبت‌های این روز:",
+                                        fontSize = 11.sp,
+                                        fontWeight = FontWeight.Bold,
+                                        color = if (isSelectedDayHoliday) Color(0xFF991B1B) else Color(0xFF166534)
+                                    )
+                                }
+
+                                if (isSelectedDayHoliday) {
+                                    Surface(
+                                        color = Color(0xFFDC2626),
+                                        shape = RoundedCornerShape(12.dp)
+                                    ) {
+                                        Text(
+                                            text = "تعطیل رسمی",
+                                            fontSize = 9.sp,
+                                            fontWeight = FontWeight.Bold,
+                                            color = Color.White,
+                                            modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
+                                        )
+                                    }
+                                }
+                            }
+
+                            Spacer(modifier = Modifier.height(4.dp))
+
+                            selectedDayOccasions.forEach { occ ->
+                                Text(
+                                    text = "• ${occ.title}",
+                                    fontSize = 11.sp,
+                                    fontWeight = if (occ.isHoliday) FontWeight.Bold else FontWeight.Normal,
+                                    color = if (occ.isHoliday) Color(0xFFB91C1C) else Color(0xFF1E293B),
+                                    lineHeight = 16.sp
+                                )
+                            }
+                        }
+                    }
+                }
+            }
+
+            // 5. Selected Day Details Header
             item {
                 val selGDate = PersianCalendarHelper.jalaliToGregorian(selectedDate.year, selectedDate.month, selectedDate.day)
                 Row(
@@ -347,7 +433,7 @@ fun CalendarScreen(
                 }
             }
 
-            // 5. Events List for Selected Day
+            // 6. Events List for Selected Day
             if (selectedDayEvents.isEmpty() && selectedDayTasks.isEmpty()) {
                 item {
                     Card(

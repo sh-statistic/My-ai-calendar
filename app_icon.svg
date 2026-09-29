@@ -1,0 +1,51 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">
+  <defs>
+    <linearGradient id="bgGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#D97706"/>
+      <stop offset="100%" stop-color="#B45309"/>
+    </linearGradient>
+    <linearGradient id="sunGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#FFFBEB"/>
+      <stop offset="100%" stop-color="#FDE68A"/>
+    </linearGradient>
+    <filter id="shadow" x="-10%" y="-10%" width="120%" height="120%">
+      <feDropShadow dx="0" dy="8" stdDeviation="12" flood-color="#78350F" flood-opacity="0.3"/>
+    </filter>
+  </defs>
+
+  <!-- Background Rect -->
+  <rect width="512" height="512" rx="112" fill="url(#bgGrad)"/>
+
+  <!-- Golden Sun Rays / Disc -->
+  <circle cx="256" cy="190" r="110" fill="url(#sunGrad)" filter="url(#shadow)"/>
+
+  <!-- Sun Flares -->
+  <g stroke="#FFFBEB" stroke-width="8" stroke-linecap="round" opacity="0.8">
+    <line x1="256" y1="50" x2="256" y2="30"/>
+    <line x1="360" y1="90" x2="375" y2="75"/>
+    <line x1="400" y1="190" x2="420" y2="190"/>
+    <line x1="152" y1="90" x2="137" y2="75"/>
+    <line x1="112" y1="190" x2="92" y2="190"/>
+  </g>
+
+  <!-- Calendar Card Surface -->
+  <rect x="116" y="210" width="280" height="230" rx="36" fill="#FAF8F5" filter="url(#shadow)"/>
+
+  <!-- Calendar Header Bar -->
+  <path d="M116 246 C116 226, 132 210, 152 210 L360 210 C380 210, 396 226, 396 246 L396 265 L116 265 Z" fill="#D97706"/>
+
+  <!-- Calendar Rings -->
+  <rect x="180" y="194" width="20" height="32" rx="10" fill="#78350F"/>
+  <rect x="312" y="194" width="20" height="32" rx="10" fill="#78350F"/>
+
+  <!-- Persian Date Text Motif / Grid Dots -->
+  <g fill="#D97706">
+    <circle cx="176" cy="305" r="14"/>
+    <circle cx="256" cy="305" r="14"/>
+    <circle cx="336" cy="305" r="14"/>
+
+    <circle cx="176" cy="365" r="14"/>
+    <circle cx="256" cy="365" r="14" fill="#0D9488"/>
+    <circle cx="336" cy="365" r="14"/>
+  </g>
+</svg>

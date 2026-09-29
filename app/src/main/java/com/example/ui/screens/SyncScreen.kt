@@ -234,37 +234,81 @@ fun SyncScreen(
             elevation = CardDefaults.cardElevation(defaultElevation = 1.dp),
             modifier = Modifier.fillMaxWidth()
         ) {
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(14.dp),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
+            Column(modifier = Modifier.padding(14.dp)) {
                 Row(
-                    modifier = Modifier.weight(1f),
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    Icon(
-                        if (isBleAdvertising) Icons.Default.BluetoothSearching else Icons.Default.Bluetooth,
-                        contentDescription = null,
-                        tint = if (isBleAdvertising) Color(0xFF3B82F6) else Color.Gray
-                    )
-                    Spacer(modifier = Modifier.width(10.dp))
-                    Column {
-                        Text("همگام‌سازی بلوتوث (BLE)", fontWeight = FontWeight.SemiBold)
-                        Text(
-                            text = if (isBleAdvertising) "درحال انتشار برای Web Bluetooth کروم" else "غیرفعال (اتصال بدون شبکه)",
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                    Row(
+                        modifier = Modifier.weight(1f),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Icon(
+                            if (isBleAdvertising) Icons.Default.BluetoothSearching else Icons.Default.Bluetooth,
+                            contentDescription = null,
+                            tint = if (isBleAdvertising) Color(0xFF3B82F6) else Color.Gray,
+                            modifier = Modifier.size(24.dp)
                         )
+                        Spacer(modifier = Modifier.width(10.dp))
+                        Column {
+                            Text("همگام‌سازی مستقیم بلوتوث (BLE)", fontWeight = FontWeight.Bold)
+                            Text(
+                                text = if (isBleAdvertising) "درحال انتشار سرویس GATT برای افزونه کروم" else "حالت انتشار بلوتوث خاموش است",
+                                style = MaterialTheme.typography.bodySmall,
+                                fontSize = 11.sp,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
                     }
+
+                    Switch(
+                        checked = isBleAdvertising,
+                        onCheckedChange = { viewModel.toggleBleAdvertising() }
+                    )
                 }
 
-                Switch(
-                    checked = isBleAdvertising,
-                    onCheckedChange = { viewModel.toggleBleAdvertising() }
-                )
+                if (isBleAdvertising) {
+                    Spacer(modifier = Modifier.height(10.dp))
+                    Text(
+                        text = "دستگاه شما به عنوان سرور بلوتوث آماده اتصال است. برای تبادل داده‌ها می‌توانید دکمه‌های زیر را لمس کنید:",
+                        fontSize = 11.sp,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        lineHeight = 16.sp
+                    )
+
+                    Spacer(modifier = Modifier.height(8.dp))
+
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        Button(
+                            onClick = {
+                                viewModel.triggerBleSyncPush()
+                                Toast.makeText(context, "بسته داده‌ها برای دستگاه بلوتوث آماده و ارسال شد", Toast.LENGTH_SHORT).show()
+                            },
+                            colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF2563EB)),
+                            modifier = Modifier.weight(1f)
+                        ) {
+                            Icon(Icons.Default.Upload, contentDescription = null, modifier = Modifier.size(16.dp))
+                            Spacer(modifier = Modifier.width(4.dp))
+                            Text("ارسال با بلوتوث", fontSize = 11.sp)
+                        }
+
+                        OutlinedButton(
+                            onClick = {
+                                viewModel.triggerBleSyncPull()
+                                Toast.makeText(context, "داده‌های بلوتوث بازخوانی شد", Toast.LENGTH_SHORT).show()
+                            },
+                            modifier = Modifier.weight(1f)
+                        ) {
+                            Icon(Icons.Default.Download, contentDescription = null, modifier = Modifier.size(16.dp))
+                            Spacer(modifier = Modifier.width(4.dp))
+                            Text("دریافت بلوتوث", fontSize = 11.sp)
+                        }
+                    }
+                }
             }
         }
 

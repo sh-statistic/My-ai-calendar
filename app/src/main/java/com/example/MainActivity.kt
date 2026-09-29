@@ -8,6 +8,7 @@ import androidx.activity.enableEdgeToEdge
 import androidx.activity.viewModels
 import androidx.compose.animation.Crossfade
 import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -24,7 +25,6 @@ import androidx.compose.material.icons.filled.CalendarMonth
 import androidx.compose.material.icons.filled.Checklist
 import androidx.compose.material.icons.filled.NoteAlt
 import androidx.compose.material.icons.filled.Settings
-import androidx.compose.material.icons.filled.SmartToy
 import androidx.compose.material.icons.filled.Sync
 import androidx.compose.material3.Badge
 import androidx.compose.material3.BadgedBox
@@ -39,7 +39,6 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBarDefaults
-import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -83,7 +82,7 @@ class MainActivity : ComponentActivity() {
                     val isServerRunning by viewModel.isServerRunning.collectAsState()
                     val todayJalali = remember { PersianCalendarHelper.getCurrentJalaliDate() }
 
-                    // BackHandler to navigate back to Calendar tab if on secondary tab
+                    // BackHandler to navigate back to Calendar tab if on secondary tab or chat
                     BackHandler(enabled = selectedTab != 0) {
                         selectedTab = 0
                     }
@@ -116,16 +115,17 @@ class MainActivity : ComponentActivity() {
                                     }
                                 },
                                 navigationIcon = {
+                                    // Header AI Assistant button
                                     IconButton(
-                                        onClick = { selectedTab = 3 },
+                                        onClick = { selectedTab = 5 }, // Open AI Chat Screen
                                         modifier = Modifier
                                             .padding(start = 4.dp)
                                             .testTag("top_bar_ai_chat_btn")
                                     ) {
                                         Icon(
                                             Icons.Default.AutoAwesome,
-                                            contentDescription = "دستیار هوشمند",
-                                            tint = if (selectedTab == 3) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.primary.copy(alpha = 0.7f)
+                                            contentDescription = "دستیار هوشمند AI",
+                                            tint = if (selectedTab == 5) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.primary.copy(alpha = 0.85f)
                                         )
                                     }
                                 },
@@ -164,44 +164,37 @@ class MainActivity : ComponentActivity() {
                             )
                         },
                         bottomBar = {
+                            // 5 Clean Bottom Navigation Tabs (AI assistant is in top bar)
                             NavigationBar(
                                 modifier = Modifier.testTag("bottom_nav_bar")
                             ) {
                                 NavigationBarItem(
                                     selected = selectedTab == 0,
                                     onClick = { selectedTab = 0 },
-                                    icon = { Icon(Icons.Default.CalendarMonth, contentDescription = "تقویم", modifier = Modifier.size(20.dp)) },
-                                    label = { Text("تقویم", fontSize = 10.sp, maxLines = 1) },
+                                    icon = { Icon(Icons.Default.CalendarMonth, contentDescription = "تقویم", modifier = Modifier.size(22.dp)) },
+                                    label = { Text("تقویم", fontSize = 11.sp) },
                                     alwaysShowLabel = true,
                                     modifier = Modifier.testTag("nav_calendar")
                                 )
                                 NavigationBarItem(
                                     selected = selectedTab == 1,
                                     onClick = { selectedTab = 1 },
-                                    icon = { Icon(Icons.Default.Checklist, contentDescription = "وظایف", modifier = Modifier.size(20.dp)) },
-                                    label = { Text("وظایف", fontSize = 10.sp, maxLines = 1) },
+                                    icon = { Icon(Icons.Default.Checklist, contentDescription = "وظایف", modifier = Modifier.size(22.dp)) },
+                                    label = { Text("وظایف", fontSize = 11.sp) },
                                     alwaysShowLabel = true,
                                     modifier = Modifier.testTag("nav_tasks")
                                 )
                                 NavigationBarItem(
                                     selected = selectedTab == 2,
                                     onClick = { selectedTab = 2 },
-                                    icon = { Icon(Icons.Default.NoteAlt, contentDescription = "یادداشت‌ها", modifier = Modifier.size(20.dp)) },
-                                    label = { Text("یادداشت", fontSize = 10.sp, maxLines = 1) },
+                                    icon = { Icon(Icons.Default.NoteAlt, contentDescription = "یادداشت‌ها", modifier = Modifier.size(22.dp)) },
+                                    label = { Text("یادداشت", fontSize = 11.sp) },
                                     alwaysShowLabel = true,
                                     modifier = Modifier.testTag("nav_notes")
                                 )
                                 NavigationBarItem(
                                     selected = selectedTab == 3,
                                     onClick = { selectedTab = 3 },
-                                    icon = { Icon(Icons.Default.SmartToy, contentDescription = "دستیار AI", modifier = Modifier.size(20.dp)) },
-                                    label = { Text("دستیار AI", fontSize = 10.sp, maxLines = 1) },
-                                    alwaysShowLabel = true,
-                                    modifier = Modifier.testTag("nav_chat")
-                                )
-                                NavigationBarItem(
-                                    selected = selectedTab == 4,
-                                    onClick = { selectedTab = 4 },
                                     icon = {
                                         BadgedBox(
                                             badge = {
@@ -210,18 +203,18 @@ class MainActivity : ComponentActivity() {
                                                 }
                                             }
                                         ) {
-                                            Icon(Icons.Default.Sync, contentDescription = "همگام‌سازی", modifier = Modifier.size(20.dp))
+                                            Icon(Icons.Default.Sync, contentDescription = "همگام‌سازی", modifier = Modifier.size(22.dp))
                                         }
                                     },
-                                    label = { Text("همگام", fontSize = 10.sp, maxLines = 1) },
+                                    label = { Text("همگام", fontSize = 11.sp) },
                                     alwaysShowLabel = true,
                                     modifier = Modifier.testTag("nav_sync")
                                 )
                                 NavigationBarItem(
-                                    selected = selectedTab == 5,
-                                    onClick = { selectedTab = 5 },
-                                    icon = { Icon(Icons.Default.Settings, contentDescription = "تنظیمات", modifier = Modifier.size(20.dp)) },
-                                    label = { Text("تنظیمات", fontSize = 10.sp, maxLines = 1) },
+                                    selected = selectedTab == 4,
+                                    onClick = { selectedTab = 4 },
+                                    icon = { Icon(Icons.Default.Settings, contentDescription = "تنظیمات", modifier = Modifier.size(22.dp)) },
+                                    label = { Text("تنظیمات", fontSize = 11.sp) },
                                     alwaysShowLabel = true,
                                     modifier = Modifier.testTag("nav_settings")
                                 )
@@ -237,9 +230,9 @@ class MainActivity : ComponentActivity() {
                                 0 -> CalendarScreen(viewModel = viewModel)
                                 1 -> TasksScreen(viewModel = viewModel)
                                 2 -> NotesScreen(viewModel = viewModel)
-                                3 -> ChatScreen(viewModel = viewModel)
-                                4 -> SyncScreen(viewModel = viewModel)
-                                5 -> SettingsScreen(viewModel = viewModel)
+                                3 -> SyncScreen(viewModel = viewModel)
+                                4 -> SettingsScreen(viewModel = viewModel)
+                                5 -> ChatScreen(viewModel = viewModel)
                             }
                         }
                     }

@@ -2,6 +2,7 @@ package com.example.ui.screens
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -18,9 +19,10 @@ import androidx.compose.foundation.lazy.staggeredgrid.StaggeredGridCells
 import androidx.compose.foundation.lazy.staggeredgrid.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.Note
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Delete
-import androidx.compose.material.icons.filled.Note
+import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.PushPin
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material3.Card
@@ -48,6 +50,7 @@ import androidx.compose.ui.unit.sp
 import com.example.data.NoteEntity
 import com.example.ui.MainViewModel
 import com.example.ui.components.AddNoteDialog
+import com.example.ui.components.EditNoteDialog
 import com.example.ui.components.parseColor
 
 @Composable
@@ -58,6 +61,7 @@ fun NotesScreen(
     val notes by viewModel.activeNotes.collectAsState()
     var searchQuery by remember { mutableStateOf("") }
     var showAddNoteDialog by remember { mutableStateOf(false) }
+    var noteToEdit by remember { mutableStateOf<NoteEntity?>(null) }
 
     val filteredNotes = if (searchQuery.isBlank()) {
         notes
@@ -102,21 +106,20 @@ fun NotesScreen(
             if (filteredNotes.isEmpty()) {
                 Box(
                     modifier = Modifier
-                        .fillMaxWidth()
-                        .weight(1f)
-                        .padding(24.dp),
+                        .fillMaxSize()
+                        .padding(32.dp),
                     contentAlignment = Alignment.Center
                 ) {
                     Column(horizontalAlignment = Alignment.CenterHorizontally) {
                         Icon(
-                            Icons.Default.Note,
+                            Icons.AutoMirrored.Filled.Note,
                             contentDescription = null,
                             tint = MaterialTheme.colorScheme.outlineVariant,
-                            modifier = Modifier.size(52.dp)
+                            modifier = Modifier.size(64.dp)
                         )
-                        Spacer(modifier = Modifier.height(8.dp))
+                        Spacer(modifier = Modifier.height(12.dp))
                         Text(
-                            text = if (searchQuery.isBlank()) "هنوز یادداشتی ایجاد نشده است." else "موردی با این عبارت یافت نشد.",
+                            text = if (searchQuery.isBlank()) "هنوز یادداشتی ثبت نشده است." else "یادداشتی با این عبارت یافت نشد.",
                             style = MaterialTheme.typography.bodyMedium,
                             color = MaterialTheme.colorScheme.outline
                         )
@@ -128,13 +131,15 @@ fun NotesScreen(
                     modifier = Modifier
                         .fillMaxWidth()
                         .weight(1f),
-                    contentPadding = PaddingValues(horizontal = 12.dp, vertical = 6.dp),
+                    contentPadding = PaddingValues(start = 12.dp, end = 12.dp, top = 6.dp, bottom = 80.dp),
                     horizontalArrangement = Arrangement.spacedBy(10.dp),
                     verticalItemSpacing = 10.dp
                 ) {
                     items(filteredNotes, key = { it.id }) { note ->
                         NoteCard(
                             note = note,
+                            onClick = { noteToEdit = note },
+                            onEdit = { noteToEdit = note },
                             onDelete = { viewModel.deleteNote(note.id) }
                         )
                     }
@@ -152,15 +157,35 @@ fun NotesScreen(
             }
         )
     }
+
+    noteToEdit?.let { note ->
+        EditNoteDialog(
+            initialNote = note,
+            onDismiss = { noteToEdit = null },
+            onConfirm = { title, content, colorHex, isPinned ->
+                viewModel.updateNote(
+                    note.copy(
+                        title = title,
+                        content = content,
+                        colorHex = colorHex,
+                        isPinned = isPinned,
+                        updatedAt = System.currentTimeMillis()
+                    )
+                )
+                noteToEdit = null
+            }
+        )
+    }
 }
 
 @Composable
 fun NoteCard(
     note: NoteEntity,
+    onClick: () -> Unit,
+    onEdit: () -> Unit,
     onDelete: () -> Unit
 ) {
     val cardColor = parseColor(note.colorHex)
-    val isLight = true // soft pastel tones
 
     Card(
         colors = CardDefaults.cardColors(containerColor = cardColor),
@@ -169,6 +194,8 @@ fun NoteCard(
         modifier = Modifier
             .fillMaxWidth()
             .border(0.5.dp, Color.Black.copy(alpha = 0.08f), RoundedCornerShape(14.dp))
+            .clickable { onClick() }
+            .testTag("note_card_${note.id}")
     ) {
         Column(modifier = Modifier.padding(12.dp)) {
             Row(
@@ -216,16 +243,30 @@ fun NoteCard(
                     color = Color(0xFF64748B)
                 )
 
-                IconButton(
-                    onClick = onDelete,
-                    modifier = Modifier.size(24.dp)
-                ) {
-                    Icon(
-                        Icons.Default.Delete,
-                        contentDescription = "حذف یادداشت",
-                        tint = Color(0xFFEF4444).copy(alpha = 0.7f),
-                        modifier = Modifier.size(16.dp)
-                    )
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    IconButton(
+                        onClick = onEdit,
+                        modifier = Modifier.size(24.dp)
+                    ) {
+                        Icon(
+                            Icons.Default.Edit,
+                            contentDescription = "ویرایش یادداشت",
+                            tint = Color(0xFF475569),
+                            modifier = Modifier.size(15.dp)
+                        )
+                    }
+
+                    IconButton(
+                        onClick = onDelete,
+                        modifier = Modifier.size(24.dp)
+                    ) {
+                        Icon(
+                            Icons.Default.Delete,
+                            contentDescription = "حذف یادداشت",
+                            tint = Color(0xFFEF4444).copy(alpha = 0.7f),
+                            modifier = Modifier.size(16.dp)
+                        )
+                    }
                 }
             }
         }

@@ -69,6 +69,7 @@ fun PrayerTimesCard(
     val prayerTimes by viewModel.prayerTimes.collectAsState()
     val nextPrayer by viewModel.nextPrayerInfo.collectAsState()
     val selectedCity by viewModel.selectedCity.collectAsState()
+    val selectedDate by viewModel.selectedDate.collectAsState()
     val alarmSettings by viewModel.fajrAlarmSettings.collectAsState()
 
     var showCityDropdown by remember { mutableStateOf(false) }
@@ -109,7 +110,7 @@ fun PrayerTimesCard(
                             )
                             Spacer(modifier = Modifier.width(3.dp))
                             Text(
-                                text = selectedCity.nameFa,
+                                text = "${selectedCity.nameFa} (${PersianCalendarHelper.toPersianDigits("${selectedDate.day} ${PersianCalendarHelper.PERSIAN_MONTH_NAMES[selectedDate.month - 1]}")})",
                                 style = MaterialTheme.typography.labelSmall,
                                 fontWeight = FontWeight.Bold,
                                 color = MaterialTheme.colorScheme.onSurface

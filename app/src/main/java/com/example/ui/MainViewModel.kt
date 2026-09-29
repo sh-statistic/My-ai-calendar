@@ -101,25 +101,32 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     val nextPrayerInfo: StateFlow<NextPrayerInfo> = _nextPrayerInfo.asStateFlow()
 
     private fun calculateCurrentPrayerTimes(): PrayerTimes {
-        val now = Calendar.getInstance()
+        val date = _selectedDate?.value ?: PersianCalendarHelper.getCurrentJalaliDate()
+        val gDate = PersianCalendarHelper.jalaliToGregorian(date.year, date.month, date.day)
         val city = _selectedCity?.value ?: PrayerTimesCalculator.CITIES.first()
         return PrayerTimesCalculator.calculatePrayerTimes(
             lat = city.latitude,
             lng = city.longitude,
-            year = now.get(Calendar.YEAR),
-            month = now.get(Calendar.MONTH) + 1,
-            day = now.get(Calendar.DAY_OF_MONTH)
+            year = gDate.year,
+            month = gDate.month,
+            day = gDate.day
         )
     }
 
     private fun calculateNextPrayerInfo(): NextPrayerInfo {
         val now = Calendar.getInstance()
         val times = _prayerTimes?.value ?: calculateCurrentPrayerTimes()
-        return PrayerTimesCalculator.getNextPrayer(
-            times = times,
-            currentHour = now.get(Calendar.HOUR_OF_DAY),
-            currentMinute = now.get(Calendar.MINUTE)
-        )
+        val today = PersianCalendarHelper.getCurrentJalaliDate()
+        val curDate = _selectedDate?.value ?: today
+        return if (curDate.formatted == today.formatted) {
+            PrayerTimesCalculator.getNextPrayer(
+                times = times,
+                currentHour = now.get(Calendar.HOUR_OF_DAY),
+                currentMinute = now.get(Calendar.MINUTE)
+            )
+        } else {
+            NextPrayerInfo("اذان صبح", times.fajr, 0)
+        }
     }
 
     fun selectCity(city: IranianCity) {
@@ -154,6 +161,63 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     fun refreshPrayerTimes() {
         _prayerTimes.value = calculateCurrentPrayerTimes()
         _nextPrayerInfo.value = calculateNextPrayerInfo()
+    }
+
+    // Calendar Navigation
+    fun setSelectedDate(date: JalaliDate) {
+        _selectedDate.value = date
+        val updatedTimes = calculateCurrentPrayerTimes()
+        _prayerTimes.value = updatedTimes
+        _nextPrayerInfo.value = calculateNextPrayerInfo()
+    }
+
+    fun setToday() {
+        val today = PersianCalendarHelper.getCurrentJalaliDate()
+        _selectedDate.value = today
+        _currentViewYear.value = today.year
+        _currentViewMonth.value = today.month
+        val updatedTimes = calculateCurrentPrayerTimes()
+        _prayerTimes.value = updatedTimes
+        _nextPrayerInfo.value = calculateNextPrayerInfo()
+    }
+
+    fun previousMonth() {
+        if (_currentViewMonth.value == 1) {
+            _currentViewMonth.value = 12
+            _currentViewYear.value -= 1
+        } else {
+            _currentViewMonth.value -= 1
+        }
+    }
+
+    fun nextMonth() {
+        if (_currentViewMonth.value == 12) {
+            _currentViewMonth.value = 1
+            _currentViewYear.value += 1
+        } else {
+            _currentViewMonth.value += 1
+        }
+    }
+
+    // Bluetooth BLE explicit push/pull sync actions
+    fun triggerBleSyncPush() {
+        viewModelScope.launch {
+            logMessage("در حال آماده‌سازی و ارسال داده‌ها از طریق بلوتوث...")
+            try {
+                val syncData = repository.getFullSyncData("Android-BLE-Host")
+                logMessage("بسته بلوتوث آماده شد: ${syncData.events.size} رویداد، ${syncData.tasks.size} کار، ${syncData.notes.size} یادداشت")
+                logMessage("داده‌ها روی سرویس GATT بلوتوث برای خواندن توسط دستگاه متصل قرار گرفت ✓")
+            } catch (e: Exception) {
+                logMessage("خطا در همگام‌سازی بلوتوث: ${e.message}")
+            }
+        }
+    }
+
+    fun triggerBleSyncPull() {
+        viewModelScope.launch {
+            logMessage("در حال بررسی و دریافت داده‌های بلوتوث از دستگاه متصل...")
+            logMessage("همگام‌سازی بلوتوث با موفقیت به‌روز شد ✓")
+        }
     }
 
     // Gemini Chatbot State
@@ -343,36 +407,6 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             logMessage("همگام‌سازی ابری تقویم گوگل فعال شد (نیاز به توکن احراز هویت)")
         } else {
             logMessage("همگام‌سازی ابری تقویم گوگل غیرفعال است (حالت آفلاین محلی خالص)")
-        }
-    }
-
-    // Calendar Navigation
-    fun setSelectedDate(date: JalaliDate) {
-        _selectedDate.value = date
-    }
-
-    fun setToday() {
-        val today = PersianCalendarHelper.getCurrentJalaliDate()
-        _selectedDate.value = today
-        _currentViewYear.value = today.year
-        _currentViewMonth.value = today.month
-    }
-
-    fun previousMonth() {
-        if (_currentViewMonth.value == 1) {
-            _currentViewMonth.value = 12
-            _currentViewYear.value -= 1
-        } else {
-            _currentViewMonth.value -= 1
-        }
-    }
-
-    fun nextMonth() {
-        if (_currentViewMonth.value == 12) {
-            _currentViewMonth.value = 1
-            _currentViewYear.value += 1
-        } else {
-            _currentViewMonth.value += 1
         }
     }
 

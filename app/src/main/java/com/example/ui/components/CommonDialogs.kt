@@ -34,10 +34,15 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Surface
+import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
+import com.example.data.NoteEntity
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
@@ -346,6 +351,102 @@ fun AddNoteDialog(
                 modifier = Modifier.testTag("confirm_add_note")
             ) {
                 Text("ذخیره یادداشت")
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) { Text("انصراف") }
+        }
+    )
+}
+
+@Composable
+fun EditNoteDialog(
+    initialNote: NoteEntity,
+    onDismiss: () -> Unit,
+    onConfirm: (title: String, content: String, colorHex: String, isPinned: Boolean) -> Unit
+) {
+    var title by remember { mutableStateOf(initialNote.title) }
+    var content by remember { mutableStateOf(initialNote.content) }
+    var colorHex by remember { mutableStateOf(initialNote.colorHex) }
+    var isPinned by remember { mutableStateOf(initialNote.isPinned) }
+
+    val noteColors = listOf("#FEF3C7", "#E0F2FE", "#DCFCE7", "#FCE7F3", "#F3E8FF")
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("ویرایش یادداشت", fontWeight = FontWeight.Bold) },
+        text = {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .verticalScroll(rememberScrollState()),
+                verticalArrangement = Arrangement.spacedBy(10.dp)
+            ) {
+                OutlinedTextField(
+                    value = title,
+                    onValueChange = { title = it },
+                    label = { Text("عنوان یادداشت") },
+                    singleLine = true,
+                    modifier = Modifier.fillMaxWidth()
+                )
+
+                OutlinedTextField(
+                    value = content,
+                    onValueChange = { content = it },
+                    label = { Text("متن یادداشت *") },
+                    minLines = 4,
+                    maxLines = 8,
+                    modifier = Modifier.fillMaxWidth()
+                )
+
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Text("سنجاق به بالا:", style = MaterialTheme.typography.bodySmall)
+                    Switch(checked = isPinned, onCheckedChange = { isPinned = it })
+                }
+
+                Text("رنگ یادداشت:", style = MaterialTheme.typography.bodySmall, fontWeight = FontWeight.SemiBold)
+                Row(
+                    horizontalArrangement = Arrangement.spacedBy(10.dp)
+                ) {
+                    noteColors.forEach { hex ->
+                        val col = parseColor(hex)
+                        Box(
+                            modifier = Modifier
+                                .size(36.dp)
+                                .clip(RoundedCornerShape(8.dp))
+                                .background(col)
+                                .border(1.dp, Color.Gray.copy(alpha = 0.3f), RoundedCornerShape(8.dp))
+                                .clickable { colorHex = hex }
+                                .then(
+                                    if (colorHex == hex) {
+                                        Modifier.border(2.dp, MaterialTheme.colorScheme.primary, RoundedCornerShape(8.dp))
+                                    } else Modifier
+                                ),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            if (colorHex == hex) {
+                                Icon(Icons.Default.Check, contentDescription = null, tint = Color.DarkGray, modifier = Modifier.size(16.dp))
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        confirmButton = {
+            Button(
+                onClick = {
+                    if (content.isNotBlank()) {
+                        onConfirm(title.trim(), content.trim(), colorHex, isPinned)
+                    }
+                },
+                enabled = content.isNotBlank(),
+                modifier = Modifier.testTag("confirm_edit_note")
+            ) {
+                Text("به‌روزرسانی یادداشت")
             }
         },
         dismissButton = {
