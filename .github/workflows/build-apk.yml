@@ -21,7 +21,7 @@ jobs:
           java-version: '17'
 
       - name: Build Debug APK
-        run: ./gradlew assembleDebug --stacktrace
+        run: gradlew assembleDebug --stacktrace
 
       - name: Create Release and Upload APK
         uses: softprops/action-gh-release@v2
