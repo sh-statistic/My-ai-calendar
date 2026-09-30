@@ -296,6 +296,17 @@ fun PrayerTimesCard(
                     }
                 }
             }
+
+            Spacer(modifier = Modifier.height(4.dp))
+
+            // Accuracy Disclaimer / Caution Note
+            Text(
+                text = "⚠️ احتیاط: اوقات شرعی با فرمول ژئوفیزیک محاسبه شده و ممکن است با افق دقیق محلی چند دقیقه تفاوت داشته باشد؛ لطفاً برای ادای فرایض دقایقی احتیاط فرمایید.",
+                fontSize = 9.sp,
+                color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.8f),
+                lineHeight = 13.sp,
+                modifier = Modifier.padding(horizontal = 4.dp, vertical = 2.dp)
+            )
         }
     }
 }

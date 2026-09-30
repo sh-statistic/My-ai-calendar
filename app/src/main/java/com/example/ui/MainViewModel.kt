@@ -200,6 +200,36 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         }
     }
 
+    fun previousDay() {
+        val cur = _selectedDate.value
+        val gDate = PersianCalendarHelper.jalaliToGregorian(cur.year, cur.month, cur.day)
+        val cal = Calendar.getInstance().apply {
+            set(gDate.year, gDate.month - 1, gDate.day)
+            add(Calendar.DAY_OF_MONTH, -1)
+        }
+        val prevJalali = PersianCalendarHelper.gregorianToJalali(
+            cal.get(Calendar.YEAR), cal.get(Calendar.MONTH) + 1, cal.get(Calendar.DAY_OF_MONTH)
+        )
+        setSelectedDate(prevJalali)
+        _currentViewYear.value = prevJalali.year
+        _currentViewMonth.value = prevJalali.month
+    }
+
+    fun nextDay() {
+        val cur = _selectedDate.value
+        val gDate = PersianCalendarHelper.jalaliToGregorian(cur.year, cur.month, cur.day)
+        val cal = Calendar.getInstance().apply {
+            set(gDate.year, gDate.month - 1, gDate.day)
+            add(Calendar.DAY_OF_MONTH, 1)
+        }
+        val nextJalali = PersianCalendarHelper.gregorianToJalali(
+            cal.get(Calendar.YEAR), cal.get(Calendar.MONTH) + 1, cal.get(Calendar.DAY_OF_MONTH)
+        )
+        setSelectedDate(nextJalali)
+        _currentViewYear.value = nextJalali.year
+        _currentViewMonth.value = nextJalali.month
+    }
+
     // Bluetooth BLE explicit push/pull sync actions
     fun triggerBleSyncPush() {
         viewModelScope.launch {
@@ -473,6 +503,13 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     fun toggleTask(id: String, isCompleted: Boolean) {
         viewModelScope.launch {
             repository.toggleTask(id, isCompleted)
+        }
+    }
+
+    fun updateTask(task: TaskEntity) {
+        viewModelScope.launch {
+            repository.updateTask(task)
+            logMessage("وظیفه ویرایش شد: ${task.title}")
         }
     }
 

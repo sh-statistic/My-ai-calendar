@@ -29,6 +29,7 @@ import androidx.compose.material.icons.filled.AutoAwesome
 import androidx.compose.material.icons.filled.CalendarMonth
 import androidx.compose.material.icons.filled.CalendarToday
 import androidx.compose.material.icons.filled.Checklist
+import androidx.compose.material.icons.filled.HourglassBottom
 import androidx.compose.material.icons.filled.NoteAlt
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.Sync
@@ -66,9 +67,9 @@ import com.example.calendar.PersianCalendarHelper
 import com.example.ui.MainViewModel
 import com.example.ui.screens.CalendarScreen
 import com.example.ui.screens.ChatScreen
+import com.example.ui.screens.LifeGridScreen
 import com.example.ui.screens.NotesScreen
 import com.example.ui.screens.SettingsScreen
-import com.example.ui.screens.SyncScreen
 import com.example.ui.screens.TasksScreen
 import com.example.ui.theme.MyApplicationTheme
 
@@ -242,10 +243,10 @@ class MainActivity : ComponentActivity() {
                                             text = when (selectedTab) {
                                                 1 -> "وظایف و چک‌لیست"
                                                 2 -> "یادداشت‌ها"
-                                                3 -> "همگام‌سازی محلی و بلوتوث"
-                                                4 -> "تنظیمات"
+                                                3 -> "عمر من (Memento Mori)"
+                                                4 -> "تنظیمات و همگام‌سازی"
                                                 5 -> "دستیار هوشمند"
-                                                else -> "همگام"
+                                                else -> "تقویم همگام"
                                             },
                                             style = MaterialTheme.typography.titleMedium,
                                             fontWeight = FontWeight.Bold,
@@ -332,6 +333,21 @@ class MainActivity : ComponentActivity() {
                                     selected = selectedTab == 3,
                                     onClick = { selectedTab = 3 },
                                     icon = {
+                                        Icon(
+                                            Icons.Default.HourglassBottom,
+                                            contentDescription = "عمر من",
+                                            modifier = Modifier.size(20.dp),
+                                            tint = if (selectedTab == 3) Color(0xFFF59E0B) else MaterialTheme.colorScheme.onSurfaceVariant
+                                        )
+                                    },
+                                    label = { Text("عمر من", fontSize = 10.sp, maxLines = 1, fontWeight = if (selectedTab == 3) FontWeight.Bold else FontWeight.Normal) },
+                                    alwaysShowLabel = true,
+                                    modifier = Modifier.testTag("nav_memento_mori")
+                                )
+                                NavigationBarItem(
+                                    selected = selectedTab == 4,
+                                    onClick = { selectedTab = 4 },
+                                    icon = {
                                         BadgedBox(
                                             badge = {
                                                 if (isServerRunning) {
@@ -339,17 +355,9 @@ class MainActivity : ComponentActivity() {
                                                 }
                                             }
                                         ) {
-                                            Icon(Icons.Default.Sync, contentDescription = "همگام‌سازی", modifier = Modifier.size(20.dp))
+                                            Icon(Icons.Default.Settings, contentDescription = "تنظیمات", modifier = Modifier.size(20.dp))
                                         }
                                     },
-                                    label = { Text("همگام", fontSize = 10.sp, maxLines = 1) },
-                                    alwaysShowLabel = true,
-                                    modifier = Modifier.testTag("nav_sync")
-                                )
-                                NavigationBarItem(
-                                    selected = selectedTab == 4,
-                                    onClick = { selectedTab = 4 },
-                                    icon = { Icon(Icons.Default.Settings, contentDescription = "تنظیمات", modifier = Modifier.size(20.dp)) },
                                     label = { Text("تنظیمات", fontSize = 10.sp, maxLines = 1) },
                                     alwaysShowLabel = true,
                                     modifier = Modifier.testTag("nav_settings")
@@ -366,7 +374,7 @@ class MainActivity : ComponentActivity() {
                                 0 -> CalendarScreen(viewModel = viewModel)
                                 1 -> TasksScreen(viewModel = viewModel)
                                 2 -> NotesScreen(viewModel = viewModel)
-                                3 -> SyncScreen(viewModel = viewModel)
+                                3 -> LifeGridScreen(viewModel = viewModel)
                                 4 -> SettingsScreen(viewModel = viewModel)
                                 5 -> ChatScreen(viewModel = viewModel)
                             }

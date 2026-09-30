@@ -39,6 +39,7 @@ import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -61,9 +62,12 @@ import com.example.calendar.JalaliDate
 import com.example.calendar.PersianCalendarHelper
 import com.example.calendar.PersianOccasionsHelper
 import com.example.data.EventEntity
+import com.example.data.TaskEntity
 import com.example.ui.MainViewModel
 import com.example.ui.components.AddEventDialog
+import com.example.ui.components.AddTaskDialog
 import com.example.ui.components.EditEventDialog
+import com.example.ui.components.EditTaskDialog
 import com.example.ui.components.PrayerTimesCard
 import com.example.ui.components.parseColor
 
@@ -79,11 +83,16 @@ fun CalendarScreen(
     val tasks by viewModel.activeTasks.collectAsState()
 
     var showAddEventDialog by remember { mutableStateOf(false) }
+    var showAddTaskDialog by remember { mutableStateOf(false) }
     var eventToEdit by remember { mutableStateOf<EventEntity?>(null) }
+    var taskToEdit by remember { mutableStateOf<TaskEntity?>(null) }
 
     val today = PersianCalendarHelper.getCurrentJalaliDate()
     val daysInMonth = PersianCalendarHelper.getDaysInJalaliMonth(viewYear, viewMonth)
     val firstDayOfWeek = PersianCalendarHelper.getPersianDayOfWeek(viewYear, viewMonth, 1)
+
+    val selectedDayOfWeekIdx = PersianCalendarHelper.getPersianDayOfWeek(selectedDate.year, selectedDate.month, selectedDate.day)
+    val selectedDayOfWeekName = PersianCalendarHelper.WEEKDAY_NAMES_PERSIAN.getOrElse(selectedDayOfWeekIdx) { "" }
 
     val selectedDayEvents = events.filter { it.persianDate == selectedDate.formatted }
     val selectedDayTasks = tasks.filter { it.persianDueDate == selectedDate.formatted }
@@ -350,19 +359,20 @@ fun CalendarScreen(
                 ) {
                     Column {
                         Text(
-                            text = "برنامه‌های ${selectedDate.formattedPersian}",
+                            text = "$selectedDayOfWeekName ${PersianCalendarHelper.toPersianDigits(selectedDate.day.toString())} ${selectedDate.monthName} ${PersianCalendarHelper.toPersianDigits(selectedDate.year.toString())}",
                             style = MaterialTheme.typography.titleSmall,
-                            fontWeight = FontWeight.Bold
+                            fontWeight = FontWeight.Bold,
+                            color = MaterialTheme.colorScheme.primary
                         )
                         Text(
-                            text = "معادل میلادی: ${selGDate.formatted} (${selGDate.day} ${selGDate.monthName} ${selGDate.year})",
+                            text = "معادل میلادی: ${selGDate.formatted} (${selGDate.day} ${selGDate.monthName} ${selGDate.year} - $selectedDayOfWeekName)",
                             style = MaterialTheme.typography.bodySmall,
                             fontSize = 10.sp,
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
                     }
                     Text(
-                        text = "${PersianCalendarHelper.toPersianDigits((selectedDayEvents.size + selectedDayTasks.size).toString())} مورد",
+                        text = "${PersianCalendarHelper.toPersianDigits((selectedDayEvents.size + selectedDayTasks.size).toString())} برنامه",
                         style = MaterialTheme.typography.bodySmall,
                         fontSize = 11.sp,
                         fontWeight = FontWeight.Bold,
@@ -381,37 +391,67 @@ fun CalendarScreen(
                             .fillMaxWidth()
                             .padding(horizontal = 10.dp)
                     ) {
-                        Row(
+                        Column(
                             modifier = Modifier
                                 .fillMaxWidth()
                                 .padding(14.dp),
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.Center
+                            horizontalAlignment = Alignment.CenterHorizontally
                         ) {
-                            Icon(
-                                Icons.Default.Event,
-                                contentDescription = null,
-                                tint = MaterialTheme.colorScheme.outlineVariant,
-                                modifier = Modifier.size(24.dp)
-                            )
-                            Spacer(modifier = Modifier.width(8.dp))
                             Text(
-                                text = "هیچ رویدادی برای این تاریخ ثبت نشده است.",
+                                text = "هیچ برنامه یا وظیفه‌ای برای این روز ثبت نشده است.",
                                 style = MaterialTheme.typography.bodySmall,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant
                             )
+                            Spacer(modifier = Modifier.height(8.dp))
+                            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                                OutlinedButton(onClick = { showAddEventDialog = true }) {
+                                    Icon(Icons.Default.Add, contentDescription = null, modifier = Modifier.size(14.dp))
+                                    Spacer(modifier = Modifier.width(4.dp))
+                                    Text("افزودن رویداد", fontSize = 11.sp)
+                                }
+                                OutlinedButton(onClick = { showAddTaskDialog = true }) {
+                                    Icon(Icons.Default.Add, contentDescription = null, modifier = Modifier.size(14.dp))
+                                    Spacer(modifier = Modifier.width(4.dp))
+                                    Text("افزودن وظیفه", fontSize = 11.sp)
+                                }
+                            }
                         }
                     }
                 }
             } else {
-                items(selectedDayEvents, key = { it.id }) { event ->
-                    Box(modifier = Modifier.padding(horizontal = 10.dp)) {
-                        EventItemCard(
-                            event = event,
-                            onClick = { eventToEdit = event },
-                            onEdit = { eventToEdit = event },
-                            onDelete = { viewModel.deleteEvent(event.id) }
+                if (selectedDayEvents.isNotEmpty()) {
+                    items(selectedDayEvents, key = { it.id }) { event ->
+                        Box(modifier = Modifier.padding(horizontal = 10.dp)) {
+                            EventItemCard(
+                                event = event,
+                                onClick = { eventToEdit = event },
+                                onEdit = { eventToEdit = event },
+                                onDelete = { viewModel.deleteEvent(event.id) }
+                            )
+                        }
+                    }
+                }
+
+                if (selectedDayTasks.isNotEmpty()) {
+                    item {
+                        Text(
+                            text = "وظایف و کارهای این روز:",
+                            style = MaterialTheme.typography.labelMedium,
+                            fontWeight = FontWeight.Bold,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            modifier = Modifier.padding(horizontal = 14.dp, vertical = 2.dp)
                         )
+                    }
+
+                    items(selectedDayTasks, key = { it.id }) { task ->
+                        Box(modifier = Modifier.padding(horizontal = 10.dp)) {
+                            TaskItemCard(
+                                task = task,
+                                onToggle = { isChecked -> viewModel.toggleTask(task.id, isChecked) },
+                                onEdit = { taskToEdit = task },
+                                onDelete = { viewModel.deleteTask(task.id) }
+                            )
+                        }
                     }
                 }
             }
@@ -425,6 +465,40 @@ fun CalendarScreen(
             onConfirm = { title, desc, pDate, time, cat, col ->
                 viewModel.addEvent(title, desc, pDate, time, cat, col)
                 showAddEventDialog = false
+            }
+        )
+    }
+
+    if (showAddTaskDialog) {
+        AddTaskDialog(
+            initialDate = selectedDate,
+            onDismiss = { showAddTaskDialog = false },
+            onConfirm = { title, dueDate, priority, category ->
+                viewModel.addTask(title, dueDate, priority, category)
+                showAddTaskDialog = false
+            }
+        )
+    }
+
+    taskToEdit?.let { task ->
+        EditTaskDialog(
+            task = task,
+            onDismiss = { taskToEdit = null },
+            onConfirm = { title, dueDate, priority, category ->
+                viewModel.updateTask(
+                    task.copy(
+                        title = title,
+                        persianDueDate = dueDate,
+                        priority = priority,
+                        category = category,
+                        updatedAt = System.currentTimeMillis()
+                    )
+                )
+                taskToEdit = null
+            },
+            onDelete = {
+                viewModel.deleteTask(task.id)
+                taskToEdit = null
             }
         )
     }
