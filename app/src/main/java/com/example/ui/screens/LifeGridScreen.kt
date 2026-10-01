@@ -101,6 +101,9 @@ import kotlinx.coroutines.launch
  * - Current Month: Pulsing Orange Circle with 3-Second Physical Drill Long-Press & Continuous Haptic Feedback
  * - Future Months: Light Gray Solid Circles
  */
+import androidx.compose.foundation.gestures.detectTapGestures
+import kotlin.math.min
+
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
 fun LifeGridScreen(
@@ -116,100 +119,6 @@ fun LifeGridScreen(
     var showMonthDetailDialog by remember { mutableStateOf<Int?>(null) }
     var reflectionNoteText by remember { mutableStateOf("") }
     var justDrilledMonthIndex by remember { mutableIntStateOf(0) }
-
-    // Long press drill state (0.0f to 1.0f over 3 seconds)
-    var isDrilling by remember { mutableStateOf(false) }
-    var drillProgress by remember { mutableFloatStateOf(0f) }
-
-    // Pulsing Animation for Current Month
-    val infiniteTransition = rememberInfiniteTransition(label = "pulse_transition")
-    val pulseScale by infiniteTransition.animateFloat(
-        initialValue = 0.9f,
-        targetValue = 1.35f,
-        animationSpec = infiniteRepeatable(
-            animation = tween(900, easing = FastOutSlowInEasing),
-            repeatMode = RepeatMode.Reverse
-        ),
-        label = "pulse_scale"
-    )
-    val pulseAlpha by infiniteTransition.animateFloat(
-        initialValue = 0.5f,
-        targetValue = 1.0f,
-        animationSpec = infiniteRepeatable(
-            animation = tween(900, easing = FastOutSlowInEasing),
-            repeatMode = RepeatMode.Reverse
-        ),
-        label = "pulse_alpha"
-    )
-
-    // Vibrator instance
-    val vibrator = remember(context) {
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
-            val manager = context.getSystemService(Context.VIBRATOR_MANAGER_SERVICE) as? VibratorManager
-            manager?.defaultVibrator
-        } else {
-            @Suppress("DEPRECATION")
-            context.getSystemService(Context.VIBRATOR_SERVICE) as? Vibrator
-        }
-    }
-
-    // Continuous Heavy Drilling Vibration Effect during Long-Press
-    LaunchedEffect(isDrilling) {
-        if (isDrilling) {
-            val startTime = System.currentTimeMillis()
-            val totalDurationMs = 3000L
-
-            while (isActive && isDrilling) {
-                val elapsed = System.currentTimeMillis() - startTime
-                drillProgress = (elapsed.toFloat() / totalDurationMs.toFloat()).coerceIn(0f, 1f)
-
-                // Trigger rapid heavy tactile impact every 60ms
-                try {
-                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-                        vibrator?.vibrate(VibrationEffect.createOneShot(50, VibrationEffect.DEFAULT_AMPLITUDE))
-                    } else {
-                        @Suppress("DEPRECATION")
-                        vibrator?.vibrate(50)
-                    }
-                } catch (_: Exception) {}
-
-                if (drillProgress >= 1.0f) {
-                    // Drill Complete! Heavy completion feedback
-                    isDrilling = false
-                    drillProgress = 0f
-
-                    try {
-                        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-                            vibrator?.vibrate(
-                                VibrationEffect.createWaveform(
-                                    longArrayOf(0, 150, 80, 250),
-                                    intArrayOf(0, 255, 0, 255),
-                                    -1
-                                )
-                            )
-                        } else {
-                            @Suppress("DEPRECATION")
-                            vibrator?.vibrate(300)
-                        }
-                    } catch (_: Exception) {}
-
-                    // Update Memento Mori state
-                    justDrilledMonthIndex = progressData.currentMonthIndex
-                    manager.addManualDrilledMonth()
-                    progressData = manager.calculateProgress()
-
-                    // Open reflection dialog
-                    reflectionNoteText = ""
-                    showReflectionDialog = true
-                    break
-                }
-
-                delay(60)
-            }
-        } else {
-            drillProgress = 0f
-        }
-    }
 
     Column(
         modifier = modifier
@@ -241,7 +150,7 @@ fun LifeGridScreen(
                         )
                         Spacer(modifier = Modifier.width(8.dp))
                         Text(
-                            text = "عمر من (۹۶۰ ماه - ۸۰ سال)",
+                            text = "عمر من (${PersianCalendarHelper.toPersianDigits(progressData.totalMonths.toString())} ماه - ${PersianCalendarHelper.toPersianDigits((progressData.totalMonths / 12).toString())} سال)",
                             style = MaterialTheme.typography.titleMedium,
                             fontWeight = FontWeight.Bold
                         )
@@ -384,7 +293,7 @@ fun LifeGridScreen(
                             .background(Color(0xFFF59E0B))
                     )
                     Spacer(modifier = Modifier.width(4.dp))
-                    Text("ماه فعلی (۳ ثانیه لمس)", fontSize = 10.sp, fontWeight = FontWeight.Bold, color = Color(0xFFD97706))
+                    Text("ماه فعلی (لمس جهت ثبت)", fontSize = 10.sp, fontWeight = FontWeight.Bold, color = Color(0xFFD97706))
                 }
 
                 // Future
@@ -401,113 +310,68 @@ fun LifeGridScreen(
             }
         }
 
-        // Active Drilling Feedback Bar (shows when user is holding finger)
-        if (isDrilling) {
-            Spacer(modifier = Modifier.height(6.dp))
-            Surface(
-                color = Color(0xFFFEF2F2),
-                shape = RoundedCornerShape(10.dp),
-                border = androidx.compose.foundation.BorderStroke(1.dp, Color(0xFFEF4444)),
-                modifier = Modifier.fillMaxWidth()
-            ) {
-                Row(
-                    modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Text(
-                        text = "⚡ در حال دریل کردن و پایان ماه فعلی...",
-                        fontSize = 11.sp,
-                        fontWeight = FontWeight.Bold,
-                        color = Color(0xFFDC2626)
-                    )
-                    CircularProgressIndicator(
-                        progress = drillProgress,
-                        modifier = Modifier.size(18.dp),
-                        strokeWidth = 2.5.dp,
-                        color = Color(0xFFDC2626)
-                    )
-                }
-            }
-        }
-
         Spacer(modifier = Modifier.height(8.dp))
 
-        // 960 Months Grid (80 Years * 12 Months)
-        val gridState = rememberLazyGridState()
-
-        // Auto-scroll near the current month on first load
-        LaunchedEffect(progressData.currentMonthIndex) {
-            val targetRow = (progressData.currentMonthIndex / 24) * 24
-            gridState.scrollToItem(targetRow.coerceAtLeast(0))
-        }
-
-        LazyVerticalGrid(
-            columns = GridCells.Fixed(24), // 24 columns = 2 years per row (40 rows total)
-            state = gridState,
+        // 960 Months Grid (80 Years * 12 Months) via High-Performance Canvas
+        Box(
             modifier = Modifier
-                .fillMaxSize()
+                .fillMaxWidth()
                 .weight(1f)
                 .background(MaterialTheme.colorScheme.surface, RoundedCornerShape(14.dp))
                 .padding(8.dp),
-            horizontalArrangement = Arrangement.spacedBy(4.dp),
-            verticalArrangement = Arrangement.spacedBy(4.dp)
+            contentAlignment = Alignment.Center
         ) {
-            items(progressData.totalMonths) { index ->
-                val isPast = index < progressData.currentMonthIndex
-                val isCurrent = index == progressData.currentMonthIndex
-                val isFuture = index > progressData.currentMonthIndex
+            Canvas(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .pointerInput(progressData) {
+                        detectTapGestures { offset ->
+                            val colWidth = size.width / 24f
+                            val rowHeight = size.height / (progressData.totalMonths / 24f)
+                            val col = (offset.x / colWidth).toInt()
+                            val row = (offset.y / rowHeight).toInt()
+                            val index = row * 24 + col
 
-                val yearIndex = (index / 12) + 1
-                val monthInYear = (index % 12) + 1
-
-                Box(
-                    modifier = Modifier
-                        .aspectRatio(1f)
-                        .then(
-                            if (isCurrent) {
-                                Modifier
-                                    .scale(pulseScale)
-                                    .clip(CircleShape)
-                                    .background(Color(0xFFF59E0B).copy(alpha = pulseAlpha))
-                                    .border(1.5.dp, Color(0xFFD97706), CircleShape)
-                                    .pointerInput(Unit) {
-                                        awaitEachGesture {
-                                            awaitFirstDown()
-                                            isDrilling = true
-                                            do {
-                                                val event = awaitPointerEvent()
-                                            } while (event.changes.any { it.pressed })
-                                            // User released finger
-                                            isDrilling = false
-                                        }
-                                    }
-                            } else if (isPast) {
-                                // Drilled hole (Dark Hollow Physical Hole effect)
-                                Modifier
-                                    .clip(CircleShape)
-                                    .background(Color(0xFF0F172A))
-                                    .border(1.dp, Color(0xFF334155), CircleShape)
-                                    .clickable {
-                                        showMonthDetailDialog = index
-                                    }
-                            } else {
-                                // Future month (Light Gray Solid)
-                                Modifier
-                                    .clip(CircleShape)
-                                    .background(Color(0xFFE2E8F0))
+                            if (index in 0 until progressData.totalMonths) {
+                                if (index < progressData.currentMonthIndex) {
+                                    showMonthDetailDialog = index
+                                } else if (index == progressData.currentMonthIndex) {
+                                    justDrilledMonthIndex = progressData.currentMonthIndex
+                                    manager.addManualDrilledMonth()
+                                    progressData = manager.calculateProgress()
+                                    reflectionNoteText = ""
+                                    showReflectionDialog = true
+                                }
                             }
-                        ),
-                    contentAlignment = Alignment.Center
-                ) {
-                    if (isPast) {
-                        // Inner dark hole depth center
-                        Box(
-                            modifier = Modifier
-                                .size(4.dp)
-                                .clip(CircleShape)
-                                .background(Color(0xFF020617))
-                        )
+                        }
+                    }
+            ) {
+                val totalRows = progressData.totalMonths / 24
+                val colWidth = size.width / 24f
+                val rowHeight = size.height / totalRows.toFloat()
+                val radius = min(colWidth, rowHeight) / 2f * 0.8f // 80% size for padding
+                val strokeWidthPx = 1.dp.toPx()
+                val strokeCurrentPx = 1.5.dp.toPx()
+
+                for (i in 0 until progressData.totalMonths) {
+                    val row = i / 24
+                    val col = i % 24
+                    val cx = col * colWidth + colWidth / 2f
+                    val cy = row * rowHeight + rowHeight / 2f
+                    val centerOffset = Offset(cx, cy)
+
+                    if (i < progressData.currentMonthIndex) {
+                        // Past
+                        drawCircle(color = Color(0xFF0F172A), radius = radius, center = centerOffset)
+                        drawCircle(color = Color(0xFF334155), radius = radius, center = centerOffset, style = Stroke(width = strokeWidthPx))
+                        drawCircle(color = Color(0xFF020617), radius = radius * 0.3f, center = centerOffset)
+                    } else if (i == progressData.currentMonthIndex) {
+                        // Current
+                        drawCircle(color = Color(0xFFF59E0B), radius = radius, center = centerOffset)
+                        drawCircle(color = Color(0xFFD97706), radius = radius, center = centerOffset, style = Stroke(width = strokeCurrentPx))
+                    } else {
+                        // Future
+                        drawCircle(color = Color(0xFFE2E8F0), radius = radius, center = centerOffset)
                     }
                 }
             }
@@ -583,7 +447,7 @@ fun LifeGridScreen(
             text = {
                 Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
                     Text(
-                        text = "شماره ماه در عمر: ${PersianCalendarHelper.toPersianDigits((monthIdx + 1).toString())} از ۹۶۰ ماه",
+                        text = "شماره ماه در عمر: ${PersianCalendarHelper.toPersianDigits((monthIdx + 1).toString())} از ${PersianCalendarHelper.toPersianDigits((progressData.totalMonths).toString())} ماه",
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
@@ -620,26 +484,30 @@ fun LifeGridScreen(
 
     // Dialog: Set Birth Year & Month
     if (showBirthDialog) {
-        var tempYear by remember { mutableIntStateOf(progressData.birthYear) }
+        var tempYear by remember { mutableStateOf(progressData.birthYear.toString()) }
         var tempMonth by remember { mutableIntStateOf(progressData.birthMonth) }
+        var tempLifespan by remember { mutableStateOf((progressData.totalMonths / 12).toString()) }
         val currentYear = PersianCalendarHelper.getCurrentJalaliDate().year
 
         AlertDialog(
             onDismissRequest = { showBirthDialog = false },
-            title = { Text("تنظیم سال و ماه تولد", fontWeight = FontWeight.Bold) },
+            title = { Text("تنظیمات عمر من", fontWeight = FontWeight.Bold) },
             text = {
                 Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                    Text("برای محاسبه دقیق ماه‌های سپری‌شده، سال و ماه تولد خود را مشخص کنید:", style = MaterialTheme.typography.bodySmall)
+                    Text("برای محاسبه دقیق ماه‌های سپری‌شده، مشخصات خود را وارد کنید:", style = MaterialTheme.typography.bodySmall)
 
                     OutlinedTextField(
-                        value = tempYear.toString(),
-                        onValueChange = { str ->
-                            val y = str.filter { it.isDigit() }.toIntOrNull()
-                            if (y != null && y in 1300..currentYear) {
-                                tempYear = y
-                            }
-                        },
+                        value = tempYear,
+                        onValueChange = { tempYear = it.filter { ch -> ch.isDigit() } },
                         label = { Text("سال تولد (شمسی)") },
+                        singleLine = true,
+                        modifier = Modifier.fillMaxWidth()
+                    )
+
+                    OutlinedTextField(
+                        value = tempLifespan,
+                        onValueChange = { tempLifespan = it.filter { ch -> ch.isDigit() } },
+                        label = { Text("فکر می‌کنید چند سال عمر می‌کنید؟") },
                         singleLine = true,
                         modifier = Modifier.fillMaxWidth()
                     )
@@ -664,7 +532,12 @@ fun LifeGridScreen(
             confirmButton = {
                 Button(
                     onClick = {
-                        manager.setBirthDate(tempYear, tempMonth)
+                        val y = tempYear.toIntOrNull() ?: progressData.birthYear
+                        val ls = tempLifespan.toIntOrNull()?.coerceIn(10, 150) ?: (progressData.totalMonths / 12)
+                        
+                        manager.setBirthDate(if (y in 1300..currentYear) y else progressData.birthYear, tempMonth)
+                        manager.setExpectedLifespan(ls)
+                        
                         progressData = manager.calculateProgress()
                         showBirthDialog = false
                     }

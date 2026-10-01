@@ -20,6 +20,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -303,14 +304,16 @@ class MainActivity : ComponentActivity() {
                         bottomBar = {
                             // 5 Clean Bottom Navigation Tabs
                             NavigationBar(
-                                modifier = Modifier.testTag("bottom_nav_bar")
+                                modifier = Modifier
+                                    .testTag("bottom_nav_bar")
+                                    .height(60.dp) // کاهش ارتفاع نوار (پیش‌فرض ۸۰ است)
                             ) {
                                 NavigationBarItem(
                                     selected = selectedTab == 0,
                                     onClick = { selectedTab = 0 },
                                     icon = { Icon(Icons.Default.CalendarMonth, contentDescription = "تقویم", modifier = Modifier.size(20.dp)) },
                                     label = { Text("تقویم", fontSize = 10.sp, maxLines = 1) },
-                                    alwaysShowLabel = true,
+                                    alwaysShowLabel = false,
                                     modifier = Modifier.testTag("nav_calendar")
                                 )
                                 NavigationBarItem(
@@ -318,7 +321,7 @@ class MainActivity : ComponentActivity() {
                                     onClick = { selectedTab = 1 },
                                     icon = { Icon(Icons.Default.Checklist, contentDescription = "وظایف", modifier = Modifier.size(20.dp)) },
                                     label = { Text("وظایف", fontSize = 10.sp, maxLines = 1) },
-                                    alwaysShowLabel = true,
+                                    alwaysShowLabel = false,
                                     modifier = Modifier.testTag("nav_tasks")
                                 )
                                 NavigationBarItem(
@@ -326,7 +329,7 @@ class MainActivity : ComponentActivity() {
                                     onClick = { selectedTab = 2 },
                                     icon = { Icon(Icons.Default.NoteAlt, contentDescription = "یادداشت‌ها", modifier = Modifier.size(20.dp)) },
                                     label = { Text("یادداشت", fontSize = 10.sp, maxLines = 1) },
-                                    alwaysShowLabel = true,
+                                    alwaysShowLabel = false,
                                     modifier = Modifier.testTag("nav_notes")
                                 )
                                 NavigationBarItem(
@@ -341,7 +344,7 @@ class MainActivity : ComponentActivity() {
                                         )
                                     },
                                     label = { Text("عمر من", fontSize = 10.sp, maxLines = 1, fontWeight = if (selectedTab == 3) FontWeight.Bold else FontWeight.Normal) },
-                                    alwaysShowLabel = true,
+                                    alwaysShowLabel = false,
                                     modifier = Modifier.testTag("nav_memento_mori")
                                 )
                                 NavigationBarItem(
@@ -359,7 +362,7 @@ class MainActivity : ComponentActivity() {
                                         }
                                     },
                                     label = { Text("تنظیمات", fontSize = 10.sp, maxLines = 1) },
-                                    alwaysShowLabel = true,
+                                    alwaysShowLabel = false,
                                     modifier = Modifier.testTag("nav_settings")
                                 )
                             }

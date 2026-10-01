@@ -69,9 +69,6 @@ fun PrayerTimesCard(
     val prayerTimes by viewModel.prayerTimes.collectAsState()
     val nextPrayer by viewModel.nextPrayerInfo.collectAsState()
     val selectedCity by viewModel.selectedCity.collectAsState()
-    val selectedDate by viewModel.selectedDate.collectAsState()
-    val alarmSettings by viewModel.fajrAlarmSettings.collectAsState()
-
     var showCityDropdown by remember { mutableStateOf(false) }
 
     Card(
@@ -83,23 +80,22 @@ fun PrayerTimesCard(
             .testTag("prayer_times_card")
     ) {
         Column(modifier = Modifier.padding(10.dp)) {
-            // Header: City Selector + Next Prayer Badge (Scalable for small screens)
+            // Header: City Display + Next Prayer Badge
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                // City Dropdown Button
-                Box {
-                    Surface(
-                        color = MaterialTheme.colorScheme.surfaceVariant,
-                        shape = RoundedCornerShape(8.dp),
-                        modifier = Modifier
-                            .clickable { showCityDropdown = true }
-                            .testTag("btn_select_city")
-                    ) {
+                // City Display (Moved selection to Settings)
+                Surface(
+                    color = MaterialTheme.colorScheme.surfaceVariant,
+                    shape = RoundedCornerShape(8.dp)
+                ) {
+                    Box {
                         Row(
-                            modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
+                            modifier = Modifier
+                                .padding(horizontal = 8.dp, vertical = 4.dp)
+                                .clickable { showCityDropdown = true },
                             verticalAlignment = Alignment.CenterVertically
                         ) {
                             Icon(
@@ -110,42 +106,36 @@ fun PrayerTimesCard(
                             )
                             Spacer(modifier = Modifier.width(3.dp))
                             Text(
-                                text = "${selectedCity.nameFa} (${PersianCalendarHelper.toPersianDigits("${selectedDate.day} ${PersianCalendarHelper.PERSIAN_MONTH_NAMES[selectedDate.month - 1]}")})",
+                                text = selectedCity.nameFa,
                                 style = MaterialTheme.typography.labelSmall,
                                 fontWeight = FontWeight.Bold,
                                 color = MaterialTheme.colorScheme.onSurface
                             )
-                            Icon(
-                                Icons.Default.ArrowDropDown,
-                                contentDescription = null,
-                                tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                                modifier = Modifier.size(16.dp)
-                            )
                         }
-                    }
-
-                    DropdownMenu(
-                        expanded = showCityDropdown,
-                        onDismissRequest = { showCityDropdown = false }
-                    ) {
-                        PrayerTimesCalculator.CITIES.forEach { city ->
-                            DropdownMenuItem(
-                                text = {
-                                    Row(
-                                        modifier = Modifier.fillMaxWidth(),
-                                        horizontalArrangement = Arrangement.SpaceBetween
-                                    ) {
-                                        Text(city.nameFa, fontWeight = if (city.nameFa == selectedCity.nameFa) FontWeight.Bold else FontWeight.Normal)
-                                        if (city.nameFa == selectedCity.nameFa) {
-                                            Icon(Icons.Default.Check, contentDescription = null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(14.dp))
+                        
+                        DropdownMenu(
+                            expanded = showCityDropdown,
+                            onDismissRequest = { showCityDropdown = false }
+                        ) {
+                            PrayerTimesCalculator.CITIES.forEach { city ->
+                                DropdownMenuItem(
+                                    text = {
+                                        Row(
+                                            modifier = Modifier.fillMaxWidth(),
+                                            horizontalArrangement = Arrangement.SpaceBetween
+                                        ) {
+                                            Text(city.nameFa, fontWeight = if (city.nameFa == selectedCity.nameFa) FontWeight.Bold else FontWeight.Normal)
+                                            if (city.nameFa == selectedCity.nameFa) {
+                                                Icon(Icons.Default.Check, contentDescription = null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(14.dp))
+                                            }
                                         }
+                                    },
+                                    onClick = {
+                                        viewModel.selectCity(city)
+                                        showCityDropdown = false
                                     }
-                                },
-                                onClick = {
-                                    viewModel.selectCity(city)
-                                    showCityDropdown = false
-                                }
-                            )
+                                )
+                            }
                         }
                     }
                 }
@@ -201,103 +191,6 @@ fun PrayerTimesCard(
             }
 
             Spacer(modifier = Modifier.height(8.dp))
-
-            // Smart Fajr Alarm Section Toggle
-            Surface(
-                color = if (alarmSettings.isEnabled) Color(0xFFFEF3C7) else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
-                shape = RoundedCornerShape(10.dp),
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .testTag("fajr_smart_alarm_card")
-            ) {
-                Column(modifier = Modifier.padding(8.dp)) {
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Row(
-                            modifier = Modifier.weight(1f),
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            Icon(
-                                if (alarmSettings.isEnabled) Icons.Default.AlarmOn else Icons.Default.Alarm,
-                                contentDescription = null,
-                                tint = if (alarmSettings.isEnabled) Color(0xFFB45309) else MaterialTheme.colorScheme.onSurfaceVariant,
-                                modifier = Modifier.size(18.dp)
-                            )
-                            Spacer(modifier = Modifier.width(6.dp))
-                            Column {
-                                Text(
-                                    text = "بیدارباش هوشمند اذان صبح",
-                                    fontSize = 11.sp,
-                                    fontWeight = FontWeight.Bold,
-                                    color = if (alarmSettings.isEnabled) Color(0xFF92400E) else MaterialTheme.colorScheme.onSurface
-                                )
-                                Text(
-                                    text = if (alarmSettings.isEnabled)
-                                        "محاسبه و زمان‌بندی پویا روزانه (${PersianCalendarHelper.toPersianDigits(alarmSettings.offsetMinutesBefore.toString())} دقیقه قبل از اذان)"
-                                    else
-                                        "آلارم خودکار بیدارباش قبل از اذان صبح",
-                                    fontSize = 9.sp,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                                )
-                            }
-                        }
-
-                        Switch(
-                            checked = alarmSettings.isEnabled,
-                            onCheckedChange = { isChecked ->
-                                viewModel.updateFajrAlarm(isChecked, alarmSettings.offsetMinutesBefore)
-                            },
-                            modifier = Modifier.testTag("toggle_fajr_alarm")
-                        )
-                    }
-
-                    // Offset selection chips if alarm is enabled
-                    AnimatedVisibility(visible = alarmSettings.isEnabled) {
-                        Column(modifier = Modifier.padding(top = 6.dp)) {
-                            Text(
-                                text = "زمان پخش هشدار:",
-                                fontSize = 10.sp,
-                                fontWeight = FontWeight.Medium,
-                                color = MaterialTheme.colorScheme.onSurface
-                            )
-                            Spacer(modifier = Modifier.height(2.dp))
-                            FlowRow(
-                                horizontalArrangement = Arrangement.spacedBy(4.dp),
-                                modifier = Modifier.fillMaxWidth()
-                            ) {
-                                val offsets = listOf(
-                                    Pair(0, "همزمان با اذان"),
-                                    Pair(5, "۵ دقیقه قبل"),
-                                    Pair(10, "۱۰ دقیقه قبل"),
-                                    Pair(15, "۱۵ دقیقه قبل"),
-                                    Pair(20, "۲۰ دقیقه قبل"),
-                                    Pair(30, "۳۰ دقیقه قبل")
-                                )
-                                offsets.forEach { (mins, label) ->
-                                    val isSelected = alarmSettings.offsetMinutesBefore == mins
-                                    FilterChip(
-                                        selected = isSelected,
-                                        onClick = {
-                                            viewModel.updateFajrAlarm(true, mins)
-                                        },
-                                        label = { Text(label, fontSize = 9.sp) },
-                                        colors = FilterChipDefaults.filterChipColors(
-                                            selectedContainerColor = Color(0xFFD97706),
-                                            selectedLabelColor = Color.White
-                                        ),
-                                        modifier = Modifier.testTag("chip_offset_$mins")
-                                    )
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-
-            Spacer(modifier = Modifier.height(4.dp))
 
             // Accuracy Disclaimer / Caution Note
             Text(

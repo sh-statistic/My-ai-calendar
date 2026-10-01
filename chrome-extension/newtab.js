@@ -178,10 +178,14 @@ document.addEventListener("DOMContentLoaded", async () => {
       const hasEvents = localEvents.some((e) => !e.isDeleted && e.persianDate === formattedJalali);
       const hasTasks = localTasks.some((t) => !t.isDeleted && t.persianDueDate === formattedJalali);
 
+      const dow = (firstDow + day - 1) % 7;
+      const isFriday = dow === 6;
+      const isHoliday = isFriday || (typeof PersianOccasions !== "undefined" && PersianOccasions.isHoliday(currentMonth, day));
+
       const cell = document.createElement("div");
-      cell.className = `calendar-cell ${isSelected ? "selected" : ""} ${isToday ? "today" : ""}`;
+      cell.className = `calendar-cell ${isSelected ? "selected" : ""} ${isToday ? "today" : ""} ${isHoliday ? "holiday" : ""}`;
       cell.innerHTML = `
-        <span class="solar-day">${PersianDateUtil.toPersianDigits(day)}</span>
+        <span class="solar-day" style="${isHoliday ? "color: var(--danger); font-weight: bold;" : ""}">${PersianDateUtil.toPersianDigits(day)}</span>
         <span class="gregorian-day">${cellGregorian.day}</span>
         ${hasEvents || hasTasks ? '<span class="event-dot"></span>' : ""}
       `;
@@ -199,16 +203,34 @@ document.addEventListener("DOMContentLoaded", async () => {
   function renderSelectedDayEvents() {
     const formatted = PersianDateUtil.formatJalali(selectedDate);
     const selG = PersianDateUtil.jalaliToGregorian(selectedDate.year, selectedDate.month, selectedDate.day);
+    const dowIdx = PersianDateUtil.getPersianDayOfWeek(selectedDate.year, selectedDate.month, selectedDate.day);
+    const dowName = PersianDateUtil.WEEKDAYS[dowIdx];
 
-    selectedDateTitle.textContent = `رویدادهای ${PersianDateUtil.toPersianDigits(formatted)}`;
-    selectedGregorianDate.textContent = `تاریخ میلادی: ${PersianDateUtil.formatGregorian(selG)}`;
+    selectedDateTitle.textContent = `${dowName} ${PersianDateUtil.toPersianDigits(formatted)}`;
+    selectedGregorianDate.textContent = `تاریخ میلادی: ${selG.day} ${PersianDateUtil.GREGORIAN_MONTHS[selG.month - 1]} ${selG.year}`;
+
+    const occasions = typeof PersianOccasions !== "undefined" ? PersianOccasions.getOccasions(selectedDate.month, selectedDate.day) : [];
+    let occasionsHtml = "";
+    if (occasions.length > 0) {
+      occasionsHtml = `
+        <div style="background: var(--bg-card); border: 1px solid var(--border-color); border-radius: 8px; padding: 8px 12px; margin-bottom: 8px;">
+          ${occasions.map(o => `
+            <div style="display: flex; align-items: center; gap: 6px; font-size: 11px; margin-bottom: 2px;">
+              <span style="font-size: 9px; padding: 1px 6px; border-radius: 4px; font-weight: bold; background: ${o.isHoliday ? 'var(--danger-light, #fee2e2)' : '#fef3c7'}; color: ${o.isHoliday ? 'var(--danger, #dc2626)' : '#b45309'};">${o.isHoliday ? 'تعطیل رسمی' : 'مناسبت'}</span>
+              <span>${o.title}</span>
+            </div>
+          `).join("")}
+        </div>
+      `;
+    }
 
     const dayEvents = localEvents.filter((e) => !e.isDeleted && e.persianDate === formatted);
 
+    let eventsHtml = "";
     if (dayEvents.length === 0) {
-      dayEventsList.innerHTML = `<p style="color: var(--text-muted); font-size: 12px;">رویدادی برای این روز ثبت نشده است.</p>`;
+      eventsHtml = `<p style="color: var(--text-muted); font-size: 12px;">رویدادی برای این روز ثبت نشده است.</p>`;
     } else {
-      dayEventsList.innerHTML = dayEvents
+      eventsHtml = dayEvents
         .map(
           (e) => `
         <div style="background: var(--bg-main); border: 1px solid var(--border-color); padding: 8px 12px; border-radius: 8px; border-right: 4px solid ${e.colorHex || 'var(--primary)'}; display: flex; justify-content: space-between; align-items: center;">
@@ -222,6 +244,8 @@ document.addEventListener("DOMContentLoaded", async () => {
         )
         .join("");
     }
+
+    dayEventsList.innerHTML = occasionsHtml + eventsHtml;
   }
 
   // Navigation Listeners
