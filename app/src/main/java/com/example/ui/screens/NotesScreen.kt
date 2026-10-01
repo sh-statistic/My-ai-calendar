@@ -78,23 +78,9 @@ fun NotesScreen(
         }
     }
 
-    Scaffold(
-        modifier = modifier.fillMaxSize(),
-        floatingActionButton = {
-            FloatingActionButton(
-                onClick = { showAddNoteDialog = true },
-                containerColor = MaterialTheme.colorScheme.primary,
-                contentColor = MaterialTheme.colorScheme.onPrimary,
-                modifier = Modifier.testTag("fab_add_note")
-            ) {
-                Icon(Icons.Default.Add, contentDescription = "یادداشت جدید")
-            }
-        }
-    ) { innerPadding ->
+    Box(modifier = modifier.fillMaxSize()) {
         Column(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(innerPadding)
+            modifier = Modifier.fillMaxSize()
         ) {
             // Search Bar
             OutlinedTextField(
@@ -152,6 +138,18 @@ fun NotesScreen(
                     }
                 }
             }
+        }
+
+        FloatingActionButton(
+            onClick = { showAddNoteDialog = true },
+            containerColor = MaterialTheme.colorScheme.primary,
+            contentColor = MaterialTheme.colorScheme.onPrimary,
+            modifier = Modifier
+                .align(Alignment.BottomEnd)
+                .padding(16.dp)
+                .testTag("fab_add_note")
+        ) {
+            Icon(Icons.Default.Add, contentDescription = "یادداشت جدید")
         }
     }
 

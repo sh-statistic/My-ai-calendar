@@ -1,7 +1,12 @@
 package com.example.ui.screens
 
 import android.R
+import android.Manifest
+import android.content.pm.PackageManager
 import android.widget.Toast
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
+import androidx.core.content.ContextCompat
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -15,6 +20,8 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -34,7 +41,10 @@ import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.Sync
 import androidx.compose.material.icons.filled.Upload
+import androidx.compose.material.icons.filled.Event
+import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.Checkbox
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
@@ -82,6 +92,19 @@ fun SettingsScreen(
 ) {
     val context = LocalContext.current
     val clipboardManager: ClipboardManager = LocalClipboardManager.current
+
+    val permissionLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.RequestMultiplePermissions()
+    ) { permissions ->
+        val readGranted = permissions[Manifest.permission.READ_CALENDAR] ?: false
+        val writeGranted = permissions[Manifest.permission.WRITE_CALENDAR] ?: false
+        if (readGranted && writeGranted) {
+            viewModel.toggleGoogleCalendar(true)
+        } else {
+            Toast.makeText(context, "مجوز دسترسی به تقویم داده نشد", Toast.LENGTH_SHORT).show()
+            viewModel.toggleGoogleCalendar(false)
+        }
+    }
 
     val isServerRunning by viewModel.isServerRunning.collectAsState()
     val serverIp by viewModel.serverIp.collectAsState()
@@ -225,6 +248,13 @@ fun SettingsScreen(
                 Spacer(modifier = Modifier.height(12.dp))
 
                 // --- 1.3 Google Calendar ---
+                val googleCalendars by viewModel.googleCalendars.collectAsState()
+                val selectedGCalName by viewModel.selectedGoogleCalName.collectAsState()
+                val isSyncing by viewModel.isSyncing.collectAsState()
+
+                val hasCalendarPerms = ContextCompat.checkSelfPermission(context, Manifest.permission.READ_CALENDAR) == PackageManager.PERMISSION_GRANTED &&
+                                     ContextCompat.checkSelfPermission(context, Manifest.permission.WRITE_CALENDAR) == PackageManager.PERMISSION_GRANTED
+
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.SpaceBetween,
@@ -232,30 +262,138 @@ fun SettingsScreen(
                 ) {
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         Icon(
-                            if (isGoogleCalendarEnabled) Icons.Default.CloudQueue else Icons.Default.CloudOff,
+                            if (hasCalendarPerms) Icons.Default.CloudQueue else Icons.Default.CloudOff,
                             contentDescription = null,
-                            tint = if (isGoogleCalendarEnabled) MaterialTheme.colorScheme.primary else Color.Gray,
+                            tint = if (hasCalendarPerms) MaterialTheme.colorScheme.primary else Color.Gray,
                             modifier = Modifier.size(20.dp)
                         )
                         Spacer(modifier = Modifier.width(8.dp))
                         Column {
                             Text("تقویم گوگل (Cloud)", style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.Bold)
                             Text(
-                                text = if (isGoogleCalendarEnabled) "فعال" else "غیرفعال",
+                                text = if (hasCalendarPerms) {
+                                    if (selectedGCalName.isNotBlank()) "دسترسی تأیید شد — $selectedGCalName" else "دسترسی تأیید شد — تقویم انتخاب نشده"
+                                } else "نیازمند دسترسی به تقویم دستگاه",
                                 style = MaterialTheme.typography.labelSmall,
-                                color = if (isGoogleCalendarEnabled) MaterialTheme.colorScheme.primary else Color.Gray
+                                color = if (hasCalendarPerms) MaterialTheme.colorScheme.primary else Color.Gray
                             )
                         }
                     }
-                    Switch(checked = isGoogleCalendarEnabled, onCheckedChange = { viewModel.toggleGoogleCalendar(it) })
+                    if (!hasCalendarPerms) {
+                        Button(
+                            onClick = {
+                                permissionLauncher.launch(
+                                    arrayOf(Manifest.permission.READ_CALENDAR, Manifest.permission.WRITE_CALENDAR)
+                                )
+                            },
+                            colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary)
+                        ) {
+                            Text("اعطای دسترسی", fontSize = 11.sp)
+                        }
+                    }
                 }
-                
-                Text(
-                    text = "هشدار: برای استفاده از این قابلیت، گوشی باید به اینترنت متصل بوده و حساب گوگل سینک شده باشد.",
-                    fontSize = 9.sp,
-                    color = MaterialTheme.colorScheme.error,
-                    modifier = Modifier.padding(top = 4.dp, start = 28.dp)
-                )
+
+                if (hasCalendarPerms) {
+                    Spacer(modifier = Modifier.height(8.dp))
+
+                    // Calendar account picker
+                    if (googleCalendars.isNotEmpty()) {
+                        Text("انتخاب تقویم:", fontSize = 11.sp, fontWeight = FontWeight.SemiBold, modifier = Modifier.padding(bottom = 4.dp))
+                        Column(verticalArrangement = Arrangement.spacedBy(3.dp)) {
+                            googleCalendars.filter { it.isGoogle }.forEach { cal ->
+                                val isSelected = selectedGCalName == cal.displayName
+                                Surface(
+                                    color = if (isSelected) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
+                                    shape = RoundedCornerShape(8.dp),
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .clickable { viewModel.selectGoogleCalendar(cal.id, cal.displayName) }
+                                ) {
+                                    Row(
+                                        modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp),
+                                        verticalAlignment = Alignment.CenterVertically
+                                    ) {
+                                        Box(
+                                            modifier = Modifier
+                                                .size(8.dp)
+                                                .clip(CircleShape)
+                                                .background(if (isSelected) MaterialTheme.colorScheme.primary else Color.Gray)
+                                        )
+                                        Spacer(modifier = Modifier.width(8.dp))
+                                        Column {
+                                            Text(cal.displayName, fontSize = 12.sp, fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal)
+                                            Text(cal.accountName, fontSize = 10.sp, color = Color.Gray)
+                                        }
+                                    }
+                                }
+                            }
+                        }
+
+                        // Show non-Google calendars if no Google ones found
+                        if (googleCalendars.none { it.isGoogle }) {
+                            googleCalendars.forEach { cal ->
+                                val isSelected = selectedGCalName == cal.displayName
+                                Surface(
+                                    color = if (isSelected) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
+                                    shape = RoundedCornerShape(8.dp),
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .clickable { viewModel.selectGoogleCalendar(cal.id, cal.displayName) }
+                                ) {
+                                    Text(
+                                        "${cal.displayName} (${cal.accountName})",
+                                        fontSize = 12.sp,
+                                        modifier = Modifier.padding(8.dp)
+                                    )
+                                }
+                            }
+                        }
+                    } else {
+                        Text(
+                            "هیچ حساب تقویمی روی دستگاه یافت نشد. لطفاً حساب گوگل را در تنظیمات گوشی اضافه کنید.",
+                            fontSize = 11.sp,
+                            color = MaterialTheme.colorScheme.error,
+                            modifier = Modifier.padding(start = 28.dp)
+                        )
+                    }
+
+                    Spacer(modifier = Modifier.height(8.dp))
+
+                    // Sync action buttons
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        Button(
+                            onClick = { viewModel.syncPushToGoogle() },
+                            enabled = selectedGCalName.isNotBlank() && !isSyncing,
+                            colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF4285F4)),
+                            modifier = Modifier.weight(1f)
+                        ) {
+                            Icon(Icons.Default.Upload, contentDescription = null, modifier = Modifier.size(14.dp))
+                            Spacer(modifier = Modifier.width(4.dp))
+                            Text(if (isSyncing) "در حال ارسال..." else "ارسال به گوگل", fontSize = 10.sp)
+                        }
+
+                        OutlinedButton(
+                            onClick = { viewModel.syncPullFromGoogle() },
+                            enabled = selectedGCalName.isNotBlank() && !isSyncing,
+                            modifier = Modifier.weight(1f)
+                        ) {
+                            Icon(Icons.Default.Download, contentDescription = null, modifier = Modifier.size(14.dp))
+                            Spacer(modifier = Modifier.width(4.dp))
+                            Text(if (isSyncing) "در حال دریافت..." else "دریافت از گوگل", fontSize = 10.sp)
+                        }
+                    }
+
+                    Spacer(modifier = Modifier.height(4.dp))
+                    Text(
+                        text = "رویدادها، وظایف و یادداشت‌ها به تقویم گوگل ارسال می‌شوند و توسط سرورهای گوگل همگام خواهند شد.",
+                        fontSize = 9.sp,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.padding(start = 4.dp)
+                    )
+                }
 
                 Spacer(modifier = Modifier.height(12.dp))
             }
@@ -387,7 +525,65 @@ fun SettingsScreen(
         }
 
         // ==========================================
-        // 3. Live Activity & Sync Logs
+        // 3. Custom Occasions Management
+        // ==========================================
+        Card(
+            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+            shape = RoundedCornerShape(16.dp),
+            elevation = CardDefaults.cardElevation(defaultElevation = 1.dp),
+            modifier = Modifier.fillMaxWidth()
+        ) {
+            Column(modifier = Modifier.padding(16.dp)) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Icon(Icons.Default.Event, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text("مناسبت‌های ثبت‌شده توسط کاربر", fontWeight = FontWeight.Bold)
+                }
+
+                Spacer(modifier = Modifier.height(8.dp))
+
+                val customOccasions = com.example.calendar.PersianOccasionsHelper.getCustomOccasions()
+                if (customOccasions.isEmpty()) {
+                    Text(
+                        "هنوز مناسبتی ثبت نشده. برای ثبت مناسبت، در تقویم یک روز را انتخاب کنید و دکمه «ثبت مناسبت» را بزنید.",
+                        fontSize = 11.sp,
+                        color = Color.Gray,
+                        lineHeight = 18.sp
+                    )
+                } else {
+                    customOccasions.forEach { occ ->
+                        Row(
+                            modifier = Modifier.fillMaxWidth().padding(vertical = 3.dp),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Column(modifier = Modifier.weight(1f)) {
+                                Text(occ.title, fontSize = 12.sp, fontWeight = FontWeight.SemiBold)
+                                val monthName = com.example.calendar.PersianCalendarHelper.PERSIAN_MONTH_NAMES.getOrElse(occ.customMonth - 1) { "" }
+                                Text(
+                                    "${com.example.calendar.PersianCalendarHelper.toPersianDigits(occ.customDay.toString())} $monthName" + if (occ.isHoliday) "  (تعطیل)" else "",
+                                    fontSize = 10.sp,
+                                    color = Color.Gray
+                                )
+                            }
+                            IconButton(
+                                onClick = {
+                                    com.example.calendar.PersianOccasionsHelper.removeCustomOccasion(context, occ)
+                                },
+                                modifier = Modifier.size(24.dp)
+                            ) {
+                                Icon(Icons.Default.Delete, contentDescription = "حذف", tint = MaterialTheme.colorScheme.error, modifier = Modifier.size(16.dp))
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        Spacer(modifier = Modifier.height(16.dp))
+
+        // ==========================================
+        // 4. Live Activity & Sync Logs
         // ==========================================
         Card(
             colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
@@ -404,7 +600,7 @@ fun SettingsScreen(
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         Icon(Icons.Default.Sync, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
                         Spacer(modifier = Modifier.width(8.dp))
-                        Text("گزارش‌های زنده همگام‌سازی", fontWeight = FontWeight.Bold)
+                        Text("گزارش‌های برنامه", fontWeight = FontWeight.Bold)
                     }
 
                     IconButton(onClick = { viewModel.clearSyncLogs() }, modifier = Modifier.size(28.dp)) {
