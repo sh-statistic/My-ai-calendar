@@ -1,0 +1,1166 @@
+<!DOCTYPE html>
+<html lang="fa" dir="rtl">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>دموی کامل اپلیکیشن موبایل همگام (Android Jetpack Compose)</title>
+  <link rel="stylesheet" href="styles.css">
+  <style>
+    :root {
+      --warm-bg: #F7F5F0;
+      --warm-surface: #FAF8F5;
+      --warm-surface-var: #ECE7DE;
+      --warm-border: #DFD9CD;
+      --text-dark: #2D3748;
+      --text-muted: #64748B;
+      --solar-amber: #D97706;
+      --solar-amber-deep: #B45309;
+      --solar-amber-pastel: #FEF3C7;
+      --solar-amber-container: #FDE68A;
+      --persian-teal: #0D9488;
+      --persian-teal-pastel: #CCFBF1;
+      --persian-blue: #0284C7;
+      --persian-blue-pastel: #E0F2FE;
+      --danger-red: #DC2626;
+      --danger-light: #FEE2E2;
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      background: radial-gradient(circle at 50% 20%, #20242D 0%, #111317 100%);
+      min-height: 100vh;
+      padding: 20px 12px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: flex-start;
+      font-family: -apple-system, BlinkMacSystemFont, "Vazirmatn", "Segoe UI", Roboto, sans-serif;
+      color: #F1F5F9;
+    }
+
+    .demo-header {
+      text-align: center;
+      margin-bottom: 18px;
+      max-width: 500px;
+    }
+
+    .demo-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 6px 14px;
+      background: rgba(217, 119, 6, 0.15);
+      border: 1px solid rgba(217, 119, 6, 0.4);
+      border-radius: 999px;
+      font-size: 13px;
+      color: #FBBF24;
+      margin-bottom: 8px;
+    }
+
+    .demo-title {
+      font-size: 22px;
+      font-weight: 700;
+      color: #FFFFFF;
+      margin-bottom: 4px;
+    }
+
+    .demo-subtitle {
+      font-size: 13px;
+      color: #94A3B8;
+    }
+
+    /* Device Chassis Frame */
+    .phone-container {
+      position: relative;
+      width: 410px;
+      height: 850px;
+      background: #1E222A;
+      border-radius: 46px;
+      padding: 12px;
+      box-shadow: 
+        0 25px 60px -15px rgba(0, 0, 0, 0.7),
+        0 0 0 1px rgba(255, 255, 255, 0.1),
+        inset 0 0 0 2px #333A48;
+      display: flex;
+      flex-direction: column;
+    }
+
+    .phone-screen {
+      position: relative;
+      width: 100%;
+      height: 100%;
+      background: var(--warm-bg);
+      color: var(--text-dark);
+      border-radius: 36px;
+      overflow: hidden;
+      display: flex;
+      flex-direction: column;
+      box-shadow: inset 0 0 4px rgba(0,0,0,0.06);
+    }
+
+    /* Camera Notch */
+    .phone-notch {
+      position: absolute;
+      top: 10px;
+      left: 50%;
+      transform: translateX(-50%);
+      width: 95px;
+      height: 22px;
+      background: #111317;
+      border-radius: 14px;
+      z-index: 50;
+      display: flex;
+      align-items: center;
+      justify-content: flex-end;
+      padding-left: 12px;
+    }
+    .camera-lens {
+      width: 10px;
+      height: 10px;
+      background: #1F2937;
+      border-radius: 50%;
+      border: 1.5px solid #374151;
+      margin-left: 10px;
+    }
+
+    /* Status Bar */
+    .status-bar {
+      height: 38px;
+      padding: 8px 18px 0 18px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      font-size: 11px;
+      font-weight: 600;
+      color: #475569;
+      z-index: 40;
+      background: var(--warm-surface);
+    }
+    .status-icons {
+      display: flex;
+      gap: 6px;
+      align-items: center;
+    }
+
+    /* Top App Bar */
+    .mobile-app-header {
+      background: var(--warm-surface);
+      border-bottom: 1px solid var(--warm-border);
+      padding: 8px 12px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      z-index: 30;
+      min-height: 52px;
+    }
+
+    .header-center-title {
+      font-size: 15px;
+      font-weight: 700;
+      color: var(--text-dark);
+      text-align: center;
+    }
+
+    /* Main Scroll Area */
+    .screen-content {
+      flex: 1;
+      overflow-y: auto;
+      overflow-x: hidden;
+      position: relative;
+      background: var(--warm-bg);
+      padding: 10px 10px 70px 10px; /* leave room for FAB */
+    }
+
+    .view-screen {
+      display: none;
+      animation: fadeIn 0.15s ease-out;
+    }
+    .view-screen.active {
+      display: block;
+    }
+
+    @keyframes fadeIn {
+      from { opacity: 0; transform: translateY(4px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+
+    /* Bottom Navigation Bar */
+    .bottom-nav {
+      background: var(--warm-surface);
+      border-top: 1px solid var(--warm-border);
+      height: 60px;
+      display: flex;
+      justify-content: space-around;
+      align-items: center;
+      padding: 0 4px;
+      z-index: 30;
+    }
+
+    .nav-item {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      flex: 1;
+      height: 100%;
+      cursor: pointer;
+      color: var(--text-muted);
+      transition: all 0.2s;
+      border: none;
+      background: transparent;
+      outline: none;
+    }
+    .nav-item .nav-icon {
+      font-size: 18px;
+      margin-bottom: 2px;
+      transition: transform 0.2s;
+    }
+    .nav-item .nav-label {
+      font-size: 10px;
+      font-weight: 600;
+    }
+    .nav-item.active {
+      color: var(--solar-amber-deep);
+    }
+    .nav-item.active .nav-icon {
+      transform: scale(1.15);
+      background: var(--solar-amber-container);
+      padding: 2px 10px;
+      border-radius: 12px;
+    }
+
+    /* Gesture bar */
+    .gesture-bar {
+      height: 14px;
+      background: var(--warm-surface);
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      padding-bottom: 4px;
+    }
+    .gesture-indicator {
+      width: 120px;
+      height: 4px;
+      background: #CBD5E1;
+      border-radius: 99px;
+    }
+
+    /* Cards */
+    .m-card {
+      background: var(--warm-surface);
+      border: 1px solid var(--warm-border);
+      border-radius: 14px;
+      padding: 12px;
+      margin-bottom: 10px;
+      box-shadow: 0 1px 3px rgba(0,0,0,0.02);
+    }
+
+    /* Calendar Grid Specifics */
+    .m-cal-weekdays {
+      display: grid;
+      grid-template-columns: repeat(7, 1fr);
+      text-align: center;
+      font-size: 11px;
+      font-weight: 700;
+      color: var(--text-muted);
+      margin-bottom: 6px;
+      padding-bottom: 4px;
+      border-bottom: 1px solid var(--warm-border);
+    }
+    .m-cal-weekdays div:last-child {
+      color: var(--danger-red);
+    }
+
+    .m-cal-days {
+      display: grid;
+      grid-template-columns: repeat(7, 1fr);
+      gap: 3px;
+    }
+
+    .m-day-cell {
+      height: 42px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      border-radius: 8px;
+      background: var(--warm-surface);
+      border: 1px solid transparent;
+      cursor: pointer;
+      position: relative;
+      transition: all 0.15s;
+      user-select: none;
+    }
+    .m-day-cell:hover {
+      background: var(--warm-surface-var);
+    }
+    .m-day-cell.selected {
+      background: var(--solar-amber-pastel);
+      border-color: var(--solar-amber);
+      font-weight: 700;
+      color: var(--solar-amber-deep);
+    }
+    .m-day-cell.today {
+      border: 1.5px solid var(--solar-amber);
+    }
+    .m-day-cell.holiday .solar-num {
+      color: var(--danger-red);
+      font-weight: 700;
+    }
+    .m-day-cell .solar-num {
+      font-size: 12px;
+      line-height: 1.1;
+    }
+    .m-day-cell .greg-num {
+      font-size: 9px;
+      color: var(--text-muted);
+      line-height: 1;
+    }
+    .m-day-cell .dot-indicator {
+      position: absolute;
+      bottom: 2px;
+      width: 4px;
+      height: 4px;
+      border-radius: 50%;
+      background: var(--solar-amber);
+    }
+
+    /* Prayer Times Pill Card */
+    .prayer-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 6px;
+      margin-top: 8px;
+    }
+    .prayer-item {
+      background: var(--warm-bg);
+      border-radius: 8px;
+      padding: 6px 4px;
+      text-align: center;
+      border: 1px solid var(--warm-border);
+    }
+    .prayer-name {
+      font-size: 10px;
+      color: var(--text-muted);
+    }
+    .prayer-val {
+      font-size: 11px;
+      font-weight: 700;
+      color: var(--solar-amber-deep);
+    }
+
+    /* Occasions Box */
+    .occasion-pill {
+      display: inline-block;
+      font-size: 10px;
+      padding: 2px 6px;
+      border-radius: 6px;
+      margin-right: 4px;
+      font-weight: 600;
+    }
+    .occasion-pill.holiday {
+      background: var(--danger-light);
+      color: var(--danger-red);
+    }
+    .occasion-pill.national {
+      background: #FEF3C7;
+      color: #92400E;
+    }
+    .occasion-pill.regular {
+      background: #DCFCE7;
+      color: #15803D;
+    }
+
+    /* Floating Action Button */
+    .m-fab {
+      position: absolute;
+      bottom: 74px;
+      left: 18px;
+      width: 48px;
+      height: 48px;
+      border-radius: 16px;
+      background: var(--solar-amber);
+      color: white;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 24px;
+      box-shadow: 0 6px 16px rgba(217, 119, 6, 0.4);
+      cursor: pointer;
+      border: none;
+      z-index: 25;
+      transition: transform 0.2s;
+    }
+    .m-fab:hover {
+      transform: scale(1.05);
+      background: var(--solar-amber-deep);
+    }
+
+    /* Tasks items */
+    .m-task-item {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 10px;
+      background: var(--warm-surface);
+      border: 1px solid var(--warm-border);
+      border-radius: 10px;
+      margin-bottom: 8px;
+    }
+    .m-task-check {
+      width: 18px;
+      height: 18px;
+      accent-color: var(--solar-amber);
+      cursor: pointer;
+    }
+
+    /* Memento Mori Grid */
+    .life-grid-dots {
+      display: grid;
+      grid-template-columns: repeat(26, 1fr);
+      gap: 2px;
+      max-height: 260px;
+      overflow-y: auto;
+      padding: 6px;
+      background: var(--warm-bg);
+      border-radius: 10px;
+    }
+    .life-dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 2px;
+      background: #CBD5E1;
+    }
+    .life-dot.spent {
+      background: var(--solar-amber);
+    }
+    .life-dot.current {
+      background: var(--danger-red);
+      animation: pulse 1.5s infinite;
+    }
+
+    /* Notes */
+    .m-notes-list {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 8px;
+    }
+    .m-note-card {
+      padding: 10px;
+      border-radius: 12px;
+      min-height: 90px;
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+      border: 1px solid rgba(0,0,0,0.06);
+    }
+
+    /* Switch toggle */
+    .switch {
+      position: relative;
+      display: inline-block;
+      width: 44px;
+      height: 24px;
+    }
+    .switch input { opacity: 0; width: 0; height: 0; }
+    .slider {
+      position: absolute;
+      cursor: pointer;
+      top: 0; left: 0; right: 0; bottom: 0;
+      background-color: #CBD5E1;
+      transition: .3s;
+      border-radius: 24px;
+    }
+    .slider:before {
+      position: absolute;
+      content: "";
+      height: 18px;
+      width: 18px;
+      left: 3px;
+      bottom: 3px;
+      background-color: white;
+      transition: .3s;
+      border-radius: 50%;
+    }
+    input:checked + .slider {
+      background-color: var(--solar-amber);
+    }
+    input:checked + .slider:before {
+      transform: translateX(20px);
+    }
+
+    /* Chat bubble */
+    .chat-bubble {
+      max-width: 85%;
+      padding: 8px 12px;
+      border-radius: 14px;
+      font-size: 12px;
+      line-height: 1.5;
+      margin-bottom: 8px;
+    }
+    .chat-bubble.bot {
+      background: var(--warm-surface);
+      border: 1px solid var(--warm-border);
+      align-self: flex-start;
+      border-top-right-radius: 2px;
+    }
+    .chat-bubble.user {
+      background: var(--solar-amber);
+      color: white;
+      align-self: flex-end;
+      border-top-left-radius: 2px;
+    }
+
+    /* Simple Modal Dialog */
+    .modal-overlay {
+      position: absolute;
+      top: 0; left: 0; right: 0; bottom: 0;
+      background: rgba(0,0,0,0.4);
+      backdrop-filter: blur(4px);
+      z-index: 100;
+      display: none;
+      align-items: center;
+      justify-content: center;
+      padding: 16px;
+    }
+    .modal-overlay.active {
+      display: flex;
+    }
+    .modal-card {
+      background: var(--warm-surface);
+      border-radius: 18px;
+      padding: 18px;
+      width: 100%;
+      max-width: 320px;
+      border: 1px solid var(--warm-border);
+      box-shadow: 0 10px 25px rgba(0,0,0,0.2);
+    }
+  </style>
+</head>
+<body>
+
+  <div class="demo-header">
+    <div class="demo-badge">📱 شبیه‌ساز واقعی اپلیکیشن موبایل اندروید</div>
+    <div class="demo-title">نمای کامل اپلیکیشن تقویم همگام</div>
+    <div class="demo-subtitle">تقویم خورشیدی کامل همراه با مناسبت‌های رسمی، تعطیلات، اوقات شرعی و یادداشت‌ها</div>
+  </div>
+
+  <!-- Mobile Device Frame -->
+  <div class="phone-container">
+    <div class="phone-screen">
+      <!-- Camera Notch / Island -->
+      <div class="phone-notch">
+        <div class="camera-lens"></div>
+      </div>
+
+      <!-- Android Status Bar -->
+      <div class="status-bar">
+        <span id="liveClock" style="letter-spacing: 0.5px;">۱۲:۴۵</span>
+        <div class="status-icons">
+          <span>📶</span>
+          <span>Wi-Fi</span>
+          <span style="font-size: 13px;">🔋</span>
+        </div>
+      </div>
+
+      <!-- Dynamic Screen Header -->
+      <div class="mobile-app-header" id="mobileAppHeader">
+        <!-- Rendered based on active tab -->
+      </div>
+
+      <!-- Screen Views Container -->
+      <div class="screen-content">
+        <!-- 0: CALENDAR SCREEN -->
+        <div class="view-screen active" id="viewCalendar">
+          <!-- Calendar Days Grid -->
+          <div class="m-card" style="padding: 10px;">
+            <div class="m-cal-weekdays">
+              <div>ش</div><div>ی</div><div>د</div><div>س</div><div>چ</div><div>پ</div><div>ج</div>
+            </div>
+            <div class="m-cal-days" id="mCalDays">
+              <!-- Rendered by JS -->
+            </div>
+          </div>
+
+          <!-- Prayer Times Card -->
+          <div class="m-card" style="background: linear-gradient(135deg, #FFFDF9 0%, #FEF9EE 100%); border-color: #FDE68A;">
+            <div style="display: flex; justify-content: space-between; align-items: center;">
+              <span style="font-size: 13px; font-weight: 700; color: var(--solar-amber-deep);">🕌 اوقات شرعی (افق تهران)</span>
+              <span id="mPrayerCityBadge" style="font-size: 10px; background: var(--solar-amber-pastel); color: var(--solar-amber-deep); padding: 2px 8px; border-radius: 99px;">محاسبه خودکار</span>
+            </div>
+            <div class="prayer-grid" id="mPrayerGrid">
+              <div class="prayer-item"><div class="prayer-name">اذان صبح</div><div class="prayer-val" id="p-fajr">--:--</div></div>
+              <div class="prayer-item"><div class="prayer-name">طلوع آفتاب</div><div class="prayer-val" id="p-sunrise">--:--</div></div>
+              <div class="prayer-item"><div class="prayer-name">اذان ظهر</div><div class="prayer-val" id="p-dhuhr">--:--</div></div>
+              <div class="prayer-item"><div class="prayer-name">غروب آفتاب</div><div class="prayer-val" id="p-sunset">--:--</div></div>
+              <div class="prayer-item"><div class="prayer-name">اذان مغرب</div><div class="prayer-val" id="p-maghrib">--:--</div></div>
+              <div class="prayer-item"><div class="prayer-name">نیمه‌شب</div><div class="prayer-val" id="p-midnight">--:--</div></div>
+            </div>
+          </div>
+
+          <!-- Selected Day Details & Occasions -->
+          <div class="m-card">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px;">
+              <div>
+                <span id="mSelectedDateLabel" style="font-size: 13px; font-weight: 700; color: var(--text-dark);">رویدادهای امروز</span>
+                <div id="mSelectedGregLabel" style="font-size: 10px; color: var(--text-muted); margin-top: 2px;"></div>
+              </div>
+              <span id="mSelectedOccasionBadge" class="occasion-pill regular">روز کاری</span>
+            </div>
+            
+            <div id="mDayOccasionsList" style="margin-top: 6px; padding: 6px; background: var(--warm-bg); border-radius: 8px; font-size: 11px;">
+              <!-- Occasions list rendered by JS -->
+            </div>
+
+            <div style="margin-top: 10px; border-top: 1px solid var(--warm-border); padding-top: 8px;">
+              <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px;">
+                <span style="font-size: 12px; font-weight: 700;">رویدادهای ثبت‌شده</span>
+                <span style="font-size: 10px; color: var(--solar-amber); cursor: pointer;" onclick="openAddEventModal()">+ افزودن</span>
+              </div>
+              <div id="mDayEventsList" style="display: flex; flex-direction: column; gap: 6px;">
+                <!-- Events rendered by JS -->
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- 1: TASKS SCREEN -->
+        <div class="view-screen" id="viewTasks">
+          <div style="display: flex; gap: 6px; margin-bottom: 10px; overflow-x: auto;">
+            <button class="btn-primary" style="padding: 4px 12px; font-size: 11px; border-radius: 99px;">همه (۳)</button>
+            <button class="btn-secondary" style="padding: 4px 12px; font-size: 11px; border-radius: 99px;">انجام‌نشده (۲)</button>
+            <button class="btn-secondary" style="padding: 4px 12px; font-size: 11px; border-radius: 99px;">انجام‌شده (۱)</button>
+          </div>
+          <div id="mTaskList">
+            <div class="m-task-item">
+              <input type="checkbox" class="m-task-check" checked onchange="toggleTask(this)">
+              <div style="flex: 1;">
+                <div style="font-size: 12px; text-decoration: line-through; color: var(--text-muted);">نصب افزونه مرورگر همگام</div>
+                <div style="font-size: 10px; color: #16A34A;">انجام شد • فوری</div>
+              </div>
+            </div>
+            <div class="m-task-item">
+              <input type="checkbox" class="m-task-check" onchange="toggleTask(this)">
+              <div style="flex: 1;">
+                <div style="font-size: 12px; font-weight: 600;">همگام‌سازی آفلاین با لپ‌تاپ روی هات‌اسپات</div>
+                <div style="font-size: 10px; color: var(--solar-amber-deep);">امروز • مهم</div>
+              </div>
+            </div>
+            <div class="m-task-item">
+              <input type="checkbox" class="m-task-check" onchange="toggleTask(this)">
+              <div style="flex: 1;">
+                <div style="font-size: 12px; font-weight: 600;">برنامه‌ریزی اهداف ماه جدید</div>
+                <div style="font-size: 10px; color: var(--text-muted);">عادی</div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- 2: NOTES SCREEN -->
+        <div class="view-screen" id="viewNotes">
+          <div style="margin-bottom: 10px;">
+            <input type="text" placeholder="🔍 جستجو در یادداشت‌ها..." style="width: 100%; padding: 8px 12px; border-radius: 10px; border: 1px solid var(--warm-border); background: var(--warm-surface); font-size: 12px;">
+          </div>
+          <div class="m-notes-list">
+            <div class="m-note-card" style="background: #FEF3C7;">
+              <div style="font-size: 12px; font-weight: 700; color: #92400E;">ایده‌های جدید</div>
+              <div style="font-size: 11px; color: #78350F; margin-top: 4px;">اضافه کردن قابلیت یادآوری صوتی اذان و ویجت تقویم خورشیدی</div>
+              <div style="font-size: 9px; color: #B45309; margin-top: 6px;">۱۴۰۵/۰۱/۰۲</div>
+            </div>
+            <div class="m-note-card" style="background: #DCFCE7;">
+              <div style="font-size: 12px; font-weight: 700; color: #166534;">تنظیمات شبکه</div>
+              <div style="font-size: 11px; color: #14532D; margin-top: 4px;">سرور داخلی روی پورت 8080 به شکل Zero-Cost بدون مصرف اینترنت</div>
+              <div style="font-size: 9px; color: #15803D; margin-top: 6px;">۱۴۰۵/۰۱/۰۱</div>
+            </div>
+            <div class="m-note-card" style="background: #E0F2FE;">
+              <div style="font-size: 12px; font-weight: 700; color: #075985;">لیست خرید</div>
+              <div style="font-size: 11px; color: #0C4A6E; margin-top: 4px;">کتاب برنامه‌ریزی، سررسید ۱۴۰۵</div>
+              <div style="font-size: 9px; color: #0284C7; margin-top: 6px;">۱۴۰۵/۰۱/۰۵</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- 3: LIFE GRID (Memento Mori) -->
+        <div class="view-screen" id="viewLifeGrid">
+          <div class="m-card" style="text-align: center;">
+            <div style="font-size: 14px; font-weight: 700; color: var(--solar-amber-deep);">⏳ گرید عمر من (Memento Mori)</div>
+            <p style="font-size: 11px; color: var(--text-muted); margin: 4px 0 10px 0;">هر خانه کوچک نمایانگر یک هفته از عمر شماست (بر مبنای ۸۰ سال)</p>
+            
+            <div style="display: flex; justify-content: space-around; margin-bottom: 12px; background: var(--warm-bg); padding: 8px; border-radius: 8px;">
+              <div><div style="font-size: 13px; font-weight: 700; color: var(--solar-amber-deep);">۲۶ سال</div><div style="font-size: 10px; color: var(--text-muted);">سن فعلی</div></div>
+              <div><div style="font-size: 13px; font-weight: 700; color: #16A34A;">۳۲.۵٪</div><div style="font-size: 10px; color: var(--text-muted);">سپری شده</div></div>
+              <div><div style="font-size: 13px; font-weight: 700; color: var(--persian-blue);">۲,۸۰۸</div><div style="font-size: 10px; color: var(--text-muted);">هفته باقی‌مانده</div></div>
+            </div>
+
+            <div class="life-grid-dots" id="mLifeGrid">
+              <!-- Rendered by JS -->
+            </div>
+
+            <div style="margin-top: 10px; font-size: 11px; font-style: italic; color: #475569;">
+              «فرصت زندگی کوتاه است؛ هر روز را با ارزش و هدفمندی سپری کن.»
+            </div>
+          </div>
+        </div>
+
+        <!-- 4: SETTINGS & SYNC SCREEN -->
+        <div class="view-screen" id="viewSettings">
+          <div class="m-card">
+            <div style="font-size: 13px; font-weight: 700; margin-bottom: 8px;">📡 وضعیت سرور همگام‌سازی محلی (HTTP)</div>
+            <div style="display: flex; justify-content: space-between; align-items: center; padding: 6px 0;">
+              <div>
+                <div style="font-size: 12px; font-weight: 600;">سرور داخلی گوشی</div>
+                <div style="font-size: 10px; color: #16A34A;" id="serverToggleStatus">فعال (آماده اتصال افزونه کروم)</div>
+              </div>
+              <label class="switch">
+                <input type="checkbox" id="mServerToggle" checked>
+                <span class="slider"></span>
+              </label>
+            </div>
+
+            <div style="background: var(--warm-bg); padding: 10px; border-radius: 8px; margin-top: 10px; border: 1px dashed var(--solar-amber);">
+              <div style="font-size: 10px; color: var(--text-muted);">آدرس IP محلی برای اتصال افزونه:</div>
+              <div style="font-size: 13px; font-weight: 700; color: var(--solar-amber-deep); direction: ltr; margin: 4px 0;">http://192.168.1.100:8080</div>
+              <div style="font-size: 9px; color: #16A34A;">● بدون نیاز به اینترنت (کامپیوتر و گوشی در یک Wi-Fi یا هات‌اسپات)</div>
+            </div>
+          </div>
+
+          <div class="m-card">
+            <div style="font-size: 13px; font-weight: 700; margin-bottom: 8px;">📊 وضعیت داده‌های محلی (Room DB)</div>
+            <div style="display: flex; justify-content: space-between; font-size: 11px; padding: 4px 0; border-bottom: 1px solid var(--warm-border);">
+              <span>رویدادهای ثبت‌شده:</span><span style="font-weight: 700;" id="statEventsCount">۲ عدد</span>
+            </div>
+            <div style="display: flex; justify-content: space-between; font-size: 11px; padding: 4px 0; border-bottom: 1px solid var(--warm-border);">
+              <span>وظایف و کارها:</span><span style="font-weight: 700;">۳ عدد</span>
+            </div>
+            <div style="display: flex; justify-content: space-between; font-size: 11px; padding: 4px 0;">
+              <span>یادداشت‌های محلی:</span><span style="font-weight: 700;">۳ عدد</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- 5: AI CHAT SCREEN -->
+        <div class="view-screen" id="viewChat">
+          <div style="display: flex; flex-direction: column; height: 500px;">
+            <div style="flex: 1; overflow-y: auto; display: flex; flex-direction: column; gap: 6px; padding: 6px;" id="mChatMessages">
+              <div class="chat-bubble bot">
+                سلام! من دستیار هوشمند تقویم شما هستم. می‌توانم به شما در تنظیم اهداف، زمان‌بندی روزانه و بررسی کارهایتان کمک کنم. چطور می‌توانم کمکتان کنم؟
+              </div>
+              <div class="chat-bubble user">
+                کارهای امروز من رو بررسی کن
+              </div>
+              <div class="chat-bubble bot">
+                برای امروز، مهم‌ترین وظیفه شما همگام‌سازی داده‌های تقویم با لپ‌تاپ است. اوقات اذان ظهر هم ساعت ۱۲:۱۰ می‌باشد.
+              </div>
+            </div>
+
+            <div style="display: flex; gap: 4px; padding-top: 8px; border-top: 1px solid var(--warm-border);">
+              <input type="text" id="mChatInput" placeholder="پیامی بنویسید..." style="flex: 1; padding: 8px 12px; border-radius: 99px; border: 1px solid var(--warm-border); background: var(--warm-surface); font-size: 12px;">
+              <button class="btn-primary" id="mBtnChatSend" style="border-radius: 99px; padding: 0 14px;">ارسال</button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Compose Floating Action Button (FAB) -->
+      <button class="m-fab" id="mFabBtn" title="افزودن رویداد">+</button>
+
+      <!-- Bottom Navigation Bar (5 Jetpack Compose Tabs) -->
+      <div class="bottom-nav">
+        <button class="nav-item active" onclick="switchMobileTab(0)">
+          <span class="nav-icon">📅</span>
+          <span class="nav-label">تقویم</span>
+        </button>
+        <button class="nav-item" onclick="switchMobileTab(1)">
+          <span class="nav-icon">✓</span>
+          <span class="nav-label">وظایف</span>
+        </button>
+        <button class="nav-item" onclick="switchMobileTab(2)">
+          <span class="nav-icon">📝</span>
+          <span class="nav-label">یادداشت</span>
+        </button>
+        <button class="nav-item" onclick="switchMobileTab(3)">
+          <span class="nav-icon">⏳</span>
+          <span class="nav-label">عمر من</span>
+        </button>
+        <button class="nav-item" onclick="switchMobileTab(4)">
+          <span class="nav-icon">⚙️</span>
+          <span class="nav-label">تنظیمات</span>
+        </button>
+      </div>
+
+      <!-- Android Navigation Gesture Bar -->
+      <div class="gesture-bar">
+        <div class="gesture-indicator"></div>
+      </div>
+
+      <!-- Modal Dialog: Add Event -->
+      <div class="modal-overlay" id="addEventModal">
+        <div class="modal-card">
+          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
+            <span style="font-weight: 700; font-size: 14px; color: var(--solar-amber-deep);">➕ افزودن رویداد جدید</span>
+            <button style="border:none; background:none; font-size:16px; cursor:pointer;" onclick="closeModal()">✕</button>
+          </div>
+          <div style="display: flex; flex-direction: column; gap: 8px;">
+            <input type="text" id="modalEventTitle" placeholder="عنوان رویداد (مثال: جلسه کاری)" style="padding: 8px 10px; border-radius: 8px; border: 1px solid var(--warm-border); font-size: 12px;">
+            <input type="time" id="modalEventTime" value="10:00" style="padding: 8px 10px; border-radius: 8px; border: 1px solid var(--warm-border); font-size: 12px;">
+            <button class="btn-primary" onclick="saveNewEvent()" style="margin-top: 6px;">ثبت رویداد</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script src="persian-date.js"></script>
+  <script src="persian-occasions.js"></script>
+  <script src="prayer-times.js"></script>
+  <script>
+    let currentTab = 0;
+    const todayJalali = PersianDateUtil.getTodayJalali();
+    let selectedYear = todayJalali.year;
+    let selectedMonth = todayJalali.month;
+    let selectedDay = todayJalali.day;
+
+    let localEvents = [
+      { id: 1, title: "جلسه هماهنگی پروژه همگام", time: "10:30", year: todayJalali.year, month: todayJalali.month, day: todayJalali.day },
+      { id: 2, title: "بررسی اوقات شرعی و یادداشت‌ها", time: "17:00", year: todayJalali.year, month: todayJalali.month, day: todayJalali.day }
+    ];
+
+    // Live clock in status bar
+    function updateClock() {
+      const now = new Date();
+      const h = String(now.getHours()).padStart(2, '0');
+      const m = String(now.getMinutes()).padStart(2, '0');
+      document.getElementById('liveClock').textContent = PersianDateUtil.toPersianDigits(`${h}:${m}`);
+    }
+    setInterval(updateClock, 1000);
+    updateClock();
+
+    function renderHeader() {
+      const header = document.getElementById('mobileAppHeader');
+      if (currentTab === 0) {
+        const daysInMonth = PersianDateUtil.getDaysInJalaliMonth(selectedYear, selectedMonth);
+        const firstG = PersianDateUtil.jalaliToGregorian(selectedYear, selectedMonth, 1);
+        const lastG = PersianDateUtil.jalaliToGregorian(selectedYear, selectedMonth, daysInMonth);
+
+        header.innerHTML = `
+          <button style="border:none; background:none; font-size:18px; cursor:pointer;" onclick="switchMobileTab(5)" title="دستیار هوشمند AI">✨</button>
+          
+          <div style="display:flex; align-items:center; gap:8px;">
+            <button style="border:none; background:none; cursor:pointer; font-size:16px;" onclick="changeMonth(1)">◀</button>
+            <div style="text-align:center;">
+              <div style="font-size:14px; font-weight:700; color:var(--solar-amber-deep);">${PersianDateUtil.PERSIAN_MONTHS[selectedMonth-1]} ${PersianDateUtil.toPersianDigits(selectedYear)}</div>
+              <div style="font-size:9px; color:var(--text-muted);">${firstG.day} ${PersianDateUtil.GREGORIAN_MONTHS[firstG.month-1]} - ${lastG.day} ${PersianDateUtil.GREGORIAN_MONTHS[lastG.month-1]}</div>
+            </div>
+            <button style="border:none; background:none; cursor:pointer; font-size:16px;" onclick="changeMonth(-1)">▶</button>
+          </div>
+
+          <div style="display:flex; align-items:center; gap:6px;">
+            <span style="font-size:10px; background:var(--solar-amber-container); color:var(--solar-amber-deep); padding:2px 8px; border-radius:12px; font-weight:700; cursor:pointer;" onclick="goToday()">امروز</span>
+            <span style="width:8px; height:8px; background:#10B981; border-radius:50%;" title="سرور همگام فعال"></span>
+          </div>
+        `;
+      } else {
+        const titles = {
+          1: "وظایف و چک‌لیست",
+          2: "یادداشت‌های محلی",
+          3: "عمر من (Memento Mori)",
+          4: "تنظیمات و همگام‌سازی",
+          5: "دستیار هوشمند تقویم (Gemini AI)"
+        };
+        header.innerHTML = `
+          <button style="border:none; background:none; font-size:16px; cursor:pointer;" onclick="switchMobileTab(0)">✕</button>
+          <div class="header-center-title">${titles[currentTab] || "همگام"}</div>
+          <div style="width:20px;"></div>
+        `;
+      }
+    }
+
+    function switchMobileTab(idx) {
+      currentTab = idx;
+      const screens = ['viewCalendar', 'viewTasks', 'viewNotes', 'viewLifeGrid', 'viewSettings', 'viewChat'];
+      screens.forEach((id, i) => {
+        const el = document.getElementById(id);
+        if (el) el.classList.toggle('active', i === idx);
+      });
+
+      // Update Nav Buttons
+      const navItems = document.querySelectorAll('.nav-item');
+      navItems.forEach((btn, i) => {
+        btn.classList.toggle('active', i === idx);
+      });
+
+      // Show/Hide FAB
+      const fab = document.getElementById('mFabBtn');
+      if (fab) fab.style.display = (idx === 0) ? 'flex' : 'none';
+
+      renderHeader();
+      if (idx === 0) renderCalendar();
+      if (idx === 3) renderLifeGrid();
+    }
+
+    function changeMonth(delta) {
+      selectedMonth += delta;
+      if (selectedMonth > 12) {
+        selectedMonth = 1;
+        selectedYear++;
+      } else if (selectedMonth < 1) {
+        selectedMonth = 12;
+        selectedYear--;
+      }
+      renderHeader();
+      renderCalendar();
+    }
+
+    function goToday() {
+      const t = PersianDateUtil.getTodayJalali();
+      selectedYear = t.year;
+      selectedMonth = t.month;
+      selectedDay = t.day;
+      renderHeader();
+      renderCalendar();
+    }
+
+    function renderCalendar() {
+      const container = document.getElementById('mCalDays');
+      if (!container) return;
+      container.innerHTML = '';
+
+      // Accurate helper calls
+      const daysInMonth = PersianDateUtil.getDaysInJalaliMonth(selectedYear, selectedMonth);
+      const startDayOfWeek = PersianDateUtil.getPersianDayOfWeek(selectedYear, selectedMonth, 1);
+
+      // Blank slots before first day
+      for (let i = 0; i < startDayOfWeek; i++) {
+        const empty = document.createElement('div');
+        container.appendChild(empty);
+      }
+
+      for (let d = 1; d <= daysInMonth; d++) {
+        const cell = document.createElement('div');
+        cell.className = 'm-day-cell';
+        const dayOfWeek = (startDayOfWeek + d - 1) % 7;
+        const isFriday = dayOfWeek === 6;
+        const isHoliday = isFriday || (typeof PersianOccasions !== 'undefined' && PersianOccasions.isHoliday(selectedMonth, d));
+
+        if (isHoliday) cell.classList.add('holiday');
+        if (d === selectedDay) cell.classList.add('selected');
+        if (d === todayJalali.day && selectedMonth === todayJalali.month && selectedYear === todayJalali.year) {
+          cell.classList.add('today');
+        }
+
+        const greg = PersianDateUtil.jalaliToGregorian(selectedYear, selectedMonth, d);
+
+        cell.innerHTML = `
+          <span class="solar-num">${PersianDateUtil.toPersianDigits(d)}</span>
+          <span class="greg-num">${greg.day}</span>
+        `;
+
+        // Check if day has event
+        const hasEvent = localEvents.some(e => e.year === selectedYear && e.month === selectedMonth && e.day === d);
+        if (hasEvent) {
+          const dot = document.createElement('div');
+          dot.className = 'dot-indicator';
+          cell.appendChild(dot);
+        }
+
+        cell.onclick = () => {
+          selectedDay = d;
+          renderCalendar();
+          updateSelectedDayInfo();
+        };
+
+        container.appendChild(cell);
+      }
+
+      updateSelectedDayInfo();
+      updatePrayerTimes();
+    }
+
+    function updateSelectedDayInfo() {
+      const label = document.getElementById('mSelectedDateLabel');
+      const gregLabel = document.getElementById('mSelectedGregLabel');
+      const badge = document.getElementById('mSelectedOccasionBadge');
+      const occasionsList = document.getElementById('mDayOccasionsList');
+      const eventsList = document.getElementById('mDayEventsList');
+
+      const dowIdx = PersianDateUtil.getPersianDayOfWeek(selectedYear, selectedMonth, selectedDay);
+      const dowName = PersianDateUtil.WEEKDAYS[dowIdx];
+      const greg = PersianDateUtil.jalaliToGregorian(selectedYear, selectedMonth, selectedDay);
+
+      if (label) {
+        label.textContent = `${dowName} ${PersianDateUtil.toPersianDigits(selectedDay)} ${PersianDateUtil.PERSIAN_MONTHS[selectedMonth-1]} ${PersianDateUtil.toPersianDigits(selectedYear)}`;
+      }
+      if (gregLabel) {
+        gregLabel.textContent = `معادل میلادی: ${greg.day} ${PersianDateUtil.GREGORIAN_MONTHS[greg.month-1]} ${greg.year}`;
+      }
+
+      const isFriday = dowIdx === 6;
+      const occasions = typeof PersianOccasions !== 'undefined' ? PersianOccasions.getOccasions(selectedMonth, selectedDay) : [];
+      const isOfficialHoliday = isFriday || occasions.some(o => o.isHoliday);
+
+      if (badge) {
+        if (isOfficialHoliday) {
+          badge.className = 'occasion-pill holiday';
+          badge.textContent = isFriday ? 'تعطیل رسمی (جمعه)' : 'تعطیل رسمی';
+        } else {
+          badge.className = 'occasion-pill regular';
+          badge.textContent = 'روز کاری';
+        }
+      }
+
+      if (occasionsList) {
+        if (occasions.length > 0) {
+          occasionsList.innerHTML = occasions.map(o => `
+            <div style="margin-bottom: 2px;">
+              <span class="occasion-pill ${o.isHoliday ? 'holiday' : 'national'}">${o.isHoliday ? 'تعطیل' : 'مناسبت'}</span>
+              <span>${o.title}</span>
+            </div>
+          `).join('');
+        } else {
+          occasionsList.innerHTML = `<span style="color:var(--text-muted);">مناسبت خاصی برای این تاریخ ثبت نشده است.</span>`;
+        }
+      }
+
+      if (eventsList) {
+        const dayEvs = localEvents.filter(e => e.year === selectedYear && e.month === selectedMonth && e.day === selectedDay);
+        if (dayEvs.length > 0) {
+          eventsList.innerHTML = dayEvs.map(e => `
+            <div style="background:var(--warm-bg); border:1px solid var(--warm-border); padding:8px 10px; border-radius:8px; border-right:4px solid var(--solar-amber); display:flex; justify-content:space-between; align-items:center;">
+              <div>
+                <strong style="font-size:12px;">${e.title}</strong>
+              </div>
+              <span style="font-size:11px; color:var(--solar-amber-deep); font-weight:700;">${PersianDateUtil.toPersianDigits(e.time)}</span>
+            </div>
+          `).join('');
+        } else {
+          eventsList.innerHTML = `<div style="font-size: 11px; color: #94A3B8; text-align: center; padding: 6px 0;">رویدادی برای این تاریخ ثبت نشده است.</div>`;
+        }
+      }
+    }
+
+    function updatePrayerTimes() {
+      if (typeof PrayerTimesEngine !== 'undefined') {
+        const greg = PersianDateUtil.jalaliToGregorian(selectedYear, selectedMonth, selectedDay);
+        const dateObj = new Date(greg.year, greg.month - 1, greg.day);
+        const city = IRANIAN_CITIES ? IRANIAN_CITIES[0] : { lat: 35.6892, lng: 51.3890 };
+        const times = PrayerTimesEngine.calculate(city.lat, city.lng, dateObj);
+
+        document.getElementById('p-fajr').textContent = PersianDateUtil.toPersianDigits(times.fajr);
+        document.getElementById('p-sunrise').textContent = PersianDateUtil.toPersianDigits(times.sunrise);
+        document.getElementById('p-dhuhr').textContent = PersianDateUtil.toPersianDigits(times.dhuhr);
+        document.getElementById('p-sunset').textContent = PersianDateUtil.toPersianDigits(times.sunset);
+        document.getElementById('p-maghrib').textContent = PersianDateUtil.toPersianDigits(times.maghrib);
+        document.getElementById('p-midnight').textContent = PersianDateUtil.toPersianDigits(times.midnight);
+      }
+    }
+
+    function renderLifeGrid() {
+      const grid = document.getElementById('mLifeGrid');
+      if (!grid) return;
+      grid.innerHTML = '';
+      for (let i = 0; i < 520; i++) {
+        const dot = document.createElement('div');
+        dot.className = 'life-dot';
+        if (i < 170) {
+          dot.classList.add('spent');
+        } else if (i === 170) {
+          dot.classList.add('current');
+        }
+        grid.appendChild(dot);
+      }
+    }
+
+    // Modal
+    function openAddEventModal() {
+      document.getElementById('addEventModal').classList.add('active');
+    }
+    function closeModal() {
+      document.getElementById('addEventModal').classList.remove('active');
+    }
+    function saveNewEvent() {
+      const title = document.getElementById('modalEventTitle').value.trim();
+      const time = document.getElementById('modalEventTime').value || "10:00";
+      if (!title) return;
+
+      localEvents.push({
+        id: Date.now(),
+        title,
+        time,
+        year: selectedYear,
+        month: selectedMonth,
+        day: selectedDay
+      });
+
+      document.getElementById('modalEventTitle').value = '';
+      closeModal();
+      renderCalendar();
+      const statEl = document.getElementById('statEventsCount');
+      if (statEl) statEl.textContent = `${localEvents.length} عدد`;
+    }
+
+    document.getElementById('mFabBtn').onclick = openAddEventModal;
+
+    function toggleTask(chk) {
+      const txt = chk.nextElementSibling.querySelector('div:first-child');
+      if (chk.checked) {
+        txt.style.textDecoration = 'line-through';
+        txt.style.color = 'var(--text-muted)';
+      } else {
+        txt.style.textDecoration = 'none';
+        txt.style.color = 'var(--text-dark)';
+      }
+    }
+
+    // Toggle server
+    const serverToggle = document.getElementById('mServerToggle');
+    if (serverToggle) {
+      serverToggle.onchange = (e) => {
+        const statusEl = document.getElementById('serverToggleStatus');
+        if (e.target.checked) {
+          statusEl.textContent = 'فعال (آماده اتصال افزونه کروم)';
+          statusEl.style.color = '#16A34A';
+        } else {
+          statusEl.textContent = 'غیرفعال';
+          statusEl.style.color = '#DC2626';
+        }
+      };
+    }
+
+    // Chat demo interaction
+    const chatInput = document.getElementById('mChatInput');
+    const chatSend = document.getElementById('mBtnChatSend');
+    const chatBox = document.getElementById('mChatMessages');
+
+    function sendMsg() {
+      const text = chatInput.value.trim();
+      if (!text) return;
+      const userBubble = document.createElement('div');
+      userBubble.className = 'chat-bubble user';
+      userBubble.textContent = text;
+      chatBox.appendChild(userBubble);
+      chatInput.value = '';
+
+      setTimeout(() => {
+        const botBubble = document.createElement('div');
+        botBubble.className = 'chat-bubble bot';
+        botBubble.textContent = 'متوجه شدم! بر اساس تقویم همگام، شما برای امروز برنامه آزادتری دارید و می‌توانید به کارهای با اولویت بالا بپردازید.';
+        chatBox.appendChild(botBubble);
+        chatBox.scrollTop = chatBox.scrollHeight;
+      }, 600);
+      chatBox.scrollTop = chatBox.scrollHeight;
+    }
+
+    if (chatSend) chatSend.onclick = sendMsg;
+    if (chatInput) chatInput.onkeypress = (e) => { if (e.key === 'Enter') sendMsg(); };
+
+    // Initial render
+    renderHeader();
+    renderCalendar();
+  </script>
+</body>
+</html>

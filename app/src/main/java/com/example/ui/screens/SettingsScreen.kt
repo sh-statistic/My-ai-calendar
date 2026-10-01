@@ -1,5 +1,6 @@
 package com.example.ui.screens
 
+import android.R
 import android.widget.Toast
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -61,7 +62,9 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.ClipboardManager
 import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalUriHandler
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -88,12 +91,9 @@ fun SettingsScreen(
     val dbLogs by viewModel.syncLogs.collectAsState()
 
     val isGoogleCalendarEnabled by viewModel.isGoogleCalendarEnabled.collectAsState()
-    val isApiKeyConfigured by viewModel.isApiKeyConfigured.collectAsState()
-    val userApiKey by viewModel.userApiKey.collectAsState()
 
     val fajrSettings by viewModel.fajrAlarmSettings.collectAsState()
 
-    var showApiKeyDialog by remember { mutableStateOf(false) }
     var showPairingDialog by remember { mutableStateOf(false) }
     var showBackupDialog by remember { mutableStateOf(false) }
     var backupJsonContent by remember { mutableStateOf("") }
@@ -110,17 +110,29 @@ fun SettingsScreen(
         verticalArrangement = Arrangement.spacedBy(14.dp)
     ) {
         // ==========================================
-        // 1. Local Wi-Fi & Hotspot Sync Server Card
+        // 1. Unified Sync Settings Card
         // ==========================================
         Card(
-            colors = CardDefaults.cardColors(
-                containerColor = if (isServerRunning) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.surface
-            ),
+            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
             shape = RoundedCornerShape(18.dp),
             elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
             modifier = Modifier.fillMaxWidth()
         ) {
             Column(modifier = Modifier.padding(16.dp)) {
+                // Section Title
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Icon(Icons.Default.Sync, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text(
+                        text = "همگام‌سازی",
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.Bold
+                    )
+                }
+
+                Spacer(modifier = Modifier.height(16.dp))
+
+                // --- 1.1 Local Wi-Fi ---
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.SpaceBetween,
@@ -129,158 +141,66 @@ fun SettingsScreen(
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         Box(
                             modifier = Modifier
-                                .size(13.dp)
+                                .size(10.dp)
                                 .clip(CircleShape)
                                 .background(if (isServerRunning) Color(0xFF10B981) else Color(0xFFEF4444))
                         )
-                        Spacer(modifier = Modifier.width(10.dp))
+                        Spacer(modifier = Modifier.width(8.dp))
                         Column {
+                            Text("سرور محلی Wi-Fi", style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.Bold)
                             Text(
-                                text = "همگام‌سازی محلی (Wi-Fi / هات‌اسپات)",
-                                style = MaterialTheme.typography.titleMedium,
-                                fontWeight = FontWeight.Bold
-                            )
-                            Text(
-                                text = if (isServerRunning) "سرور فعال و آماده اتصال" else "سرور محلی خاموش است",
+                                text = if (isServerRunning) "فعال ($serverUrl)" else "غیرفعال",
                                 style = MaterialTheme.typography.labelSmall,
-                                color = if (isServerRunning) Color(0xFF15803D) else MaterialTheme.colorScheme.error,
-                                fontWeight = FontWeight.SemiBold
+                                color = if (isServerRunning) Color(0xFF15803D) else MaterialTheme.colorScheme.onSurfaceVariant
                             )
                         }
                     }
-
-                    Switch(
-                        checked = isServerRunning,
-                        onCheckedChange = { active ->
-                            if (active) viewModel.startServer() else viewModel.stopServer()
-                        },
-                        modifier = Modifier.testTag("toggle_server_switch")
-                    )
+                    Switch(checked = isServerRunning, onCheckedChange = { if (it) viewModel.startServer() else viewModel.stopServer() })
                 }
 
-                Spacer(modifier = Modifier.height(10.dp))
-
-                Text(
-                    text = "ارتباط مستقیم با افزونه کروم بدون اینترنت از طریق شبکه Wi-Fi یا نقطه اتصال (Hotspot)",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-
-                Spacer(modifier = Modifier.height(10.dp))
-
-                // Server Address Box
-                Surface(
-                    color = MaterialTheme.colorScheme.surface.copy(alpha = 0.85f),
-                    shape = RoundedCornerShape(12.dp),
-                    modifier = Modifier.fillMaxWidth()
-                ) {
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(10.dp),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Column {
-                            Text(
-                                text = "آدرس اتصال در مرورگر / افزونه کروم:",
-                                style = MaterialTheme.typography.labelSmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant
-                            )
-                            Text(
-                                text = serverUrl,
-                                style = MaterialTheme.typography.titleSmall,
-                                fontWeight = FontWeight.Bold,
-                                color = MaterialTheme.colorScheme.primary
-                            )
-                        }
-
-                        Row {
-                            IconButton(onClick = {
-                                clipboardManager.setText(AnnotatedString(serverUrl))
-                                Toast.makeText(context, "آدرس کپی شد", Toast.LENGTH_SHORT).show()
-                            }) {
-                                Icon(Icons.Default.ContentCopy, contentDescription = "کپی آدرس")
-                            }
-                            IconButton(onClick = { showPairingDialog = true }) {
-                                Icon(Icons.Default.Info, contentDescription = "راهنمای اتصال")
-                            }
-                        }
+                if (isServerRunning) {
+                    Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
+                        TextButton(onClick = {
+                            clipboardManager.setText(AnnotatedString(serverUrl))
+                            Toast.makeText(context, "آدرس کپی شد", Toast.LENGTH_SHORT).show()
+                        }) { Text("کپی آدرس", fontSize = 11.sp) }
+                        TextButton(onClick = { showPairingDialog = true }) { Text("راهنما", fontSize = 11.sp) }
                     }
                 }
 
-                Spacer(modifier = Modifier.height(8.dp))
+                Spacer(modifier = Modifier.height(12.dp))
+                Box(modifier = Modifier.fillMaxWidth().height(1.dp).background(MaterialTheme.colorScheme.surfaceVariant))
+                Spacer(modifier = Modifier.height(12.dp))
 
-                // Network connection info
+                // --- 1.2 Bluetooth BLE ---
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.SpaceBetween,
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    Text(
-                        text = "نوع اتصال: ${networkInfo.first} (IP: $serverIp)",
-                        style = MaterialTheme.typography.labelSmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                    IconButton(onClick = { viewModel.refreshNetworkInfo() }, modifier = Modifier.size(24.dp)) {
-                        Icon(Icons.Default.Refresh, contentDescription = "بروزرسانی شبکه", modifier = Modifier.size(16.dp))
-                    }
-                }
-            }
-        }
-
-        // ==========================================
-        // 2. Bluetooth BLE Sync Card
-        // ==========================================
-        Card(
-            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
-            shape = RoundedCornerShape(16.dp),
-            elevation = CardDefaults.cardElevation(defaultElevation = 1.dp),
-            modifier = Modifier.fillMaxWidth()
-        ) {
-            Column(modifier = Modifier.padding(16.dp)) {
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Row(
-                        modifier = Modifier.weight(1f),
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
                         Icon(
                             if (isBleAdvertising) Icons.Default.BluetoothSearching else Icons.Default.Bluetooth,
                             contentDescription = null,
                             tint = if (isBleAdvertising) Color(0xFF3B82F6) else Color.Gray,
-                            modifier = Modifier.size(26.dp)
+                            modifier = Modifier.size(20.dp)
                         )
-                        Spacer(modifier = Modifier.width(10.dp))
+                        Spacer(modifier = Modifier.width(8.dp))
                         Column {
+                            Text("بلوتوث (BLE)", style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.Bold)
                             Text(
-                                text = "همگام‌سازی بلوتوث (BLE)",
-                                style = MaterialTheme.typography.titleMedium,
-                                fontWeight = FontWeight.Bold
-                            )
-                            Text(
-                                text = if (isBleAdvertising) "انتشار بلوتوث فعال است" else "بلوتوث خاموش است",
+                                text = if (isBleAdvertising) "آماده انتقال" else "خاموش",
                                 style = MaterialTheme.typography.labelSmall,
                                 color = if (isBleAdvertising) Color(0xFF2563EB) else Color.Gray
                             )
                         }
                     }
-
-                    Switch(
-                        checked = isBleAdvertising,
-                        onCheckedChange = { viewModel.toggleBleAdvertising() }
-                    )
+                    Switch(checked = isBleAdvertising, onCheckedChange = { viewModel.toggleBleAdvertising() })
                 }
 
                 if (isBleAdvertising) {
-                    Spacer(modifier = Modifier.height(10.dp))
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.spacedBy(8.dp)
-                    ) {
+                    Spacer(modifier = Modifier.height(8.dp))
+                    Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                         Button(
                             onClick = {
                                 viewModel.triggerBleSyncPush()
@@ -288,11 +208,7 @@ fun SettingsScreen(
                             },
                             colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF2563EB)),
                             modifier = Modifier.weight(1f)
-                        ) {
-                            Icon(Icons.Default.Upload, contentDescription = null, modifier = Modifier.size(14.dp))
-                            Spacer(modifier = Modifier.width(4.dp))
-                            Text("ارسال با بلوتوث", fontSize = 11.sp)
-                        }
+                        ) { Text("ارسال بلوتوث", fontSize = 10.sp) }
 
                         OutlinedButton(
                             onClick = {
@@ -300,81 +216,97 @@ fun SettingsScreen(
                                 Toast.makeText(context, "داده‌های بلوتوث بازخوانی شد", Toast.LENGTH_SHORT).show()
                             },
                             modifier = Modifier.weight(1f)
-                        ) {
-                            Icon(Icons.Default.Download, contentDescription = null, modifier = Modifier.size(14.dp))
-                            Spacer(modifier = Modifier.width(4.dp))
-                            Text("دریافت بلوتوث", fontSize = 11.sp)
-                        }
+                        ) { Text("دریافت", fontSize = 10.sp) }
                     }
                 }
+
+                Spacer(modifier = Modifier.height(12.dp))
+                Box(modifier = Modifier.fillMaxWidth().height(1.dp).background(MaterialTheme.colorScheme.surfaceVariant))
+                Spacer(modifier = Modifier.height(12.dp))
+
+                // --- 1.3 Google Calendar ---
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Icon(
+                            if (isGoogleCalendarEnabled) Icons.Default.CloudQueue else Icons.Default.CloudOff,
+                            contentDescription = null,
+                            tint = if (isGoogleCalendarEnabled) MaterialTheme.colorScheme.primary else Color.Gray,
+                            modifier = Modifier.size(20.dp)
+                        )
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Column {
+                            Text("تقویم گوگل (Cloud)", style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.Bold)
+                            Text(
+                                text = if (isGoogleCalendarEnabled) "فعال" else "غیرفعال",
+                                style = MaterialTheme.typography.labelSmall,
+                                color = if (isGoogleCalendarEnabled) MaterialTheme.colorScheme.primary else Color.Gray
+                            )
+                        }
+                    }
+                    Switch(checked = isGoogleCalendarEnabled, onCheckedChange = { viewModel.toggleGoogleCalendar(it) })
+                }
+                
+                Text(
+                    text = "هشدار: برای استفاده از این قابلیت، گوشی باید به اینترنت متصل بوده و حساب گوگل سینک شده باشد.",
+                    fontSize = 9.sp,
+                    color = MaterialTheme.colorScheme.error,
+                    modifier = Modifier.padding(top = 4.dp, start = 28.dp)
+                )
+
+                Spacer(modifier = Modifier.height(12.dp))
             }
         }
 
         // ==========================================
-        // 3. Offline JSON Backup & Restore Card
+        // 2. Offline JSON Backup Card
         // ==========================================
         Card(
             colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
-            shape = RoundedCornerShape(16.dp),
-            elevation = CardDefaults.cardElevation(defaultElevation = 1.dp),
+            shape = RoundedCornerShape(18.dp),
+            elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
             modifier = Modifier.fillMaxWidth()
         ) {
             Column(modifier = Modifier.padding(16.dp)) {
+                // Section Title
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Icon(Icons.Default.Download, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
                     Spacer(modifier = Modifier.width(8.dp))
                     Text(
-                        text = "پشتیبان‌گیری و بازیابی آفلاین JSON",
+                        text = "پشتیبان‌گیری (آفلاین)",
                         style = MaterialTheme.typography.titleMedium,
                         fontWeight = FontWeight.Bold
                     )
                 }
 
-                Spacer(modifier = Modifier.height(6.dp))
-
-                Text(
-                    text = "پشتیبان‌گیری کامل از رویدادها، وظایف و یادداشت‌ها در قالب متن JSON بدون نیاز به اینترنت.",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-
-                Spacer(modifier = Modifier.height(10.dp))
+                Spacer(modifier = Modifier.height(16.dp))
 
                 Row(
                     modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
                 ) {
-                    Button(
-                        onClick = {
-                            viewModel.exportBackupJson { json ->
-                                backupJsonContent = json
-                                showBackupDialog = true
-                            }
-                        },
-                        modifier = Modifier.weight(1f)
-                    ) {
-                        Icon(Icons.Default.Download, contentDescription = null, modifier = Modifier.size(16.dp))
-                        Spacer(modifier = Modifier.width(4.dp))
-                        Text("خروجی JSON", fontSize = 11.sp)
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text("فایل آفلاین (JSON)", style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.Bold)
+                        Text(
+                            text = "ذخیره فایل در گوشی",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
                     }
-
-                    OutlinedButton(
-                        onClick = {
-                            backupJsonContent = ""
-                            showBackupDialog = true
-                        },
-                        modifier = Modifier.weight(1f)
-                    ) {
-                        Icon(Icons.Default.Upload, contentDescription = null, modifier = Modifier.size(16.dp))
-                        Spacer(modifier = Modifier.width(4.dp))
-                        Text("ورود اطلاعات", fontSize = 11.sp)
+                    Row {
+                        TextButton(onClick = { backupJsonContent = ""; showBackupDialog = true }) { Text("ورود", fontSize = 11.sp) }
+                        TextButton(onClick = { viewModel.exportBackupJson { json -> backupJsonContent = json; showBackupDialog = true } }) { Text("خروجی", fontSize = 11.sp) }
                     }
                 }
             }
         }
 
         // ==========================================
-        // 4. Fajr Smart Alarm Settings Card
+        // 3. Fajr Smart Alarm Settings Card
         // ==========================================
         Card(
             colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
@@ -455,117 +387,7 @@ fun SettingsScreen(
         }
 
         // ==========================================
-        // 5. Gemini AI Assistant Settings Card
-        // ==========================================
-        Card(
-            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
-            shape = RoundedCornerShape(16.dp),
-            elevation = CardDefaults.cardElevation(defaultElevation = 1.dp),
-            modifier = Modifier.fillMaxWidth()
-        ) {
-            Column(modifier = Modifier.padding(16.dp)) {
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Row(
-                        modifier = Modifier.weight(1f),
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Icon(
-                            Icons.Default.AutoAwesome,
-                            contentDescription = null,
-                            tint = MaterialTheme.colorScheme.primary,
-                            modifier = Modifier.size(26.dp)
-                        )
-                        Spacer(modifier = Modifier.width(10.dp))
-                        Column {
-                            Text(
-                                text = "دستیار هوشمند جمینای (Gemini AI)",
-                                style = MaterialTheme.typography.titleMedium,
-                                fontWeight = FontWeight.Bold
-                            )
-                            Text(
-                                text = if (isApiKeyConfigured) "کلید API فعال است" else "نیاز به ثبت کلید API",
-                                style = MaterialTheme.typography.labelSmall,
-                                color = if (isApiKeyConfigured) Color(0xFF15803D) else MaterialTheme.colorScheme.error,
-                                fontWeight = FontWeight.SemiBold
-                            )
-                        }
-                    }
-
-                    Button(
-                        onClick = { showApiKeyDialog = true },
-                        modifier = Modifier.testTag("btn_settings_api_key")
-                    ) {
-                        Icon(Icons.Default.Key, contentDescription = null, modifier = Modifier.size(16.dp))
-                        Spacer(modifier = Modifier.width(4.dp))
-                        Text(if (isApiKeyConfigured) "ویرایش" else "ثبت کلید", fontSize = 12.sp)
-                    }
-                }
-
-                Spacer(modifier = Modifier.height(8.dp))
-
-                Text(
-                    text = "دستیار هوشمند همگام مجهز به مدل‌های Gemini 3.5 Flash و Gemini 3.8 می‌باشد. کلید اختصاصی شما با امنیت کامل در دستگاه نگهداری می‌شود.",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-            }
-        }
-
-        // ==========================================
-        // 6. Google Calendar Cloud Sync (Opt-in)
-        // ==========================================
-        Card(
-            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
-            shape = RoundedCornerShape(16.dp),
-            elevation = CardDefaults.cardElevation(defaultElevation = 1.dp),
-            modifier = Modifier.fillMaxWidth()
-        ) {
-            Column(modifier = Modifier.padding(16.dp)) {
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Row(
-                        modifier = Modifier.weight(1f),
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Icon(
-                            if (isGoogleCalendarEnabled) Icons.Default.CloudQueue else Icons.Default.CloudOff,
-                            contentDescription = null,
-                            tint = if (isGoogleCalendarEnabled) MaterialTheme.colorScheme.primary else Color.Gray,
-                            modifier = Modifier.size(26.dp)
-                        )
-                        Spacer(modifier = Modifier.width(10.dp))
-                        Column {
-                            Text(
-                                text = "همگام‌سازی ابری تقویم گوگل",
-                                style = MaterialTheme.typography.titleMedium,
-                                fontWeight = FontWeight.Bold
-                            )
-                            Text(
-                                text = "(اختیاری - پیش‌فرض غیرفعال)",
-                                style = MaterialTheme.typography.labelSmall,
-                                color = MaterialTheme.colorScheme.error
-                            )
-                        }
-                    }
-
-                    Switch(
-                        checked = isGoogleCalendarEnabled,
-                        onCheckedChange = { viewModel.toggleGoogleCalendar(it) },
-                        modifier = Modifier.testTag("toggle_google_calendar")
-                    )
-                }
-            }
-        }
-
-        // ==========================================
-        // 7. Live Activity & Sync Logs
+        // 3. Live Activity & Sync Logs
         // ==========================================
         Card(
             colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
@@ -628,27 +450,34 @@ fun SettingsScreen(
             Column(modifier = Modifier.padding(14.dp)) {
                 Row(
                     modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
                 ) {
-                    Text("نسخه برنامه:", style = MaterialTheme.typography.bodySmall)
-                    Text("۱.۱.۰ (تقویم + عمر من + همگام‌سازی)", style = MaterialTheme.typography.bodySmall, fontWeight = FontWeight.Bold)
+                    Text("نسخه برنامه: ۰.۳.۰", style = MaterialTheme.typography.bodySmall, fontWeight = FontWeight.Bold)
+                    
+                    val uriHandler = LocalUriHandler.current
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        modifier = Modifier
+                            .clip(RoundedCornerShape(8.dp))
+                            .clickable { uriHandler.openUri("https://github.com/sh-statistic") }
+                            .padding(4.dp)
+                    ) {
+                        Text("Design & Development: sh-statistic", style = MaterialTheme.typography.bodySmall, fontSize = 9.sp)
+                        Spacer(modifier = Modifier.width(4.dp))
+                        Icon(
+                            painter = painterResource(id = com.example.R.drawable.ic_github),
+                            contentDescription = "GitHub",
+                            modifier = Modifier.size(16.dp),
+                            tint = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
                 }
             }
         }
     }
 
     // Dialogs
-    if (showApiKeyDialog) {
-        ApiKeySetupDialog(
-            currentKey = userApiKey,
-            onDismiss = { showApiKeyDialog = false },
-            onSave = { newKey: String ->
-                viewModel.updateApiKey(newKey)
-                showApiKeyDialog = false
-            }
-        )
-    }
-
     if (showPairingDialog) {
         PairingInfoDialog(
             ip = serverIp,

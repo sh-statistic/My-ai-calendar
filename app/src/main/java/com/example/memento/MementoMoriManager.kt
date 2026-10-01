@@ -24,13 +24,25 @@ class MementoMoriManager(private val context: Context) {
         private const val PREFS_NAME = "hamgam_memento_mori_prefs"
         private const val KEY_BIRTH_YEAR = "birth_year"
         private const val KEY_BIRTH_MONTH = "birth_month"
+        private const val KEY_EXPECTED_LIFESPAN = "expected_lifespan"
         private const val KEY_MANUAL_DRILLED_COUNT = "manual_drilled_count"
         private const val KEY_NOTES_JSON = "reflection_notes_json"
-        const val TOTAL_LIFETIME_MONTHS = 960 // 80 Years
     }
 
     private val prefs: SharedPreferences =
         context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+
+    fun getExpectedLifespan(): Int {
+        return prefs.getInt(KEY_EXPECTED_LIFESPAN, 80) // Default 80 years
+    }
+
+    fun setExpectedLifespan(years: Int) {
+        prefs.edit().putInt(KEY_EXPECTED_LIFESPAN, years).apply()
+    }
+
+    fun getTotalLifetimeMonths(): Int {
+        return getExpectedLifespan() * 12
+    }
 
     fun getBirthYear(): Int {
         val currentYear = PersianCalendarHelper.getCurrentJalaliDate().year
@@ -61,14 +73,15 @@ class MementoMoriManager(private val context: Context) {
         val today = PersianCalendarHelper.getCurrentJalaliDate()
         val birthY = getBirthYear()
         val birthM = getBirthMonth()
+        val totalLifetimeMonths = getTotalLifetimeMonths()
 
         // Calculate chronological months lived
         var rawMonths = (today.year - birthY) * 12 + (today.month - birthM)
         if (rawMonths < 0) rawMonths = 0
 
         // Add any manually finished months
-        val totalElapsed = (rawMonths + getManualDrilledCount()).coerceIn(0, TOTAL_LIFETIME_MONTHS)
-        val remaining = (TOTAL_LIFETIME_MONTHS - totalElapsed).coerceAtLeast(0)
+        val totalElapsed = (rawMonths + getManualDrilledCount()).coerceIn(0, totalLifetimeMonths)
+        val remaining = (totalLifetimeMonths - totalElapsed).coerceAtLeast(0)
 
         val elapsedYears = totalElapsed / 12
         val elapsedRemMonths = totalElapsed % 12
@@ -76,12 +89,12 @@ class MementoMoriManager(private val context: Context) {
         val remainingYears = remaining / 12
         val remainingRemMonths = remaining % 12
 
-        val percent = (totalElapsed.toFloat() / TOTAL_LIFETIME_MONTHS.toFloat()) * 100f
-        val currentMonthIdx = totalElapsed.coerceAtMost(TOTAL_LIFETIME_MONTHS - 1)
+        val percent = (totalElapsed.toFloat() / totalLifetimeMonths.toFloat()) * 100f
+        val currentMonthIdx = totalElapsed.coerceAtMost(totalLifetimeMonths - 1)
 
         return LifeProgress(
             elapsedMonths = totalElapsed,
-            totalMonths = TOTAL_LIFETIME_MONTHS,
+            totalMonths = totalLifetimeMonths,
             elapsedYears = elapsedYears,
             elapsedRemainingMonths = elapsedRemMonths,
             remainingYears = remainingYears,

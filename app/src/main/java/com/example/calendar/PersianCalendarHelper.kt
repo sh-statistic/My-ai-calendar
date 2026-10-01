@@ -48,70 +48,98 @@ object PersianCalendarHelper {
         return sb.toString()
     }
 
-    fun gregorianToJdn(year: Int, month: Int, day: Int): Long {
-        val a = (14 - month) / 12
-        val y = year + 4800 - a
-        val m = month + 12 * a - 3
-        return day + (153 * m + 2) / 5 + 365L * y + y / 4 - y / 100 + y / 400 - 32045
-    }
-
-    fun jdnToGregorian(jdn: Long): GregorianDate {
-        val a = jdn + 32044
-        val b = (4 * a + 3) / 146097
-        val c = a - (146097 * b) / 4
-        val d = (4 * c + 3) / 1461
-        val e = c - (1461 * d) / 4
-        val m = (5 * e + 2) / 153
-        val day = (e - (153 * m + 2) / 5 + 1).toInt()
-        val month = (m + 3 - 12 * (m / 10)).toInt()
-        val year = (100 * b + d - 4800 + m / 10).toInt()
-        return GregorianDate(year, month, day)
-    }
-
-    fun jalaliToJdn(year: Int, month: Int, day: Int): Long {
-        val epBase = year - 474
-        val epYear = 474 + ((epBase % 2820) + 2820) % 2820
-        val md = if (month <= 7) (month - 1) * 31 else (month - 1) * 30 + 6
-        return day.toLong() + md + ((epYear * 682) - 110) / 2816 + (epYear - 1) * 365L + (epBase / 2820) * 1029983L + (1948320 - 1)
-    }
-
-    fun jdnToJalali(jdn: Long): JalaliDate {
-        val dep = jdn - 2121445L
-        val cycle = dep / 1029983L
-        val cDay = ((dep % 1029983L) + 1029983L) % 1029983L
-        var yCycle = 0L
-        if (cDay == 1029982L) {
-            yCycle = 2820
-        } else {
-            val aux1 = cDay / 366L
-            val aux2 = cDay % 366L
-            yCycle = ((2134L * aux1 + 2816L * aux2 + 2815L) / 1028522L) + aux1 + 1
-        }
-        val year = (yCycle + 2820 * cycle + 474).toInt()
-        val dayOfYear = (jdn - jalaliToJdn(year, 1, 1) + 1).toInt()
-        val month: Int
-        val day: Int
-        if (dayOfYear <= 186) {
-            month = Math.max(1, Math.min(6, (Math.ceil(dayOfYear / 31.0)).toInt()))
-            val rem = dayOfYear % 31
-            day = if (rem == 0) 31 else rem
-        } else {
-            val remOfYear = dayOfYear - 186
-            month = Math.max(7, Math.min(12, 6 + (Math.ceil(remOfYear / 30.0)).toInt()))
-            val rem = remOfYear % 30
-            day = if (rem == 0) 30 else rem
-        }
-        return JalaliDate(year, month, day)
-    }
-
     fun gregorianToJalali(gYear: Int, gMonth: Int, gDay: Int): JalaliDate {
-        val jdn = gregorianToJdn(gYear, gMonth, gDay)
-        return jdnToJalali(jdn)
+        val gDaysInMonth = intArrayOf(31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31)
+        val jDaysInMonth = intArrayOf(31, 31, 31, 31, 31, 31, 30, 30, 30, 30, 30, 29)
+        
+        val gy = gYear - 1600
+        val gm = gMonth - 1
+        val gd = gDay - 1
+
+        var gDayNo = 365 * gy + Math.floorDiv(gy + 3, 4) - Math.floorDiv(gy + 99, 100) + Math.floorDiv(gy + 399, 400)
+        for (i in 0 until gm) {
+            gDayNo += gDaysInMonth[i]
+        }
+        if (gm > 1 && ((gy % 4 == 0 && gy % 100 != 0) || (gy % 400 == 0))) {
+            gDayNo++
+        }
+        gDayNo += gd
+
+        var jDayNo = gDayNo - 79
+        val jNp = Math.floorDiv(jDayNo, 12053)
+        jDayNo %= 12053
+
+        var jy = 979 + 33 * jNp + 4 * Math.floorDiv(jDayNo, 1461)
+        jDayNo %= 1461
+
+        if (jDayNo >= 366) {
+            jy += Math.floorDiv(jDayNo - 1, 365)
+            jDayNo = (jDayNo - 1) % 365
+        }
+
+        var jm = 0
+        while (jm < 11 && jDayNo >= jDaysInMonth[jm]) {
+            jDayNo -= jDaysInMonth[jm]
+            jm++
+        }
+        return JalaliDate(jy, jm + 1, jDayNo + 1)
     }
 
     fun jalaliToGregorian(jYear: Int, jMonth: Int, jDay: Int): GregorianDate {
-        val jdn = jalaliToJdn(jYear, jMonth, jDay)
-        return jdnToGregorian(jdn)
+        val gDaysInMonth = intArrayOf(31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31)
+        val jDaysInMonth = intArrayOf(31, 31, 31, 31, 31, 31, 30, 30, 30, 30, 30, 29)
+        
+        val jy = jYear - 979
+        val jm = jMonth - 1
+        val jd = jDay - 1
+
+        var jDayNo = 365 * jy + Math.floorDiv(jy, 33) * 8 + Math.floorDiv((jy % 33) + 3, 4)
+        for (i in 0 until jm) {
+            jDayNo += jDaysInMonth[i]
+        }
+        jDayNo += jd
+
+        var gDayNo = jDayNo + 79
+        var gy = 1600 + 400 * Math.floorDiv(gDayNo, 146097)
+        gDayNo %= 146097
+
+        var leap = true
+        if (gDayNo >= 36525) {
+            gDayNo--
+            gy += 100 * Math.floorDiv(gDayNo, 36524)
+            gDayNo %= 36524
+            if (gDayNo >= 365) {
+                gDayNo++
+            } else {
+                leap = false
+            }
+        }
+
+        gy += 4 * Math.floorDiv(gDayNo, 1461)
+        gDayNo %= 1461
+
+        if (gDayNo >= 366) {
+            leap = false
+            gDayNo--
+            gy += Math.floorDiv(gDayNo, 365)
+            gDayNo %= 365
+        }
+
+        var gm = 0
+        while (gm < 11) {
+            var days = gDaysInMonth[gm]
+            if (gm == 1 && leap) {
+                days++
+            }
+            if (gDayNo >= days) {
+                gDayNo -= days
+                gm++
+            } else {
+                break
+            }
+        }
+
+        return GregorianDate(gy, gm + 1, gDayNo + 1)
     }
 
     fun getDaysInJalaliMonth(year: Int, month: Int): Int {
@@ -137,10 +165,16 @@ object PersianCalendarHelper {
      * 6 -> جمعه (Friday)
      */
     fun getPersianDayOfWeek(jYear: Int, jMonth: Int, jDay: Int): Int {
-        val jdn = jalaliToJdn(jYear, jMonth, jDay)
-        // Saturday is jdn % 7 == 1, so (jdn + 1 + 1) % 7
-        val dow = ((jdn + 2) % 7).toInt()
-        return if (dow < 0) dow + 7 else dow
+        val greg = jalaliToGregorian(jYear, jMonth, jDay)
+        val cal = Calendar.getInstance()
+        cal.set(greg.year, greg.month - 1, greg.day)
+        val dow = cal.get(Calendar.DAY_OF_WEEK)
+        // Calendar.SATURDAY = 7 -> 0
+        // Calendar.SUNDAY = 1 -> 1
+        // Calendar.MONDAY = 2 -> 2
+        // ...
+        // Calendar.FRIDAY = 6 -> 6
+        return dow % 7
     }
 
     fun getCurrentJalaliDate(): JalaliDate {

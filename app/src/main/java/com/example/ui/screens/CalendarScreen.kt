@@ -56,6 +56,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.calendar.JalaliDate
@@ -268,15 +269,7 @@ fun CalendarScreen(
                 }
             }
 
-            // 3. Ultra-Lightweight Offline Prayer Times & Fajr Alarm Card (Dynamically updates with selectedDate!)
-            item {
-                PrayerTimesCard(
-                    viewModel = viewModel,
-                    modifier = Modifier.padding(horizontal = 10.dp)
-                )
-            }
-
-            // 4. National & Religious Occasions Card for Selected Date
+            // 3. National & Religious Occasions Card for Selected Date
             if (selectedDayOccasions.isNotEmpty()) {
                 item {
                     Card(
@@ -345,6 +338,14 @@ fun CalendarScreen(
                         }
                     }
                 }
+            }
+
+            // 4. Ultra-Lightweight Offline Prayer Times Card (Dynamically updates with selectedDate!)
+            item {
+                PrayerTimesCard(
+                    viewModel = viewModel,
+                    modifier = Modifier.padding(horizontal = 10.dp)
+                )
             }
 
             // 5. Selected Day Details Header
@@ -660,6 +661,32 @@ fun EventItemCard(
                     )
                 }
             }
+        }
+    }
+}
+
+@Preview(showBackground = true)
+@Composable
+fun EventItemCardPreview() {
+    MaterialTheme {
+        Surface {
+            EventItemCard(
+                event = EventEntity(
+                    id = "1",
+                    title = "جلسه با تیم فنی",
+                    description = "[یادآوری:۱۵ دقیقه قبل] بررسی موارد اسپرینت جدید",
+                    persianDate = "1402/08/15",
+                    startTime = "10:30",
+                    endTime = "",
+                    category = "کاری",
+                    colorHex = "#3b82f6",
+                    updatedAt = 0L,
+                    isDeleted = false
+                ),
+                onClick = {},
+                onEdit = {},
+                onDelete = {}
+            )
         }
     }
 }
