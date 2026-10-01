@@ -240,19 +240,34 @@ class MainActivity : ComponentActivity() {
                                 // Standard Compact Header for Secondary Screens (Tasks, Notes, Sync, Settings, Chat)
                                 CenterAlignedTopAppBar(
                                     title = {
-                                        Text(
-                                            text = when (selectedTab) {
-                                                1 -> "وظایف و چک‌لیست"
-                                                2 -> "یادداشت‌ها"
-                                                3 -> "عمر من (Memento Mori)"
-                                                4 -> "تنظیمات و همگام‌سازی"
-                                                5 -> "دستیار هوشمند"
-                                                else -> "تقویم همگام"
-                                            },
-                                            style = MaterialTheme.typography.titleMedium,
-                                            fontWeight = FontWeight.Bold,
-                                            color = MaterialTheme.colorScheme.primary
-                                        )
+                                        if (selectedTab == 3) {
+                                            Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                                                Text(
+                                                    text = "عمر من",
+                                                    style = MaterialTheme.typography.titleMedium,
+                                                    fontWeight = FontWeight.Bold,
+                                                    color = Color(0xFFE08A00)
+                                                )
+                                                Text(
+                                                    text = "هر روز، یک فرصت دیگر",
+                                                    fontSize = 11.sp,
+                                                    color = Color.Gray
+                                                )
+                                            }
+                                        } else {
+                                            Text(
+                                                text = when (selectedTab) {
+                                                    1 -> "وظایف و چک‌لیست"
+                                                    2 -> "یادداشت‌ها"
+                                                    4 -> "تنظیمات و همگام‌سازی"
+                                                    5 -> "دستیار هوشمند"
+                                                    else -> "تقویم همگام"
+                                                },
+                                                style = MaterialTheme.typography.titleMedium,
+                                                fontWeight = FontWeight.Bold,
+                                                color = MaterialTheme.colorScheme.primary
+                                            )
+                                        }
                                     },
                                     navigationIcon = {
                                         if (selectedTab != 5) {
