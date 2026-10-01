@@ -82,6 +82,7 @@ fun CalendarScreen(
     val viewMonth by viewModel.currentViewMonth.collectAsState()
     val events by viewModel.activeEvents.collectAsState()
     val tasks by viewModel.activeTasks.collectAsState()
+    val notes by viewModel.activeNotes.collectAsState()
 
     var showAddEventDialog by remember { mutableStateOf(false) }
     var showAddTaskDialog by remember { mutableStateOf(false) }
@@ -100,26 +101,13 @@ fun CalendarScreen(
     val selectedDayOccasions = PersianOccasionsHelper.getOccasionsForDate(selectedDate.month, selectedDate.day)
     val isSelectedDayHoliday = PersianOccasionsHelper.isHoliday(selectedDate.month, selectedDate.day)
 
-    Scaffold(
-        modifier = modifier.fillMaxSize(),
-        floatingActionButton = {
-            FloatingActionButton(
-                onClick = { showAddEventDialog = true },
-                containerColor = MaterialTheme.colorScheme.primary,
-                contentColor = MaterialTheme.colorScheme.onPrimary,
-                modifier = Modifier.testTag("fab_add_event")
-            ) {
-                Icon(Icons.Default.Add, contentDescription = "افزودن رویداد جدید")
-            }
-        }
-    ) { innerPadding ->
+    Box(modifier = modifier.fillMaxSize()) {
         // Single unified scrollable container so all details are visible on smaller Android 6 screens
         LazyColumn(
             modifier = Modifier
                 .fillMaxSize()
-                .padding(innerPadding)
                 .testTag("calendar_scrollable_container"),
-            contentPadding = PaddingValues(top = 6.dp, bottom = 80.dp),
+            contentPadding = PaddingValues(top = 4.dp, bottom = 80.dp),
             verticalArrangement = Arrangement.spacedBy(8.dp)
         ) {
             // 1. Calendar Grid Card (with national & religious holidays marked)
@@ -128,7 +116,7 @@ fun CalendarScreen(
                     colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(horizontal = 10.dp),
+                        .padding(horizontal = 12.dp),
                     shape = RoundedCornerShape(14.dp),
                     elevation = CardDefaults.cardElevation(defaultElevation = 1.dp)
                 ) {
@@ -160,7 +148,7 @@ fun CalendarScreen(
                             Row(
                                 modifier = Modifier
                                     .fillMaxWidth()
-                                    .padding(vertical = 1.dp),
+                                    .padding(vertical = 0.dp),
                                 horizontalArrangement = Arrangement.SpaceAround
                             ) {
                                 for (col in 0 until 7) {
@@ -178,11 +166,29 @@ fun CalendarScreen(
 
                                         val hasEvents = events.any { it.persianDate == cellJalali.formatted }
                                         val hasTasks = tasks.any { it.persianDueDate == cellJalali.formatted }
+                                        val hasNotes = notes.any { it.persianDate == cellJalali.formatted }
+
+                                        // Only show circle for user-created content (not for national occasions)
+                                        val hasUserContent = hasEvents || hasTasks || hasNotes
+                                        val userContentCount = listOf(hasEvents, hasTasks, hasNotes).count { it }
+
+                                        // Use event's own color if it's the only indicator, otherwise use primary
+                                        val indicatorColor = when {
+                                            !hasUserContent -> Color.Transparent
+                                            userContentCount > 1 -> MaterialTheme.colorScheme.primary
+                                            hasEvents -> {
+                                                val firstEvent = events.firstOrNull { it.persianDate == cellJalali.formatted }
+                                                firstEvent?.let { parseColor(it.colorHex) } ?: MaterialTheme.colorScheme.primary
+                                            }
+                                            hasTasks -> MaterialTheme.colorScheme.tertiary
+                                            hasNotes -> Color(0xFFF59E0B)
+                                            else -> Color.Transparent
+                                        }
 
                                         Box(
                                             modifier = Modifier
                                                 .weight(1f)
-                                                .aspectRatio(1.15f)
+                                                .height(42.dp)
                                                 .clip(RoundedCornerShape(6.dp))
                                                 .background(
                                                     when {
@@ -199,68 +205,47 @@ fun CalendarScreen(
                                                     )
                                                     else Modifier
                                                 )
-                                                .clickable { viewModel.setSelectedDate(cellJalali) }
-                                                .padding(1.dp),
+                                                .clickable { viewModel.setSelectedDate(cellJalali) },
                                             contentAlignment = Alignment.Center
                                         ) {
                                             Column(
                                                 horizontalAlignment = Alignment.CenterHorizontally,
                                                 verticalArrangement = Arrangement.Center
                                             ) {
-                                                // Primary: Persian Day (Red if holiday or Friday)
-                                                Text(
-                                                    text = PersianCalendarHelper.toPersianDigits(dayNum.toString()),
-                                                    fontSize = 12.sp,
-                                                    fontWeight = if (isSelected || isToday || isHoliday) FontWeight.Bold else FontWeight.Normal,
-                                                    color = when {
-                                                        isSelected -> MaterialTheme.colorScheme.primary
-                                                        isHoliday -> MaterialTheme.colorScheme.error
-                                                        else -> MaterialTheme.colorScheme.onSurface
-                                                    }
-                                                )
-                                                // Secondary: Gregorian Day
+                                                // Persian Day with Circular Indicator for user content
+                                                Box(
+                                                    modifier = Modifier
+                                                        .size(23.dp)
+                                                        .then(
+                                                            if (hasUserContent) Modifier.border(1.5.dp, indicatorColor, CircleShape) else Modifier
+                                                        ),
+                                                    contentAlignment = Alignment.Center
+                                                ) {
+                                                    Text(
+                                                        text = PersianCalendarHelper.toPersianDigits(dayNum.toString()),
+                                                        fontSize = 12.sp,
+                                                        fontWeight = if (isSelected || isToday || isHoliday) FontWeight.Bold else FontWeight.Normal,
+                                                        color = when {
+                                                            isSelected -> MaterialTheme.colorScheme.primary
+                                                            isHoliday -> MaterialTheme.colorScheme.error
+                                                            else -> MaterialTheme.colorScheme.onSurface
+                                                        }
+                                                    )
+                                                }
+
+                                                // Gregorian Day (clearly visible, never clipped)
                                                 Text(
                                                     text = cellGregorian.day.toString(),
-                                                    fontSize = 8.sp,
-                                                    color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f)
+                                                    fontSize = 9.sp,
+                                                    lineHeight = 11.sp,
+                                                    maxLines = 1,
+                                                    softWrap = false,
+                                                    color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.8f)
                                                 )
-
-                                                // Dot indicators (Events / Tasks / Occasions)
-                                                if (hasEvents || hasTasks || cellOccasions.isNotEmpty()) {
-                                                    Row(
-                                                        horizontalArrangement = Arrangement.spacedBy(2.dp),
-                                                        modifier = Modifier.padding(top = 1.dp)
-                                                    ) {
-                                                        if (cellOccasions.isNotEmpty()) {
-                                                            Box(
-                                                                modifier = Modifier
-                                                                    .size(3.dp)
-                                                                    .clip(CircleShape)
-                                                                    .background(if (isHoliday) MaterialTheme.colorScheme.error else Color(0xFF0D9488))
-                                                            )
-                                                        }
-                                                        if (hasEvents) {
-                                                            Box(
-                                                                modifier = Modifier
-                                                                    .size(3.dp)
-                                                                    .clip(CircleShape)
-                                                                    .background(MaterialTheme.colorScheme.primary)
-                                                            )
-                                                        }
-                                                        if (hasTasks) {
-                                                            Box(
-                                                                modifier = Modifier
-                                                                    .size(3.dp)
-                                                                    .clip(CircleShape)
-                                                                    .background(MaterialTheme.colorScheme.tertiary)
-                                                            )
-                                                        }
-                                                    }
-                                                }
                                             }
                                         }
                                     } else {
-                                        Spacer(modifier = Modifier.weight(1f))
+                                        Spacer(modifier = Modifier.weight(1f).height(42.dp))
                                     }
                                 }
                             }
@@ -269,45 +254,49 @@ fun CalendarScreen(
                 }
             }
 
-            // 3. National & Religious Occasions Card for Selected Date
-            if (selectedDayOccasions.isNotEmpty()) {
-                item {
-                    Card(
-                        colors = CardDefaults.cardColors(
-                            containerColor = if (isSelectedDayHoliday) Color(0xFFFEE2E2) else Color(0xFFF0FDF4)
-                        ),
-                        shape = RoundedCornerShape(10.dp),
-                        border = androidx.compose.foundation.BorderStroke(
-                            1.dp,
-                            if (isSelectedDayHoliday) Color(0xFFFCA5A5) else Color(0xFFBBF7D0)
-                        ),
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(horizontal = 10.dp)
-                            .testTag("card_occasions")
-                    ) {
-                        Column(modifier = Modifier.padding(10.dp)) {
-                            Row(
-                                modifier = Modifier.fillMaxWidth(),
-                                horizontalArrangement = Arrangement.SpaceBetween,
-                                verticalAlignment = Alignment.CenterVertically
-                            ) {
-                                Row(verticalAlignment = Alignment.CenterVertically) {
-                                    Icon(
-                                        Icons.Default.Star,
-                                        contentDescription = null,
-                                        tint = if (isSelectedDayHoliday) Color(0xFFDC2626) else Color(0xFF16A34A),
-                                        modifier = Modifier.size(16.dp)
-                                    )
-                                    Spacer(modifier = Modifier.width(6.dp))
-                                    Text(
-                                        text = "مناسبت‌های این روز:",
-                                        fontSize = 11.sp,
-                                        fontWeight = FontWeight.Bold,
-                                        color = if (isSelectedDayHoliday) Color(0xFF991B1B) else Color(0xFF166534)
-                                    )
-                                }
+            // 3. National & Religious Occasions Card for Selected Date + Custom Occasion Add
+            item {
+                val context = androidx.compose.ui.platform.LocalContext.current
+                var showAddOccasionDialog by remember { mutableStateOf(false) }
+                val customOccasionsForDay = selectedDayOccasions.filter { it.customMonth != -1 }
 
+                Card(
+                    colors = CardDefaults.cardColors(
+                        containerColor = if (isSelectedDayHoliday) Color(0xFFFEE2E2) else Color(0xFFF0FDF4)
+                    ),
+                    shape = RoundedCornerShape(10.dp),
+                    border = androidx.compose.foundation.BorderStroke(
+                        1.dp,
+                        if (isSelectedDayHoliday) Color(0xFFFCA5A5) else Color(0xFFBBF7D0)
+                    ),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 10.dp)
+                        .testTag("card_occasions")
+                ) {
+                    Column(modifier = Modifier.padding(10.dp)) {
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                Icon(
+                                    Icons.Default.Star,
+                                    contentDescription = null,
+                                    tint = if (isSelectedDayHoliday) Color(0xFFDC2626) else Color(0xFF16A34A),
+                                    modifier = Modifier.size(16.dp)
+                                )
+                                Spacer(modifier = Modifier.width(6.dp))
+                                Text(
+                                    text = "مناسبت‌های این روز:",
+                                    fontSize = 11.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    color = if (isSelectedDayHoliday) Color(0xFF991B1B) else Color(0xFF166534)
+                                )
+                            }
+
+                            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                                 if (isSelectedDayHoliday) {
                                     Surface(
                                         color = Color(0xFFDC2626),
@@ -322,21 +311,149 @@ fun CalendarScreen(
                                         )
                                     }
                                 }
+                                // Add custom occasion button
+                                Surface(
+                                    color = Color(0xFF16A34A).copy(alpha = 0.15f),
+                                    shape = RoundedCornerShape(12.dp),
+                                    modifier = Modifier.clickable { showAddOccasionDialog = true }
+                                ) {
+                                    Row(
+                                        modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp),
+                                        verticalAlignment = Alignment.CenterVertically
+                                    ) {
+                                        Icon(Icons.Default.Add, contentDescription = null, tint = Color(0xFF16A34A), modifier = Modifier.size(12.dp))
+                                        Spacer(modifier = Modifier.width(2.dp))
+                                        Text("ثبت مناسبت", fontSize = 9.sp, fontWeight = FontWeight.SemiBold, color = Color(0xFF16A34A))
+                                    }
+                                }
                             }
+                        }
 
+                        if (selectedDayOccasions.isNotEmpty()) {
                             Spacer(modifier = Modifier.height(4.dp))
 
                             selectedDayOccasions.forEach { occ ->
-                                Text(
-                                    text = "• ${occ.title}",
-                                    fontSize = 11.sp,
-                                    fontWeight = if (occ.isHoliday) FontWeight.Bold else FontWeight.Normal,
-                                    color = if (occ.isHoliday) Color(0xFFB91C1C) else Color(0xFF1E293B),
-                                    lineHeight = 16.sp
-                                )
+                                val isCustom = occ.customMonth != -1
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    horizontalArrangement = Arrangement.SpaceBetween,
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Text(
+                                        text = "• ${occ.title}",
+                                        fontSize = 11.sp,
+                                        fontWeight = if (occ.isHoliday) FontWeight.Bold else FontWeight.Normal,
+                                        color = if (occ.isHoliday) Color(0xFFB91C1C) else Color(0xFF1E293B),
+                                        lineHeight = 16.sp,
+                                        modifier = Modifier.weight(1f)
+                                    )
+                                    if (isCustom) {
+                                        IconButton(
+                                            onClick = {
+                                                PersianOccasionsHelper.removeCustomOccasion(context, occ)
+                                                // Force recomposition by re-selecting the date
+                                                viewModel.setSelectedDate(selectedDate)
+                                            },
+                                            modifier = Modifier.size(20.dp)
+                                        ) {
+                                            Icon(
+                                                Icons.Default.Delete,
+                                                contentDescription = "حذف مناسبت",
+                                                tint = MaterialTheme.colorScheme.error.copy(alpha = 0.7f),
+                                                modifier = Modifier.size(13.dp)
+                                            )
+                                        }
+                                    }
+                                }
                             }
+                        } else {
+                            Spacer(modifier = Modifier.height(4.dp))
+                            Text(
+                                text = "مناسبت ثبت‌شده‌ای برای این روز وجود ندارد.",
+                                fontSize = 10.sp,
+                                color = Color.Gray
+                            )
                         }
                     }
+                }
+
+                // Add Custom Occasion Dialog
+                if (showAddOccasionDialog) {
+                    var occasionTitle by remember { mutableStateOf("") }
+                    var isHolidayCheck by remember { mutableStateOf(false) }
+
+                    androidx.compose.material3.AlertDialog(
+                        onDismissRequest = { showAddOccasionDialog = false },
+                        title = {
+                            Text(
+                                "ثبت مناسبت توسط کاربر",
+                                fontWeight = FontWeight.Bold,
+                                fontSize = 16.sp
+                            )
+                        },
+                        text = {
+                            Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                                // Show the selected date
+                                Surface(
+                                    color = Color(0xFFF0FDF4),
+                                    shape = RoundedCornerShape(8.dp),
+                                    modifier = Modifier.fillMaxWidth()
+                                ) {
+                                    Row(
+                                        modifier = Modifier.padding(10.dp),
+                                        verticalAlignment = Alignment.CenterVertically
+                                    ) {
+                                        Icon(Icons.Default.CalendarToday, contentDescription = null, tint = Color(0xFF16A34A), modifier = Modifier.size(16.dp))
+                                        Spacer(modifier = Modifier.width(8.dp))
+                                        Text(
+                                            text = "${PersianCalendarHelper.toPersianDigits(selectedDate.day.toString())} ${selectedDate.monthName}  (هر سال تکرار می‌شود)",
+                                            fontSize = 12.sp,
+                                            fontWeight = FontWeight.SemiBold,
+                                            color = Color(0xFF166534)
+                                        )
+                                    }
+                                }
+
+                                androidx.compose.material3.OutlinedTextField(
+                                    value = occasionTitle,
+                                    onValueChange = { occasionTitle = it },
+                                    label = { Text("عنوان مناسبت") },
+                                    placeholder = { Text("مثلاً: سالگرد شهادت فلانی، تولد...") },
+                                    modifier = Modifier.fillMaxWidth(),
+                                    singleLine = true
+                                )
+
+                                Row(verticalAlignment = Alignment.CenterVertically) {
+                                    androidx.compose.material3.Checkbox(
+                                        checked = isHolidayCheck,
+                                        onCheckedChange = { isHolidayCheck = it }
+                                    )
+                                    Text("روز تعطیل", fontSize = 12.sp)
+                                }
+                            }
+                        },
+                        confirmButton = {
+                            androidx.compose.material3.Button(
+                                onClick = {
+                                    if (occasionTitle.isNotBlank()) {
+                                        PersianOccasionsHelper.addCustomOccasion(
+                                            context, occasionTitle,
+                                            selectedDate.month, selectedDate.day,
+                                            isHolidayCheck
+                                        )
+                                        showAddOccasionDialog = false
+                                        // Force recomposition
+                                        viewModel.setSelectedDate(selectedDate)
+                                    }
+                                }
+                            ) { Text("ثبت") }
+                        },
+                        dismissButton = {
+                            androidx.compose.material3.TextButton(onClick = { showAddOccasionDialog = false }) {
+                                Text("انصراف")
+                            }
+                        }
+                    )
                 }
             }
 
@@ -456,6 +573,18 @@ fun CalendarScreen(
                     }
                 }
             }
+        }
+
+        FloatingActionButton(
+            onClick = { showAddEventDialog = true },
+            containerColor = MaterialTheme.colorScheme.primary,
+            contentColor = MaterialTheme.colorScheme.onPrimary,
+            modifier = Modifier
+                .align(Alignment.BottomEnd)
+                .padding(16.dp)
+                .testTag("fab_add_event")
+        ) {
+            Icon(Icons.Default.Add, contentDescription = "افزودن رویداد جدید")
         }
     }
 

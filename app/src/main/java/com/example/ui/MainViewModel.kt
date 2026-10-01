@@ -6,6 +6,7 @@ import androidx.lifecycle.viewModelScope
 import com.example.calendar.GregorianDate
 import com.example.calendar.JalaliDate
 import com.example.calendar.PersianCalendarHelper
+import com.example.calendar.PersianOccasionsHelper
 import com.example.data.AppDatabase
 import com.example.data.AppRepository
 import com.example.data.EventEntity
@@ -20,6 +21,7 @@ import com.example.chat.ChatSender
 import com.example.chat.GeminiChatService
 import com.example.sync.BleSyncServer
 import com.example.sync.LocalHttpSyncServer
+import com.example.sync.GoogleCalendarSyncManager
 import com.example.sync.NetworkUtils
 import com.example.prayer.FajrAlarmManager
 import com.example.prayer.FajrAlarmSettings
@@ -39,6 +41,10 @@ import kotlinx.coroutines.launch
 import java.util.UUID
 
 class MainViewModel(application: Application) : AndroidViewModel(application) {
+
+    init {
+        PersianOccasionsHelper.loadCustomOccasions(application)
+    }
 
     private val database = AppDatabase.getInstance(application)
     val repository = AppRepository(database)
@@ -82,9 +88,19 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     private val _activityLogList = MutableStateFlow<List<String>>(emptyList())
     val activityLogList: StateFlow<List<String>> = _activityLogList.asStateFlow()
 
-    // Optional Google Calendar Cloud Sync (strictly disabled by default)
+    // Google Calendar Sync (via Calendar Content Provider)
+    val googleCalSyncManager = GoogleCalendarSyncManager(application)
     private val _isGoogleCalendarEnabled = MutableStateFlow(false)
     val isGoogleCalendarEnabled: StateFlow<Boolean> = _isGoogleCalendarEnabled.asStateFlow()
+
+    private val _googleCalendars = MutableStateFlow<List<GoogleCalendarSyncManager.CalendarAccount>>(emptyList())
+    val googleCalendars: StateFlow<List<GoogleCalendarSyncManager.CalendarAccount>> = _googleCalendars.asStateFlow()
+
+    private val _selectedGoogleCalName = MutableStateFlow(googleCalSyncManager.getSelectedCalendarName())
+    val selectedGoogleCalName: StateFlow<String> = _selectedGoogleCalName.asStateFlow()
+
+    private val _isSyncing = MutableStateFlow(false)
+    val isSyncing: StateFlow<Boolean> = _isSyncing.asStateFlow()
 
     // Prayer Times & Fajr Smart Alarm State (100% Offline, Tehran Geophysics Method)
     private val _fajrAlarmSettings = MutableStateFlow(FajrAlarmManager.getSettings(application))
@@ -435,9 +451,65 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     fun toggleGoogleCalendar(enabled: Boolean) {
         _isGoogleCalendarEnabled.value = enabled
         if (enabled) {
-            logMessage("همگام‌سازی ابری تقویم گوگل فعال شد (نیاز به توکن احراز هویت)")
+            refreshGoogleCalendars()
+            logMessage("همگام‌سازی تقویم گوگل فعال شد")
         } else {
-            logMessage("همگام‌سازی ابری تقویم گوگل غیرفعال است (حالت آفلاین محلی خالص)")
+            logMessage("همگام‌سازی تقویم گوگل غیرفعال شد")
+        }
+    }
+
+    fun refreshGoogleCalendars() {
+        _googleCalendars.value = googleCalSyncManager.getAvailableCalendars()
+    }
+
+    fun selectGoogleCalendar(calId: Long, calName: String) {
+        googleCalSyncManager.selectCalendar(calId, calName)
+        _selectedGoogleCalName.value = calName
+        logMessage("تقویم «$calName» برای همگام‌سازی انتخاب شد")
+    }
+
+    fun syncPushToGoogle() {
+        if (_isSyncing.value) return
+        viewModelScope.launch {
+            _isSyncing.value = true
+            try {
+                val events = repository.allActiveEvents.first()
+                val tasks = repository.allActiveTasks.first()
+                val notes = repository.allActiveNotes.first()
+                val result = googleCalSyncManager.syncAll(events, tasks, notes)
+                logMessage(result.message)
+                repository.recordLog("تقویم گوگل", result.message, result.eventsAdded + result.tasksAdded + result.notesAdded, result.errors == 0)
+            } catch (e: Exception) {
+                logMessage("خطا در همگام‌سازی: ${e.message}")
+            } finally {
+                _isSyncing.value = false
+            }
+        }
+    }
+
+    fun syncPullFromGoogle() {
+        if (_isSyncing.value) return
+        viewModelScope.launch {
+            _isSyncing.value = true
+            try {
+                val imported = googleCalSyncManager.importEventsFromGoogle()
+                var added = 0
+                for (event in imported) {
+                    // Skip if similar event already exists
+                    val existing = repository.allActiveEvents.first()
+                    val alreadyExists = existing.any { it.title == event.title && it.persianDate == event.persianDate }
+                    if (!alreadyExists) {
+                        repository.insertEvent(event)
+                        added++
+                    }
+                }
+                logMessage("✓ $added رویداد از تقویم گوگل دریافت شد")
+                repository.recordLog("تقویم گوگل", "دریافت $added رویداد جدید", added, true)
+            } catch (e: Exception) {
+                logMessage("خطا در دریافت: ${e.message}")
+            } finally {
+                _isSyncing.value = false
+            }
         }
     }
 

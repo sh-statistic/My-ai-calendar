@@ -89,23 +89,9 @@ fun TasksScreen(
     val totalCount = tasks.size
     val progress = if (totalCount > 0) (completedCount.toFloat() / totalCount).coerceIn(0f, 1f) else 0f
 
-    Scaffold(
-        modifier = modifier.fillMaxSize(),
-        floatingActionButton = {
-            FloatingActionButton(
-                onClick = { showAddTaskDialog = true },
-                containerColor = MaterialTheme.colorScheme.primary,
-                contentColor = MaterialTheme.colorScheme.onPrimary,
-                modifier = Modifier.testTag("fab_add_task")
-            ) {
-                Icon(Icons.Default.Add, contentDescription = "افزودن کار جدید")
-            }
-        }
-    ) { innerPadding ->
+    Box(modifier = modifier.fillMaxSize()) {
         Column(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(innerPadding)
+            modifier = Modifier.fillMaxSize()
         ) {
             // Header 1: Interactive Calendar Date Bar (Linked with Selected Calendar Date)
             Surface(
@@ -251,7 +237,7 @@ fun TasksScreen(
                     modifier = Modifier
                         .fillMaxWidth()
                         .weight(1f),
-                    contentPadding = PaddingValues(horizontal = 12.dp, vertical = 8.dp),
+                    contentPadding = PaddingValues(start = 12.dp, end = 12.dp, top = 8.dp, bottom = 80.dp),
                     verticalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
                     items(filteredTasks, key = { it.id }) { task ->
@@ -264,6 +250,18 @@ fun TasksScreen(
                     }
                 }
             }
+        }
+
+        FloatingActionButton(
+            onClick = { showAddTaskDialog = true },
+            containerColor = MaterialTheme.colorScheme.primary,
+            contentColor = MaterialTheme.colorScheme.onPrimary,
+            modifier = Modifier
+                .align(Alignment.BottomEnd)
+                .padding(16.dp)
+                .testTag("fab_add_task")
+        ) {
+            Icon(Icons.Default.Add, contentDescription = "افزودن کار جدید")
         }
     }
 
