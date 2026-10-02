@@ -945,7 +945,7 @@
         cell.className = 'm-day-cell';
         const dayOfWeek = (startDayOfWeek + d - 1) % 7;
         const isFriday = dayOfWeek === 6;
-        const isHoliday = isFriday || (typeof PersianOccasions !== 'undefined' && PersianOccasions.isHoliday(selectedMonth, d));
+        const isHoliday = isFriday || (typeof PersianOccasions !== 'undefined' && PersianOccasions.isHoliday(selectedMonth, d, selectedYear));
 
         if (isHoliday) cell.classList.add('holiday');
         if (d === selectedDay) cell.classList.add('selected');
@@ -954,10 +954,18 @@
         }
 
         const greg = PersianDateUtil.jalaliToGregorian(selectedYear, selectedMonth, d);
+        let hijriDayHtml = "";
+        if (typeof PersianOccasions !== 'undefined' && PersianOccasions.persianToIslamic) {
+          const hijri = PersianOccasions.persianToIslamic(selectedYear, selectedMonth, d);
+          hijriDayHtml = `<span class="hijri-num" style="color: var(--primary); font-size: 0.6rem; opacity: 0.8; margin-left: 2px;">${PersianDateUtil.toPersianDigits(hijri.day)}</span>`;
+        }
 
         cell.innerHTML = `
           <span class="solar-num">${PersianDateUtil.toPersianDigits(d)}</span>
-          <span class="greg-num">${greg.day}</span>
+          <div style="display: flex; gap: 4px; justify-content: center; align-items: center;">
+            ${hijriDayHtml}
+            <span class="greg-num">${greg.day}</span>
+          </div>
         `;
 
         // Check if day has event
@@ -1000,7 +1008,7 @@
       }
 
       const isFriday = dowIdx === 6;
-      const occasions = typeof PersianOccasions !== 'undefined' ? PersianOccasions.getOccasions(selectedMonth, selectedDay) : [];
+      const occasions = typeof PersianOccasions !== 'undefined' ? PersianOccasions.getOccasions(selectedMonth, selectedDay, selectedYear) : [];
       const isOfficialHoliday = isFriday || occasions.some(o => o.isHoliday);
 
       if (badge) {
@@ -1159,8 +1167,11 @@
     if (chatInput) chatInput.onkeypress = (e) => { if (e.key === 'Enter') sendMsg(); };
 
     // Initial render
-    renderHeader();
-    renderCalendar();
+    (async () => {
+      await PersianOccasions.loadOfficialData(selectedYear);
+      renderHeader();
+      renderCalendar();
+    })();
   </script>
 </body>
 </html>

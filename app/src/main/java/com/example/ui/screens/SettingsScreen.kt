@@ -400,7 +400,73 @@ fun SettingsScreen(
         }
 
         // ==========================================
-        // 2. Offline JSON Backup Card
+        // 2. Calendar Settings
+        // ==========================================
+        Card(
+            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+            shape = RoundedCornerShape(18.dp),
+            elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
+            modifier = Modifier.fillMaxWidth()
+        ) {
+            Column(modifier = Modifier.padding(16.dp)) {
+                // Section Title
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Icon(Icons.Default.Event, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text(
+                        text = "تنظیمات تقویم",
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.Bold
+                    )
+                }
+
+                Spacer(modifier = Modifier.height(16.dp))
+
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text("تنظیم روز هجری قمری", style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.Bold)
+                        Text(
+                            text = "برای تطبیق با تقویم رسمی کشور",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                }
+                
+                Spacer(modifier = Modifier.height(8.dp))
+                
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(6.dp)
+                ) {
+                    val currentOffset = com.example.calendar.HijriOffsetManager.currentOffset
+                    val offsetOptions = listOf(-2, -1, 0, 1, 2)
+                    
+                    offsetOptions.forEach { offset ->
+                        val label = when {
+                            offset > 0 -> "+$offset روز"
+                            offset < 0 -> "$offset روز"
+                            else -> "بدون تغییر"
+                        }
+                        FilterChip(
+                            selected = currentOffset == offset,
+                            onClick = { com.example.calendar.HijriOffsetManager.setOffset(offset) },
+                            label = { Text(label, fontSize = 10.sp) },
+                            modifier = Modifier.weight(1f)
+                        )
+                    }
+                }
+            }
+        }
+        
+        Spacer(modifier = Modifier.height(16.dp))
+
+        // ==========================================
+        // 3. Offline JSON Backup Card
         // ==========================================
         Card(
             colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
@@ -649,7 +715,7 @@ fun SettingsScreen(
                     horizontalArrangement = Arrangement.SpaceBetween,
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    Text("نسخه برنامه: ۰.۳.۰", style = MaterialTheme.typography.bodySmall, fontWeight = FontWeight.Bold)
+                    Text("نسخه برنامه: ${com.example.calendar.PersianCalendarHelper.toPersianDigits(com.example.BuildConfig.VERSION_NAME)}", style = MaterialTheme.typography.bodySmall, fontWeight = FontWeight.Bold)
                     
                     val uriHandler = LocalUriHandler.current
                     Row(
@@ -659,7 +725,7 @@ fun SettingsScreen(
                             .clickable { uriHandler.openUri("https://github.com/sh-statistic") }
                             .padding(4.dp)
                     ) {
-                        Text("Design & Development: sh-statistic", style = MaterialTheme.typography.bodySmall, fontSize = 9.sp)
+                        Text("created by: sh-statistic", style = MaterialTheme.typography.bodySmall, fontSize = 9.sp)
                         Spacer(modifier = Modifier.width(4.dp))
                         Icon(
                             painter = painterResource(id = com.example.R.drawable.ic_github),

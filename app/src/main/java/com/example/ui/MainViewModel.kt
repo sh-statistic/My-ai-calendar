@@ -38,6 +38,7 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.Dispatchers
 import java.util.UUID
 
 class MainViewModel(application: Application) : AndroidViewModel(application) {
@@ -321,12 +322,59 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         currentList.add(userMsg)
         _chatMessages.value = currentList
 
+        // 1. Try Offline NLP Engine First
+        val nlpResult = com.example.chat.OfflineNLPProcessor.processCommand(trimmed)
+        if (nlpResult is com.example.chat.OfflineNLPProcessor.NLPResult.AddNote) {
+            viewModelScope.launch(Dispatchers.IO) {
+                repository.insertNote(nlpResult.note)
+                val updatedList = _chatMessages.value.toMutableList()
+                updatedList.add(
+                    ChatMessage(
+                        sender = ChatSender.GEMINI,
+                        text = "یادداشت شما به صورت آفلاین ذخیره شد: ${nlpResult.note.title}",
+                        modelBadge = "آفلاین"
+                    )
+                )
+                _chatMessages.value = updatedList
+            }
+            return
+        } else if (nlpResult is com.example.chat.OfflineNLPProcessor.NLPResult.AddTask) {
+            viewModelScope.launch(Dispatchers.IO) {
+                repository.insertTask(nlpResult.task)
+                val updatedList = _chatMessages.value.toMutableList()
+                updatedList.add(
+                    ChatMessage(
+                        sender = ChatSender.GEMINI,
+                        text = "وظیفه جدید شما به صورت آفلاین ثبت شد: ${nlpResult.task.title}",
+                        modelBadge = "آفلاین"
+                    )
+                )
+                _chatMessages.value = updatedList
+            }
+            return
+        } else if (nlpResult is com.example.chat.OfflineNLPProcessor.NLPResult.AddEvent) {
+            viewModelScope.launch(Dispatchers.IO) {
+                repository.insertEvent(nlpResult.event)
+                val updatedList = _chatMessages.value.toMutableList()
+                updatedList.add(
+                    ChatMessage(
+                        sender = ChatSender.GEMINI,
+                        text = "رویداد جدید شما به صورت آفلاین برای تاریخ ${nlpResult.event.persianDate} ${if (nlpResult.event.startTime.isNotBlank()) "ساعت " + nlpResult.event.startTime else ""} ثبت شد: ${nlpResult.event.title}",
+                        modelBadge = "آفلاین"
+                    )
+                )
+                _chatMessages.value = updatedList
+            }
+            return
+        }
+
+        // 2. Fallback to Online Engine (Gemini)
         val key = _userApiKey.value
         if (key.isBlank()) {
             currentList.add(
                 ChatMessage(
                     sender = ChatSender.GEMINI,
-                    text = "لطفاً برای ارسال درخواست به هوش مصنوعی، ابتدا کلید اختصاصی Gemini API خود را وارد نمایید. بر روی دکمه کلید در بالای صفحه یا کارت پیام کلیک کنید.",
+                    text = "من متوجه این دستور نشدم. لطفاً برای صحبت کردن یا ارسال درخواست پیچیده‌تر، کلید اختصاصی Gemini API خود را وارد نمایید.",
                     isError = true
                 )
             )
@@ -338,17 +386,81 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
 
         viewModelScope.launch {
             _isGeneratingResponse.value = true
+
+            // Build dynamic context
+            val todayDate = PersianCalendarHelper.getCurrentJalaliDate().formattedPersian
+            val tasksStr = activeTasks.value.take(10).joinToString("\n") { "- ${it.title} (انجام شده: ${it.isCompleted})" }
+            val notesStr = activeNotes.value.take(10).joinToString("\n") { "- ${it.title}" }
+
+            val dynamicContext = """
+                
+                اطلاعات سیستم کاربر:
+                تاریخ امروز: $todayDate
+                وظایف فعال فعلی:
+                ${if (tasksStr.isNotBlank()) tasksStr else "هیچ وظیفه‌ای وجود ندارد"}
+                
+                یادداشت‌های کاربر:
+                ${if (notesStr.isNotBlank()) notesStr else "هیچ یادداشتی وجود ندارد"}
+                
+                دستورالعمل‌های ویژه (بسیار مهم):
+                اگر کاربر از شما خواست وظیفه (تسک) جدیدی اضافه کنید، باید دقیقاً و فقط این خروجی JSON را تولید کنید (هیچ متن اضافه‌ای ننویسید):
+                {"action": "ADD_TASK", "title": "عنوان وظیفه"}
+                
+                اگر کاربر خواست یادداشت جدیدی اضافه کنید، دقیقاً این خروجی JSON را تولید کنید:
+                {"action": "ADD_NOTE", "title": "عنوان", "content": "محتوای کامل یادداشت"}
+            """.trimIndent()
+
+            val fullSystemInstruction = currentRole.systemInstruction + "\n" + dynamicContext
+
             val result = GeminiChatService.sendMessage(
                 apiKey = key,
                 history = currentList,
                 userMessage = trimmed,
                 modelName = currentRole.modelName,
-                systemInstruction = currentRole.systemInstruction
+                systemInstruction = fullSystemInstruction
             )
             _isGeneratingResponse.value = false
 
             val updated = _chatMessages.value.toMutableList()
             result.onSuccess { reply ->
+                try {
+                    val cleanReply = reply.trim().removePrefix("```json").removeSuffix("```").trim()
+                    if (cleanReply.startsWith("{") && cleanReply.contains("\"action\"")) {
+                        val obj = org.json.JSONObject(cleanReply)
+                        val action = obj.optString("action")
+                        if (action == "ADD_TASK") {
+                            val title = obj.optString("title", "بدون عنوان")
+                            val task = TaskEntity(
+                                id = UUID.randomUUID().toString(),
+                                title = title,
+                                persianDueDate = PersianCalendarHelper.getCurrentJalaliDate().formatted,
+                                priority = "متوسط",
+                                category = "هوش مصنوعی"
+                            )
+                            repository.insertTask(task)
+                            updated.add(ChatMessage(sender = ChatSender.GEMINI, text = "وظیفه جدید با موفقیت اضافه شد: $title", modelBadge = currentRole.badge))
+                            _chatMessages.value = updated
+                            return@launch
+                        } else if (action == "ADD_NOTE") {
+                            val title = obj.optString("title", "بدون عنوان")
+                            val content = obj.optString("content", "")
+                            val note = NoteEntity(
+                                id = UUID.randomUUID().toString(),
+                                title = title,
+                                content = content,
+                                persianDate = PersianCalendarHelper.getCurrentJalaliDate().formattedPersian,
+                                colorHex = "#FEF3C7"
+                            )
+                            repository.insertNote(note)
+                            updated.add(ChatMessage(sender = ChatSender.GEMINI, text = "یادداشت جدید با موفقیت ثبت شد: $title", modelBadge = currentRole.badge))
+                            _chatMessages.value = updated
+                            return@launch
+                        }
+                    }
+                } catch (e: Exception) {
+                    // Not JSON, continue to normal text response
+                }
+
                 updated.add(
                     ChatMessage(
                         sender = ChatSender.GEMINI,

@@ -1,0 +1,2961 @@
+{
+ "1": {
+ "1": {
+ "hYear": 1447,
+ "hMonth": 10,
+ "hDay": 1,
+ "isHoliday": true,
+ "occasions": [
+ "عید سعید فطر(تعطیل) - آغاز نوروز (تعطیل)"
+ ]
+ },
+ "2": {
+ "hYear": 1447,
+ "hMonth": 10,
+ "hDay": 2,
+ "isHoliday": true,
+ "occasions": [
+ "تعطیل به مناسبت عید سعید فطر - عید نوروز (تعطیل) - هجوم مأموران ستم شاهی پهلوی به مدرسه فیضیه قم (۱۳۴۲ ه‍.ش) - آغاز عملیات فتح المبین (۱۳۶۱ ه‍.ش)"
+ ]
+ },
+ "3": {
+ "hYear": 1447,
+ "hMonth": 10,
+ "hDay": 3,
+ "isHoliday": true,
+ "occasions": [
+ "عید نوروز (تعطیل)"
+ ]
+ },
+ "4": {
+ "hYear": 1447,
+ "hMonth": 10,
+ "hDay": 4,
+ "isHoliday": true,
+ "occasions": [
+ "عید نوروز (تعطیل)"
+ ]
+ },
+ "5": {
+ "hYear": 1447,
+ "hMonth": 10,
+ "hDay": 5,
+ "isHoliday": false,
+ "occasions": []
+ },
+ "6": {
+ "hYear": 1447,
+ "hMonth": 10,
+ "hDay": 6,
+ "isHoliday": false,
+ "occasions": [
+ "زادروز زرتشت پیامبر"
+ ]
+ },
+ "7": {
+ "hYear": 1447,
+ "hMonth": 10,
+ "hDay": 7,
+ "isHoliday": true,
+ "occasions": [
+ "روز هنرهای نمایشی"
+ ]
+ },
+ "8": {
+ "hYear": 1447,
+ "hMonth": 10,
+ "hDay": 8,
+ "isHoliday": false,
+ "occasions": []
+ },
+ "9": {
+ "hYear": 1447,
+ "hMonth": 10,
+ "hDay": 9,
+ "isHoliday": false,
+ "occasions": []
+ },
+ "10": {
+ "hYear": 1447,
+ "hMonth": 10,
+ "hDay": 10,
+ "isHoliday": false,
+ "occasions": []
+ },
+ "11": {
+ "hYear": 1447,
+ "hMonth": 10,
+ "hDay": 11,
+ "isHoliday": false,
+ "occasions": []
+ },
+ "12": {
+ "hYear": 1447,
+ "hMonth": 10,
+ "hDay": 12,
+ "isHoliday": true,
+ "occasions": [
+ "روز جمهوری اسلامی ایران (تعطیل)"
+ ]
+ },
+ "13": {
+ "hYear": 1447,
+ "hMonth": 10,
+ "hDay": 13,
+ "isHoliday": true,
+ "occasions": [
+ "روز طبیعت (تعطیل)"
+ ]
+ },
+ "14": {
+ "hYear": 1447,
+ "hMonth": 10,
+ "hDay": 14,
+ "isHoliday": true,
+ "occasions": []
+ },
+ "15": {
+ "hYear": 1447,
+ "hMonth": 10,
+ "hDay": 15,
+ "isHoliday": false,
+ "occasions": []
+ },
+ "16": {
+ "hYear": 1447,
+ "hMonth": 10,
+ "hDay": 16,
+ "isHoliday": false,
+ "occasions": []
+ },
+ "17": {
+ "hYear": 1447,
+ "hMonth": 10,
+ "hDay": 17,
+ "isHoliday": false,
+ "occasions": [
+ "روز فرهنگ پهلوانی - ورزش زورخانهای"
+ ]
+ },
+ "18": {
+ "hYear": 1447,
+ "hMonth": 10,
+ "hDay": 18,
+ "isHoliday": false,
+ "occasions": [
+ "روز سالمتی"
+ ]
+ },
+ "19": {
+ "hYear": 1447,
+ "hMonth": 10,
+ "hDay": 19,
+ "isHoliday": false,
+ "occasions": []
+ },
+ "20": {
+ "hYear": 1447,
+ "hMonth": 10,
+ "hDay": 20,
+ "isHoliday": false,
+ "occasions": [
+ "روز ملی فناوری هستهای - شهادت سید مرتضی آوینی(۱۳۷۲ ه‍.ش) - روز هنر انقلاب اسلامی"
+ ]
+ },
+ "21": {
+ "hYear": 1447,
+ "hMonth": 10,
+ "hDay": 21,
+ "isHoliday": true,
+ "occasions": [
+ "شهادت امیر سپهبد علی صیاد شیرازی (۱۳۷۸ ه‍.ش) - سالروز افتتاح حساب شمارۀ 100 به فرمان حضرت امام خمینی - تأسیس بنیاد مسکن انقلاب اسلامی (۱۳۵۸ ه‍.ش)"
+ ]
+ },
+ "22": {
+ "hYear": 1447,
+ "hMonth": 10,
+ "hDay": 22,
+ "isHoliday": false,
+ "occasions": []
+ },
+ "23": {
+ "hYear": 1447,
+ "hMonth": 10,
+ "hDay": 23,
+ "isHoliday": false,
+ "occasions": []
+ },
+ "24": {
+ "hYear": 1447,
+ "hMonth": 10,
+ "hDay": 24,
+ "isHoliday": false,
+ "occasions": []
+ },
+ "25": {
+ "hYear": 1447,
+ "hMonth": 10,
+ "hDay": 25,
+ "isHoliday": true,
+ "occasions": [
+ "شهادت حضرت امام جعفر صادق علیه السلام (۱۴۸ ه‍.ق) (تعطیل) - روز بزرگداشت عطار نیشابوری"
+ ]
+ },
+ "26": {
+ "hYear": 1447,
+ "hMonth": 10,
+ "hDay": 26,
+ "isHoliday": false,
+ "occasions": []
+ },
+ "27": {
+ "hYear": 1447,
+ "hMonth": 10,
+ "hDay": 27,
+ "isHoliday": false,
+ "occasions": []
+ },
+ "28": {
+ "hYear": 1447,
+ "hMonth": 10,
+ "hDay": 28,
+ "isHoliday": true,
+ "occasions": []
+ },
+ "29": {
+ "hYear": 1447,
+ "hMonth": 10,
+ "hDay": 29,
+ "isHoliday": false,
+ "occasions": [
+ "روز ارتش جمهوری اسلامی - نیروی زمینی"
+ ]
+ },
+ "30": {
+ "hYear": 1447,
+ "hMonth": 11,
+ "hDay": 1,
+ "isHoliday": false,
+ "occasions": [
+ "ولادت حضرت معصومه سلام الله علیها (۱۷۳ ه‍.ق) - روز دختران - آغاز دهه کرامت"
+ ]
+ },
+ "31": {
+ "hYear": 1447,
+ "hMonth": 11,
+ "hDay": 2,
+ "isHoliday": false,
+ "occasions": []
+ }
+ },
+ "2": {
+ "1": {
+ "hYear": 1447,
+ "hMonth": 11,
+ "hDay": 3,
+ "isHoliday": false,
+ "occasions": [
+ "روز بزرگداشت سعدی - روز نثر فارسی - روز شهدای ورزشکار"
+ ]
+ },
+ "2": {
+ "hYear": 1447,
+ "hMonth": 11,
+ "hDay": 4,
+ "isHoliday": false,
+ "occasions": [
+ "تأسیس سپاه پاسداران انقلاب اسلامی (۱۳۵۸ ه‍.ش) - سالروز اعالم انقلاب فرهنگی (۱۳۵۹ ه‍.ش)"
+ ]
+ },
+ "3": {
+ "hYear": 1447,
+ "hMonth": 11,
+ "hDay": 5,
+ "isHoliday": false,
+ "occasions": [
+ "روز تجلیل از امامزادگان - بقاع متبرکه - شهادت امیر سپهبد قرنی (۱۳۵۸ ه‍.ش) - روز بزرگداشت شیخ بهایی - روز معماری"
+ ]
+ },
+ "4": {
+ "hYear": 1447,
+ "hMonth": 11,
+ "hDay": 6,
+ "isHoliday": true,
+ "occasions": [
+ "روز بزرگداشت حضرت احمد بن موسی شاهچراغ علیه السلام"
+ ]
+ },
+ "5": {
+ "hYear": 1447,
+ "hMonth": 11,
+ "hDay": 7,
+ "isHoliday": false,
+ "occasions": [
+ "شکست حمله نظامی آمریکا به ایران در طبس (۱۳۵۹ ه‍.ش)"
+ ]
+ },
+ "6": {
+ "hYear": 1447,
+ "hMonth": 11,
+ "hDay": 8,
+ "isHoliday": false,
+ "occasions": []
+ },
+ "7": {
+ "hYear": 1447,
+ "hMonth": 11,
+ "hDay": 9,
+ "isHoliday": false,
+ "occasions": [
+ "روز ایمنی حمل - نقل"
+ ]
+ },
+ "8": {
+ "hYear": 1447,
+ "hMonth": 11,
+ "hDay": 10,
+ "isHoliday": false,
+ "occasions": []
+ },
+ "9": {
+ "hYear": 1447,
+ "hMonth": 11,
+ "hDay": 11,
+ "isHoliday": false,
+ "occasions": [
+ "ولادت حضرت امام رضا علیه السلام (۱۴۸ ه‍.ق) - روز شوراها"
+ ]
+ },
+ "10": {
+ "hYear": 1447,
+ "hMonth": 11,
+ "hDay": 12,
+ "isHoliday": false,
+ "occasions": [
+ "روز ملی خلیج فارس"
+ ]
+ },
+ "11": {
+ "hYear": 1447,
+ "hMonth": 11,
+ "hDay": 13,
+ "isHoliday": true,
+ "occasions": [
+ "روز جهانی کار - کارگر"
+ ]
+ },
+ "12": {
+ "hYear": 1447,
+ "hMonth": 11,
+ "hDay": 14,
+ "isHoliday": false,
+ "occasions": [
+ "شهادت استاد مرتضی مطهری (۱۳۵۸ ه‍.ش) - روز معلم"
+ ]
+ },
+ "13": {
+ "hYear": 1447,
+ "hMonth": 11,
+ "hDay": 15,
+ "isHoliday": false,
+ "occasions": []
+ },
+ "14": {
+ "hYear": 1447,
+ "hMonth": 11,
+ "hDay": 16,
+ "isHoliday": false,
+ "occasions": []
+ },
+ "15": {
+ "hYear": 1447,
+ "hMonth": 11,
+ "hDay": 17,
+ "isHoliday": false,
+ "occasions": [
+ "روز بزرگداشت شیخ صدوق"
+ ]
+ },
+ "16": {
+ "hYear": 1447,
+ "hMonth": 11,
+ "hDay": 18,
+ "isHoliday": false,
+ "occasions": []
+ },
+ "17": {
+ "hYear": 1447,
+ "hMonth": 11,
+ "hDay": 19,
+ "isHoliday": false,
+ "occasions": []
+ },
+ "18": {
+ "hYear": 1447,
+ "hMonth": 11,
+ "hDay": 20,
+ "isHoliday": true,
+ "occasions": [
+ "روز بیماریهای خاص - صعب العالج"
+ ]
+ },
+ "19": {
+ "hYear": 1447,
+ "hMonth": 11,
+ "hDay": 21,
+ "isHoliday": false,
+ "occasions": [
+ "روز بزرگداشت شیخ کلینی"
+ ]
+ },
+ "20": {
+ "hYear": 1447,
+ "hMonth": 11,
+ "hDay": 22,
+ "isHoliday": false,
+ "occasions": []
+ },
+ "21": {
+ "hYear": 1447,
+ "hMonth": 11,
+ "hDay": 23,
+ "isHoliday": false,
+ "occasions": []
+ },
+ "22": {
+ "hYear": 1447,
+ "hMonth": 11,
+ "hDay": 24,
+ "isHoliday": false,
+ "occasions": []
+ },
+ "23": {
+ "hYear": 1447,
+ "hMonth": 11,
+ "hDay": 25,
+ "isHoliday": false,
+ "occasions": []
+ },
+ "24": {
+ "hYear": 1447,
+ "hMonth": 11,
+ "hDay": 26,
+ "isHoliday": false,
+ "occasions": [
+ "لغ - امتیاز تنباک - به فتوای آیتالله میرزا حسن شیرازی (۱۲۷۰ ه‍.ش)"
+ ]
+ },
+ "25": {
+ "hYear": 1447,
+ "hMonth": 11,
+ "hDay": 27,
+ "isHoliday": true,
+ "occasions": [
+ "روز پاسداشت زبان فارسی - بزرگداشت حکیم ابوالقاسم فردوسی"
+ ]
+ },
+ "26": {
+ "hYear": 1447,
+ "hMonth": 11,
+ "hDay": 28,
+ "isHoliday": false,
+ "occasions": []
+ },
+ "27": {
+ "hYear": 1447,
+ "hMonth": 11,
+ "hDay": 29,
+ "isHoliday": false,
+ "occasions": [
+ "شهادت حضرت امام محمد تقی علیه السلام »جواد الائمه« (۲۲۰ ه‍.ق)"
+ ]
+ },
+ "28": {
+ "hYear": 1447,
+ "hMonth": 12,
+ "hDay": 1,
+ "isHoliday": false,
+ "occasions": [
+ "سالروز ازدواج حضرت امام علی علیه السلام - حضرت فاطمه سلام الله علیها (۲ ه‍.ق) - روز ازدواج - روز بزرگداشت حکیم عمر خیام"
+ ]
+ },
+ "29": {
+ "hYear": 1447,
+ "hMonth": 12,
+ "hDay": 2,
+ "isHoliday": false,
+ "occasions": []
+ },
+ "30": {
+ "hYear": 1447,
+ "hMonth": 12,
+ "hDay": 3,
+ "isHoliday": false,
+ "occasions": [
+ "روز ملی جمعیت - روز شهدای خدمت"
+ ]
+ },
+ "31": {
+ "hYear": 1447,
+ "hMonth": 12,
+ "hDay": 4,
+ "isHoliday": false,
+ "occasions": [
+ "روز اهدای عضو، اهدای زندگی"
+ ]
+ }
+ },
+ "3": {
+ "1": {
+ "hYear": 1447,
+ "hMonth": 12,
+ "hDay": 5,
+ "isHoliday": true,
+ "occasions": [
+ "روز بهرهوری - بهینه سازی مصرف - روز بزرگداشت مالصدرا )صدرالمتألهین("
+ ]
+ },
+ "2": {
+ "hYear": 1447,
+ "hMonth": 12,
+ "hDay": 6,
+ "isHoliday": false,
+ "occasions": [
+ "شهادت مظلومانه زائران خانه خدا به دست مأموران آل سعود )1366 ه - ش - برابر با 6 ذیالحجه 1407 ه - ق("
+ ]
+ },
+ "3": {
+ "hYear": 1447,
+ "hMonth": 12,
+ "hDay": 7,
+ "isHoliday": false,
+ "occasions": [
+ "شهادت حضرت امام محمد باقر علیه السلام (۱۱۴ ه‍.ق) - فتح خرمشهر در عملیات بیت المقدس (۱۳۶۱ ه‍.ش) - روز مقاومت، ایثار - پیروزی"
+ ]
+ },
+ "4": {
+ "hYear": 1447,
+ "hMonth": 12,
+ "hDay": 8,
+ "isHoliday": false,
+ "occasions": [
+ "روز مقاومت - پایداری - روز دزفول"
+ ]
+ },
+ "5": {
+ "hYear": 1447,
+ "hMonth": 12,
+ "hDay": 9,
+ "isHoliday": false,
+ "occasions": [
+ "روز عرفه )روز نیایش("
+ ]
+ },
+ "6": {
+ "hYear": 1447,
+ "hMonth": 12,
+ "hDay": 10,
+ "isHoliday": true,
+ "occasions": [
+ "عید سعید قربان (تعطیل) - آغاز دهه امامت - والیت"
+ ]
+ },
+ "7": {
+ "hYear": 1447,
+ "hMonth": 12,
+ "hDay": 11,
+ "isHoliday": false,
+ "occasions": []
+ },
+ "8": {
+ "hYear": 1447,
+ "hMonth": 12,
+ "hDay": 12,
+ "isHoliday": true,
+ "occasions": []
+ },
+ "9": {
+ "hYear": 1447,
+ "hMonth": 12,
+ "hDay": 13,
+ "isHoliday": false,
+ "occasions": []
+ },
+ "10": {
+ "hYear": 1447,
+ "hMonth": 12,
+ "hDay": 14,
+ "isHoliday": false,
+ "occasions": []
+ },
+ "11": {
+ "hYear": 1447,
+ "hMonth": 12,
+ "hDay": 15,
+ "isHoliday": false,
+ "occasions": [
+ "ولادت حضرت امام علی النقی الهادی علیه السلام (۲۱۲ ه‍.ق)"
+ ]
+ },
+ "12": {
+ "hYear": 1447,
+ "hMonth": 12,
+ "hDay": 16,
+ "isHoliday": false,
+ "occasions": []
+ },
+ "13": {
+ "hYear": 1447,
+ "hMonth": 12,
+ "hDay": 17,
+ "isHoliday": false,
+ "occasions": []
+ },
+ "14": {
+ "hYear": 1447,
+ "hMonth": 12,
+ "hDay": 18,
+ "isHoliday": true,
+ "occasions": [
+ "عید سعید غدیر خم (۱۰ ه‍.ق) (تعطیل) - رحلت حضرت امام خمینی رهبر کبیر انقلاب - بنیانگذار جمهوری اسلامی ایران (۱۳۶۸ ه‍.ش) (تعطیل) - انتخاب حضرت آیتالله امام خامنهای به رهبری (۱۳۶۸ ه‍.ش)"
+ ]
+ },
+ "15": {
+ "hYear": 1447,
+ "hMonth": 12,
+ "hDay": 19,
+ "isHoliday": true,
+ "occasions": [
+ "قیام خونین 15 خرداد (۱۳۴۲ ه‍.ش) (تعطیل) - روز جهانی محیط زیست"
+ ]
+ },
+ "16": {
+ "hYear": 1447,
+ "hMonth": 12,
+ "hDay": 20,
+ "isHoliday": false,
+ "occasions": [
+ "ولادت حضرت امام موسی کاظم علیه السلام(۱۲۸ ه‍.ق)"
+ ]
+ },
+ "17": {
+ "hYear": 1447,
+ "hMonth": 12,
+ "hDay": 21,
+ "isHoliday": false,
+ "occasions": []
+ },
+ "18": {
+ "hYear": 1447,
+ "hMonth": 12,
+ "hDay": 22,
+ "isHoliday": false,
+ "occasions": []
+ },
+ "19": {
+ "hYear": 1447,
+ "hMonth": 12,
+ "hDay": 23,
+ "isHoliday": false,
+ "occasions": []
+ },
+ "20": {
+ "hYear": 1447,
+ "hMonth": 12,
+ "hDay": 24,
+ "isHoliday": false,
+ "occasions": [
+ "روز مباهله پیامبر اسالم صلی الله علیه و آله (۱۰ ه‍.ق) - روز صنای دستی - روز ملی فرش"
+ ]
+ },
+ "21": {
+ "hYear": 1447,
+ "hMonth": 12,
+ "hDay": 25,
+ "isHoliday": false,
+ "occasions": [
+ "روز خانواده - تکریم بازنشستگان"
+ ]
+ },
+ "22": {
+ "hYear": 1447,
+ "hMonth": 12,
+ "hDay": 26,
+ "isHoliday": true,
+ "occasions": []
+ },
+ "23": {
+ "hYear": 1447,
+ "hMonth": 12,
+ "hDay": 27,
+ "isHoliday": false,
+ "occasions": [
+ "روز شهدای اقتدار - اتحاد ملی ایران"
+ ]
+ },
+ "24": {
+ "hYear": 1447,
+ "hMonth": 12,
+ "hDay": 28,
+ "isHoliday": false,
+ "occasions": []
+ },
+ "25": {
+ "hYear": 1447,
+ "hMonth": 12,
+ "hDay": 29,
+ "isHoliday": false,
+ "occasions": []
+ },
+ "26": {
+ "hYear": 1448,
+ "hMonth": 1,
+ "hDay": 1,
+ "isHoliday": false,
+ "occasions": [
+ "آغاز سال 1448 هجری قمری - روز بزرگداشت محتشم کاشانی - روز شعر - ادبیات آیینی - شهادت سربازان دلیر اسالم: بخارایی، امانی، صفار هرندی - نیک نژاد(۱۳۴۴ ه‍.ش)"
+ ]
+ },
+ "27": {
+ "hYear": 1448,
+ "hMonth": 1,
+ "hDay": 2,
+ "isHoliday": false,
+ "occasions": [
+ "روز امر به معروف - نهی از منکر - روز جهاد کشاورزی )تشکیل جهاد سازندگی به فرمان حضرت امام خمینی - 1358 ه - ش("
+ ]
+ },
+ "28": {
+ "hYear": 1448,
+ "hMonth": 1,
+ "hDay": 3,
+ "isHoliday": false,
+ "occasions": []
+ },
+ "29": {
+ "hYear": 1448,
+ "hMonth": 1,
+ "hDay": 4,
+ "isHoliday": true,
+ "occasions": [
+ "درگذشت دکتر علی شریعتی (۱۳۵۶ ه‍.ش)"
+ ]
+ },
+ "30": {
+ "hYear": 1448,
+ "hMonth": 1,
+ "hDay": 5,
+ "isHoliday": false,
+ "occasions": []
+ },
+ "31": {
+ "hYear": 1448,
+ "hMonth": 1,
+ "hDay": 6,
+ "isHoliday": false,
+ "occasions": [
+ "شهادت دکتر مصطفی چمران (۱۳۶۰ ه‍.ش) - روز بسیج استادان"
+ ]
+ }
+ },
+ "4": {
+ "1": {
+ "hYear": 1448,
+ "hMonth": 1,
+ "hDay": 7,
+ "isHoliday": false,
+ "occasions": [
+ "سالروز صدور فرمان حضرت امام خمینی مبنی بر تأسیس سازمان تبلیغات اسلامی(۱۳۶۰ ه‍.ش) - روز تبلیغ - اطالعرسانی دینی - روز اصناف"
+ ]
+ },
+ "2": {
+ "hYear": 1448,
+ "hMonth": 1,
+ "hDay": 8,
+ "isHoliday": false,
+ "occasions": []
+ },
+ "3": {
+ "hYear": 1448,
+ "hMonth": 1,
+ "hDay": 9,
+ "isHoliday": true,
+ "occasions": [
+ "تاسوعای حسینی (تعطیل)"
+ ]
+ },
+ "4": {
+ "hYear": 1448,
+ "hMonth": 1,
+ "hDay": 10,
+ "isHoliday": true,
+ "occasions": [
+ "عاشورای حسینی (تعطیل)"
+ ]
+ },
+ "5": {
+ "hYear": 1448,
+ "hMonth": 1,
+ "hDay": 11,
+ "isHoliday": true,
+ "occasions": [
+ "روز تجلیل از اسرا - مفقودان"
+ ]
+ },
+ "6": {
+ "hYear": 1448,
+ "hMonth": 1,
+ "hDay": 12,
+ "isHoliday": false,
+ "occasions": [
+ "شهادت حضرت امام زین العابدین علیه السلام (۹۵ ه‍.ق)"
+ ]
+ },
+ "7": {
+ "hYear": 1448,
+ "hMonth": 1,
+ "hDay": 13,
+ "isHoliday": false,
+ "occasions": [
+ "شهادت مظلومانه آیت الله دکتر بهشتی - 72 تن از یاران امام خمینی با انفجار بمب به دست منافقان در دفتر مرکزی حزب جمهوری اسلامی (۱۳۶۰ ه‍.ش) - روز قوۀ قضاییه - بمباران شیمیایی شهر سردشت (۱۳۶۶ ه‍.ش)"
+ ]
+ },
+ "8": {
+ "hYear": 1448,
+ "hMonth": 1,
+ "hDay": 14,
+ "isHoliday": false,
+ "occasions": [
+ "روز مبارزه با سالحهای شیمیایی - میکروبی"
+ ]
+ },
+ "9": {
+ "hYear": 1448,
+ "hMonth": 1,
+ "hDay": 15,
+ "isHoliday": false,
+ "occasions": []
+ },
+ "10": {
+ "hYear": 1448,
+ "hMonth": 1,
+ "hDay": 16,
+ "isHoliday": false,
+ "occasions": [
+ "روز صنعت - معدن - روز دیپلماسی فرهنگی - تعامل با جهان"
+ ]
+ },
+ "11": {
+ "hYear": 1448,
+ "hMonth": 1,
+ "hDay": 17,
+ "isHoliday": false,
+ "occasions": [
+ "شهادت چهارمین شهید محراب، آیتالله صدوقی به دست منافقان (۱۳۶۱ ه‍.ش)"
+ ]
+ },
+ "12": {
+ "hYear": 1448,
+ "hMonth": 1,
+ "hDay": 18,
+ "isHoliday": true,
+ "occasions": [
+ "حمله ددمنشانه ناوگان آمریکای جنایتکار به هواپیمای مسافربری جمهوری اسلامی ایران (۱۳۶۷ ه‍.ش) - روز افشای حقوق بشر آمریکایی"
+ ]
+ },
+ "13": {
+ "hYear": 1448,
+ "hMonth": 1,
+ "hDay": 19,
+ "isHoliday": false,
+ "occasions": []
+ },
+ "14": {
+ "hYear": 1448,
+ "hMonth": 1,
+ "hDay": 20,
+ "isHoliday": false,
+ "occasions": [
+ "روز قلم"
+ ]
+ },
+ "15": {
+ "hYear": 1448,
+ "hMonth": 1,
+ "hDay": 21,
+ "isHoliday": false,
+ "occasions": []
+ },
+ "16": {
+ "hYear": 1448,
+ "hMonth": 1,
+ "hDay": 22,
+ "isHoliday": false,
+ "occasions": []
+ },
+ "17": {
+ "hYear": 1448,
+ "hMonth": 1,
+ "hDay": 23,
+ "isHoliday": false,
+ "occasions": []
+ },
+ "18": {
+ "hYear": 1448,
+ "hMonth": 1,
+ "hDay": 24,
+ "isHoliday": false,
+ "occasions": [
+ "روز ادبیات کودکان - نوجوانان"
+ ]
+ },
+ "19": {
+ "hYear": 1448,
+ "hMonth": 1,
+ "hDay": 25,
+ "isHoliday": true,
+ "occasions": [
+ "شهادت حضرت امام زین العابدین علیه السلام (۹۵ ه‍.ق) به روایتی"
+ ]
+ },
+ "20": {
+ "hYear": 1448,
+ "hMonth": 1,
+ "hDay": 26,
+ "isHoliday": false,
+ "occasions": []
+ },
+ "21": {
+ "hYear": 1448,
+ "hMonth": 1,
+ "hDay": 27,
+ "isHoliday": false,
+ "occasions": [
+ "روز عفاف - حجاب"
+ ]
+ },
+ "22": {
+ "hYear": 1448,
+ "hMonth": 1,
+ "hDay": 28,
+ "isHoliday": false,
+ "occasions": [
+ "روز بزرگداشت خوارزمی - روز فناوری اطلاعات"
+ ]
+ },
+ "23": {
+ "hYear": 1448,
+ "hMonth": 1,
+ "hDay": 29,
+ "isHoliday": false,
+ "occasions": []
+ },
+ "24": {
+ "hYear": 1448,
+ "hMonth": 1,
+ "hDay": 30,
+ "isHoliday": false,
+ "occasions": []
+ },
+ "25": {
+ "hYear": 1448,
+ "hMonth": 2,
+ "hDay": 1,
+ "isHoliday": false,
+ "occasions": [
+ "روز بهزیستی - تأمین اجتماعی"
+ ]
+ },
+ "26": {
+ "hYear": 1448,
+ "hMonth": 2,
+ "hDay": 2,
+ "isHoliday": true,
+ "occasions": [
+ "سالروز تأسیس نهاد شورای نگهبان"
+ ]
+ },
+ "27": {
+ "hYear": 1448,
+ "hMonth": 2,
+ "hDay": 3,
+ "isHoliday": false,
+ "occasions": []
+ },
+ "28": {
+ "hYear": 1448,
+ "hMonth": 2,
+ "hDay": 4,
+ "isHoliday": false,
+ "occasions": []
+ },
+ "29": {
+ "hYear": 1448,
+ "hMonth": 2,
+ "hDay": 5,
+ "isHoliday": false,
+ "occasions": []
+ },
+ "30": {
+ "hYear": 1448,
+ "hMonth": 2,
+ "hDay": 6,
+ "isHoliday": false,
+ "occasions": []
+ },
+ "31": {
+ "hYear": 1448,
+ "hMonth": 2,
+ "hDay": 7,
+ "isHoliday": false,
+ "occasions": [
+ "شهادت حضرت امام حسن مجتبی علیه السلام (۵۰ ه‍.ق) به روایتی - روز بزرگداشت سلمان فارسی"
+ ]
+ }
+ },
+ "5": {
+ "1": {
+ "hYear": 1448,
+ "hMonth": 2,
+ "hDay": 8,
+ "isHoliday": false,
+ "occasions": []
+ },
+ "2": {
+ "hYear": 1448,
+ "hMonth": 2,
+ "hDay": 9,
+ "isHoliday": true,
+ "occasions": []
+ },
+ "3": {
+ "hYear": 1448,
+ "hMonth": 2,
+ "hDay": 10,
+ "isHoliday": false,
+ "occasions": []
+ },
+ "4": {
+ "hYear": 1448,
+ "hMonth": 2,
+ "hDay": 11,
+ "isHoliday": false,
+ "occasions": [
+ "روز بزرگداشت شیخ صفیالدین اردبیلی"
+ ]
+ },
+ "5": {
+ "hYear": 1448,
+ "hMonth": 2,
+ "hDay": 12,
+ "isHoliday": false,
+ "occasions": [
+ "سالروز عملیات افتخار آفرین مرصاد (۱۳۶۷ ه‍.ش)"
+ ]
+ },
+ "6": {
+ "hYear": 1448,
+ "hMonth": 2,
+ "hDay": 13,
+ "isHoliday": false,
+ "occasions": []
+ },
+ "7": {
+ "hYear": 1448,
+ "hMonth": 2,
+ "hDay": 14,
+ "isHoliday": false,
+ "occasions": []
+ },
+ "8": {
+ "hYear": 1448,
+ "hMonth": 2,
+ "hDay": 15,
+ "isHoliday": false,
+ "occasions": [
+ "روز بزرگداشت شیخ شهابالدین سهروردی )شیخ اشراق("
+ ]
+ },
+ "9": {
+ "hYear": 1448,
+ "hMonth": 2,
+ "hDay": 16,
+ "isHoliday": true,
+ "occasions": [
+ "روز اهدای خون"
+ ]
+ },
+ "10": {
+ "hYear": 1448,
+ "hMonth": 2,
+ "hDay": 17,
+ "isHoliday": false,
+ "occasions": []
+ },
+ "11": {
+ "hYear": 1448,
+ "hMonth": 2,
+ "hDay": 18,
+ "isHoliday": false,
+ "occasions": []
+ },
+ "12": {
+ "hYear": 1448,
+ "hMonth": 2,
+ "hDay": 19,
+ "isHoliday": false,
+ "occasions": []
+ },
+ "13": {
+ "hYear": 1448,
+ "hMonth": 2,
+ "hDay": 20,
+ "isHoliday": true,
+ "occasions": [
+ "اربعین حسینی (تعطیل)"
+ ]
+ },
+ "14": {
+ "hYear": 1448,
+ "hMonth": 2,
+ "hDay": 21,
+ "isHoliday": false,
+ "occasions": [
+ "صدور فرمان مشروطیت (۱۲۸۵ ه‍.ش) - روز حقوق بشر اسلامی - کرامت انسانی"
+ ]
+ },
+ "15": {
+ "hYear": 1448,
+ "hMonth": 2,
+ "hDay": 22,
+ "isHoliday": false,
+ "occasions": []
+ },
+ "16": {
+ "hYear": 1448,
+ "hMonth": 2,
+ "hDay": 23,
+ "isHoliday": true,
+ "occasions": [
+ "تشکیل جهاد دانشگاهی (۱۳۵۹ ه‍.ش)"
+ ]
+ },
+ "17": {
+ "hYear": 1448,
+ "hMonth": 2,
+ "hDay": 24,
+ "isHoliday": false,
+ "occasions": [
+ "سالروز شهادت محمود صارمی - روز خبرنگار"
+ ]
+ },
+ "18": {
+ "hYear": 1448,
+ "hMonth": 2,
+ "hDay": 25,
+ "isHoliday": false,
+ "occasions": [
+ "روز بزرگداشت شهدای مداف حرم"
+ ]
+ },
+ "19": {
+ "hYear": 1448,
+ "hMonth": 2,
+ "hDay": 26,
+ "isHoliday": false,
+ "occasions": []
+ },
+ "20": {
+ "hYear": 1448,
+ "hMonth": 2,
+ "hDay": 27,
+ "isHoliday": false,
+ "occasions": []
+ },
+ "21": {
+ "hYear": 1448,
+ "hMonth": 2,
+ "hDay": 28,
+ "isHoliday": true,
+ "occasions": [
+ "رحلت حضرت رسول اکرم صلی الله علیه و آله (۱۱ ه‍.ق) - شهادت حضرت امام حسن مجتبی علیه السلام (۵۰ ه‍.ق)(تعطیل) - روز حمایت از صنای کوچک"
+ ]
+ },
+ "22": {
+ "hYear": 1448,
+ "hMonth": 2,
+ "hDay": 29,
+ "isHoliday": true,
+ "occasions": [
+ "شهادت حضرت امام رضا علیه السلام (۲۰۳ ه‍.ق) (تعطیل) - روز تشکلها - مشارکتهای اجتماعی"
+ ]
+ },
+ "23": {
+ "hYear": 1448,
+ "hMonth": 2,
+ "hDay": 1,
+ "isHoliday": true,
+ "occasions": [
+ "\" هجرت حضرت رسول اکرم صلی الله علیه و آله از مکه به مدینه - روز مقاومت اسلامی"
+ ]
+ },
+ "24": {
+ "hYear": 1448,
+ "hMonth": 2,
+ "hDay": 2,
+ "isHoliday": false,
+ "occasions": []
+ },
+ "25": {
+ "hYear": 1448,
+ "hMonth": 2,
+ "hDay": 3,
+ "isHoliday": false,
+ "occasions": []
+ },
+ "26": {
+ "hYear": 1448,
+ "hMonth": 2,
+ "hDay": 4,
+ "isHoliday": false,
+ "occasions": [
+ "آغاز بازگشت آزادگان به میهن اسلامی (۱۳۶۹ ه‍.ش)"
+ ]
+ },
+ "27": {
+ "hYear": 1448,
+ "hMonth": 2,
+ "hDay": 5,
+ "isHoliday": false,
+ "occasions": []
+ },
+ "28": {
+ "hYear": 1448,
+ "hMonth": 2,
+ "hDay": 6,
+ "isHoliday": false,
+ "occasions": [
+ "کودتای آمریکا برای بازگرداندن شاه (۱۳۳۲ ه‍.ش)"
+ ]
+ },
+ "29": {
+ "hYear": 1448,
+ "hMonth": 2,
+ "hDay": 7,
+ "isHoliday": false,
+ "occasions": []
+ },
+ "30": {
+ "hYear": 1448,
+ "hMonth": 2,
+ "hDay": 8,
+ "isHoliday": true,
+ "occasions": [
+ "شهادت حضرت امام حسن عسکری علیه السلام (۲۶۰ ه‍.ق) - آغاز امامت حضرت ولیعصر)عجل الله تعالی فرجه((تعطیل) - روز بزرگداشت عالمه مجلسی - روز جهانی مسجد"
+ ]
+ },
+ "31": {
+ "hYear": 1448,
+ "hMonth": 2,
+ "hDay": 9,
+ "isHoliday": false,
+ "occasions": []
+ }
+ },
+ "6": {
+ "1": {
+ "hYear": 1448,
+ "hMonth": 2,
+ "hDay": 10,
+ "isHoliday": false,
+ "occasions": [
+ "اوت 2026 روز بزرگداشت ابوعلی سینا - روز پزشک"
+ ]
+ },
+ "2": {
+ "hYear": 1448,
+ "hMonth": 2,
+ "hDay": 11,
+ "isHoliday": false,
+ "occasions": [
+ "آغاز هفته دولت - شهادت سید علی اندرزگ - )19 رمضان - 1357 ه - ش("
+ ]
+ },
+ "3": {
+ "hYear": 1448,
+ "hMonth": 2,
+ "hDay": 12,
+ "isHoliday": false,
+ "occasions": [
+ "ولادت حضرت رسول اکرم صلی الله علیه و آله به روایت اهل سنت (۵۳ سال قبل از هجرت) - آغاز هفته وحدت"
+ ]
+ },
+ "4": {
+ "hYear": 1448,
+ "hMonth": 2,
+ "hDay": 13,
+ "isHoliday": false,
+ "occasions": [
+ "روز کارمند"
+ ]
+ },
+ "5": {
+ "hYear": 1448,
+ "hMonth": 2,
+ "hDay": 14,
+ "isHoliday": false,
+ "occasions": [
+ "روز بزرگداشت محمدبن زکریای رازی - روز داروسازی - روز کُشتی"
+ ]
+ },
+ "6": {
+ "hYear": 1448,
+ "hMonth": 2,
+ "hDay": 15,
+ "isHoliday": true,
+ "occasions": []
+ },
+ "7": {
+ "hYear": 1448,
+ "hMonth": 2,
+ "hDay": 16,
+ "isHoliday": false,
+ "occasions": [
+ "روز وقف"
+ ]
+ },
+ "8": {
+ "hYear": 1448,
+ "hMonth": 2,
+ "hDay": 17,
+ "isHoliday": true,
+ "occasions": [
+ "ولادت حضرت رسول اکرم صلی الله علیه و آله (۵۳ سال قبل از هجرت) - روز اخالق - مهرورزی - ولادت حضرت امام جعفر صادق علیه السلام مؤسس مذهب جعفری(۸۳ ه‍.ق)(تعطیل) - انفجار دفتر نخستوزیری به دست منافقان - شهادت مظلومانه شهیدان رجایی - باهنر(۱۳۶۰ ه‍.ش) - روز مبارزه با تروریسم"
+ ]
+ },
+ "9": {
+ "hYear": 1448,
+ "hMonth": 2,
+ "hDay": 18,
+ "isHoliday": false,
+ "occasions": []
+ },
+ "10": {
+ "hYear": 1448,
+ "hMonth": 2,
+ "hDay": 19,
+ "isHoliday": false,
+ "occasions": []
+ },
+ "11": {
+ "hYear": 1448,
+ "hMonth": 2,
+ "hDay": 20,
+ "isHoliday": false,
+ "occasions": []
+ },
+ "12": {
+ "hYear": 1448,
+ "hMonth": 2,
+ "hDay": 21,
+ "isHoliday": false,
+ "occasions": [
+ "شهادت رییسعلی دلواری - روز مبارزه با استعمار انگلیس"
+ ]
+ },
+ "13": {
+ "hYear": 1448,
+ "hMonth": 2,
+ "hDay": 22,
+ "isHoliday": true,
+ "occasions": [
+ "روز تعاون - روز بزرگداشت ابوریحان بیرونی - روز علوم پایه"
+ ]
+ },
+ "14": {
+ "hYear": 1448,
+ "hMonth": 2,
+ "hDay": 23,
+ "isHoliday": false,
+ "occasions": [
+ "شهادت آیتالله قدوسی - سرتیپ وحید دستجردی (۱۳۶۰ ه‍.ش)"
+ ]
+ },
+ "15": {
+ "hYear": 1448,
+ "hMonth": 2,
+ "hDay": 24,
+ "isHoliday": false,
+ "occasions": []
+ },
+ "16": {
+ "hYear": 1448,
+ "hMonth": 2,
+ "hDay": 25,
+ "isHoliday": false,
+ "occasions": []
+ },
+ "17": {
+ "hYear": 1448,
+ "hMonth": 2,
+ "hDay": 26,
+ "isHoliday": false,
+ "occasions": [
+ "قیام17شهریور - کشتارجمعیاز مردم بهدستمأمورانستمشاهیپهلوی(۱۳۵۷ ه‍.ش)"
+ ]
+ },
+ "18": {
+ "hYear": 1448,
+ "hMonth": 2,
+ "hDay": 27,
+ "isHoliday": false,
+ "occasions": []
+ },
+ "19": {
+ "hYear": 1448,
+ "hMonth": 2,
+ "hDay": 28,
+ "isHoliday": false,
+ "occasions": [
+ "وفاتآیتالله سیدمحمود طالقانی اولین امام جمعه تهران (۱۳۵۸ ه‍.ش)"
+ ]
+ },
+ "20": {
+ "hYear": 1448,
+ "hMonth": 2,
+ "hDay": 29,
+ "isHoliday": true,
+ "occasions": [
+ "شهادت دومین شهید محراب، آیتالله مدنی به دست منافقان (۱۳۶۰ ه‍.ش)"
+ ]
+ },
+ "21": {
+ "hYear": 1448,
+ "hMonth": 2,
+ "hDay": 30,
+ "isHoliday": false,
+ "occasions": [
+ "روز سینما"
+ ]
+ },
+ "22": {
+ "hYear": 1448,
+ "hMonth": 2,
+ "hDay": 1,
+ "isHoliday": false,
+ "occasions": [
+ "\""
+ ]
+ },
+ "23": {
+ "hYear": 1448,
+ "hMonth": 2,
+ "hDay": 2,
+ "isHoliday": false,
+ "occasions": []
+ },
+ "24": {
+ "hYear": 1448,
+ "hMonth": 2,
+ "hDay": 3,
+ "isHoliday": false,
+ "occasions": []
+ },
+ "25": {
+ "hYear": 1448,
+ "hMonth": 2,
+ "hDay": 4,
+ "isHoliday": false,
+ "occasions": []
+ },
+ "26": {
+ "hYear": 1448,
+ "hMonth": 2,
+ "hDay": 5,
+ "isHoliday": false,
+ "occasions": []
+ },
+ "27": {
+ "hYear": 1448,
+ "hMonth": 2,
+ "hDay": 6,
+ "isHoliday": true,
+ "occasions": [
+ "روز شعر - ادب فارسی - روز بزرگداشت استاد سید محمد حسین شهریار"
+ ]
+ },
+ "28": {
+ "hYear": 1448,
+ "hMonth": 2,
+ "hDay": 7,
+ "isHoliday": false,
+ "occasions": []
+ },
+ "29": {
+ "hYear": 1448,
+ "hMonth": 2,
+ "hDay": 8,
+ "isHoliday": false,
+ "occasions": [
+ "ولادت حضرت امام حسن عسکری علیه السلام (۲۳۲ ه‍.ق)"
+ ]
+ },
+ "30": {
+ "hYear": 1448,
+ "hMonth": 2,
+ "hDay": 9,
+ "isHoliday": false,
+ "occasions": []
+ },
+ "31": {
+ "hYear": 1448,
+ "hMonth": 2,
+ "hDay": 10,
+ "isHoliday": false,
+ "occasions": [
+ "وفات حضرت معصومه سلام الله علیها (۲۰۱ ه‍.ق) - آغاز جنگ تحمیلی (۱۳۵۹ ه‍.ش) - آغاز هفته دفاع مقدس"
+ ]
+ }
+ },
+ "7": {
+ "1": {
+ "hYear": 1448,
+ "hMonth": 2,
+ "hDay": 11,
+ "isHoliday": false,
+ "occasions": [
+ "سپتامبر 2026 روز پرچم"
+ ]
+ },
+ "2": {
+ "hYear": 1448,
+ "hMonth": 2,
+ "hDay": 12,
+ "isHoliday": false,
+ "occasions": [
+ "روز بزرگداشت شهدای منا"
+ ]
+ },
+ "3": {
+ "hYear": 1448,
+ "hMonth": 2,
+ "hDay": 13,
+ "isHoliday": true,
+ "occasions": []
+ },
+ "4": {
+ "hYear": 1448,
+ "hMonth": 2,
+ "hDay": 14,
+ "isHoliday": false,
+ "occasions": [
+ "روز سرباز"
+ ]
+ },
+ "5": {
+ "hYear": 1448,
+ "hMonth": 2,
+ "hDay": 15,
+ "isHoliday": false,
+ "occasions": [
+ "شکست حصر آبادان در عملیات ثامن االئمه علیوهالسوالم )1360 هو - ش( - روز گردشگری"
+ ]
+ },
+ "6": {
+ "hYear": 1448,
+ "hMonth": 2,
+ "hDay": 16,
+ "isHoliday": false,
+ "occasions": []
+ },
+ "7": {
+ "hYear": 1448,
+ "hMonth": 2,
+ "hDay": 17,
+ "isHoliday": false,
+ "occasions": [
+ "شهادت سرداران اسالم: فالحی، فکوری، نامجو، کالهدوز - جهانآرا (۱۳۶۰ ه‍.ش) - روز بزرگداشت فرماندهان شهید دفاع مقدس - روز آتشنشانی - ایمنی - روز بزرگداشت شمس"
+ ]
+ },
+ "8": {
+ "hYear": 1448,
+ "hMonth": 2,
+ "hDay": 18,
+ "isHoliday": false,
+ "occasions": [
+ "روز بزرگداشت مولوی"
+ ]
+ },
+ "9": {
+ "hYear": 1448,
+ "hMonth": 2,
+ "hDay": 19,
+ "isHoliday": false,
+ "occasions": [
+ "روز جهانی سالمندان"
+ ]
+ },
+ "10": {
+ "hYear": 1448,
+ "hMonth": 2,
+ "hDay": 20,
+ "isHoliday": true,
+ "occasions": [
+ "روز نخبگان"
+ ]
+ },
+ "11": {
+ "hYear": 1448,
+ "hMonth": 2,
+ "hDay": 21,
+ "isHoliday": false,
+ "occasions": []
+ },
+ "12": {
+ "hYear": 1448,
+ "hMonth": 2,
+ "hDay": 22,
+ "isHoliday": false,
+ "occasions": []
+ },
+ "13": {
+ "hYear": 1448,
+ "hMonth": 2,
+ "hDay": 23,
+ "isHoliday": false,
+ "occasions": [
+ "هجرت حضرت امام خمینی از عراق به پواریس )1357 هو - ش(و - روز نیروی انتظامی"
+ ]
+ },
+ "14": {
+ "hYear": 1448,
+ "hMonth": 2,
+ "hDay": 24,
+ "isHoliday": false,
+ "occasions": [
+ "روز دامپزشکی"
+ ]
+ },
+ "15": {
+ "hYear": 1448,
+ "hMonth": 2,
+ "hDay": 25,
+ "isHoliday": false,
+ "occasions": [
+ "روز روستا - عشایر - روز جهانی حماسه فلسطین - طوفان االقصی"
+ ]
+ },
+ "16": {
+ "hYear": 1448,
+ "hMonth": 2,
+ "hDay": 26,
+ "isHoliday": false,
+ "occasions": []
+ },
+ "17": {
+ "hYear": 1448,
+ "hMonth": 2,
+ "hDay": 27,
+ "isHoliday": true,
+ "occasions": []
+ },
+ "18": {
+ "hYear": 1448,
+ "hMonth": 2,
+ "hDay": 28,
+ "isHoliday": false,
+ "occasions": []
+ },
+ "19": {
+ "hYear": 1448,
+ "hMonth": 2,
+ "hDay": 29,
+ "isHoliday": false,
+ "occasions": []
+ },
+ "20": {
+ "hYear": 1448,
+ "hMonth": 5,
+ "hDay": 1,
+ "isHoliday": false,
+ "occasions": [
+ "روز بزرگداشت حافظ"
+ ]
+ },
+ "21": {
+ "hYear": 1448,
+ "hMonth": 5,
+ "hDay": 2,
+ "isHoliday": false,
+ "occasions": []
+ },
+ "22": {
+ "hYear": 1448,
+ "hMonth": 5,
+ "hDay": 3,
+ "isHoliday": false,
+ "occasions": [
+ "روز جهانی استاندارد"
+ ]
+ },
+ "23": {
+ "hYear": 1448,
+ "hMonth": 5,
+ "hDay": 4,
+ "isHoliday": false,
+ "occasions": [
+ "شهادت پنجمین شهید محراب، آیتالله اشرفی اصفهانی به دست منافقوان (۱۳۶۱ ه‍.ش) - روز جهانی نابینایان )عصای سفید("
+ ]
+ },
+ "24": {
+ "hYear": 1448,
+ "hMonth": 5,
+ "hDay": 5,
+ "isHoliday": true,
+ "occasions": [
+ "ولادت حضرت زینب سلام الله علیها )5 هو. ق( - روز پرستار - روز ملی پارالمپیک"
+ ]
+ },
+ "25": {
+ "hYear": 1448,
+ "hMonth": 5,
+ "hDay": 6,
+ "isHoliday": false,
+ "occasions": [
+ "روز نسلکشی کودکان - زنان فلسطینی"
+ ]
+ },
+ "26": {
+ "hYear": 1448,
+ "hMonth": 5,
+ "hDay": 7,
+ "isHoliday": false,
+ "occasions": [
+ "روز تربیت بدنی - ورزش"
+ ]
+ },
+ "27": {
+ "hYear": 1448,
+ "hMonth": 5,
+ "hDay": 8,
+ "isHoliday": false,
+ "occasions": []
+ },
+ "28": {
+ "hYear": 1448,
+ "hMonth": 5,
+ "hDay": 9,
+ "isHoliday": false,
+ "occasions": []
+ },
+ "29": {
+ "hYear": 1448,
+ "hMonth": 5,
+ "hDay": 10,
+ "isHoliday": false,
+ "occasions": [
+ "روز صادرات"
+ ]
+ },
+ "30": {
+ "hYear": 1448,
+ "hMonth": 5,
+ "hDay": 11,
+ "isHoliday": false,
+ "occasions": []
+ }
+ },
+ "8": {
+ "1": {
+ "hYear": 1448,
+ "hMonth": 5,
+ "hDay": 12,
+ "isHoliday": true,
+ "occasions": [
+ "روز بزرگداشت ابوالفضل بیهقی"
+ ]
+ },
+ "2": {
+ "hYear": 1448,
+ "hMonth": 5,
+ "hDay": 13,
+ "isHoliday": false,
+ "occasions": [
+ "شهادت حضرت فاطمه زهرا سلام الله علیها (۱۱ ه‍.ق) به روایتی"
+ ]
+ },
+ "3": {
+ "hYear": 1448,
+ "hMonth": 5,
+ "hDay": 14,
+ "isHoliday": false,
+ "occasions": []
+ },
+ "4": {
+ "hYear": 1448,
+ "hMonth": 5,
+ "hDay": 15,
+ "isHoliday": false,
+ "occasions": [
+ "اعتراض - افشاگری حضرت امام خمینی علیه پذیرش کاپیتولاسیون (۱۳۴۳ ه‍.ش)"
+ ]
+ },
+ "5": {
+ "hYear": 1448,
+ "hMonth": 5,
+ "hDay": 16,
+ "isHoliday": false,
+ "occasions": []
+ },
+ "6": {
+ "hYear": 1448,
+ "hMonth": 5,
+ "hDay": 17,
+ "isHoliday": false,
+ "occasions": []
+ },
+ "7": {
+ "hYear": 1448,
+ "hMonth": 5,
+ "hDay": 18,
+ "isHoliday": false,
+ "occasions": []
+ },
+ "8": {
+ "hYear": 1448,
+ "hMonth": 5,
+ "hDay": 19,
+ "isHoliday": true,
+ "occasions": [
+ "شهادت محمدحسین فهمیده)بسیجی 13 ساله( - روز نوجوان - بسیج دانشآموزی"
+ ]
+ },
+ "9": {
+ "hYear": 1448,
+ "hMonth": 5,
+ "hDay": 20,
+ "isHoliday": false,
+ "occasions": []
+ },
+ "10": {
+ "hYear": 1448,
+ "hMonth": 5,
+ "hDay": 21,
+ "isHoliday": false,
+ "occasions": [
+ "شهادتاولین شهید محراب،آیتالله قاضی طباطبایی بهدست منافقان(۱۳۵۸ ه‍.ش)"
+ ]
+ },
+ "11": {
+ "hYear": 1448,
+ "hMonth": 5,
+ "hDay": 22,
+ "isHoliday": false,
+ "occasions": []
+ },
+ "12": {
+ "hYear": 1448,
+ "hMonth": 5,
+ "hDay": 23,
+ "isHoliday": false,
+ "occasions": []
+ },
+ "13": {
+ "hYear": 1448,
+ "hMonth": 5,
+ "hDay": 24,
+ "isHoliday": false,
+ "occasions": [
+ "تسخیر النه جاسوسی آمریکا به دست دانشجویان پیر - خط امام (۱۳۵۸ ه‍.ش) - روز ملی مبارزه با استکبار جهانی - روز دانش آموز"
+ ]
+ },
+ "14": {
+ "hYear": 1448,
+ "hMonth": 5,
+ "hDay": 25,
+ "isHoliday": false,
+ "occasions": [
+ "روز فرهنگ عمومی"
+ ]
+ },
+ "15": {
+ "hYear": 1448,
+ "hMonth": 5,
+ "hDay": 26,
+ "isHoliday": true,
+ "occasions": []
+ },
+ "16": {
+ "hYear": 1448,
+ "hMonth": 5,
+ "hDay": 27,
+ "isHoliday": false,
+ "occasions": []
+ },
+ "17": {
+ "hYear": 1448,
+ "hMonth": 5,
+ "hDay": 28,
+ "isHoliday": false,
+ "occasions": []
+ },
+ "18": {
+ "hYear": 1448,
+ "hMonth": 5,
+ "hDay": 29,
+ "isHoliday": false,
+ "occasions": []
+ },
+ "19": {
+ "hYear": 1448,
+ "hMonth": 5,
+ "hDay": 30,
+ "isHoliday": false,
+ "occasions": [
+ "روز جهانی علم در خدمت صلح - توسعه"
+ ]
+ },
+ "20": {
+ "hYear": 1448,
+ "hMonth": 6,
+ "hDay": 1,
+ "isHoliday": false,
+ "occasions": []
+ },
+ "21": {
+ "hYear": 1448,
+ "hMonth": 6,
+ "hDay": 2,
+ "isHoliday": false,
+ "occasions": [
+ "روز هوافضا"
+ ]
+ },
+ "22": {
+ "hYear": 1448,
+ "hMonth": 6,
+ "hDay": 3,
+ "isHoliday": true,
+ "occasions": [
+ "شهادت حضرت فاطمه زهرا سلام الله علیها (۱۱ ه‍.ق) (تعطیل)"
+ ]
+ },
+ "23": {
+ "hYear": 1448,
+ "hMonth": 6,
+ "hDay": 4,
+ "isHoliday": false,
+ "occasions": []
+ },
+ "24": {
+ "hYear": 1448,
+ "hMonth": 6,
+ "hDay": 5,
+ "isHoliday": false,
+ "occasions": [
+ "روزکتاب، کتابخوانی - کتابدار - روز بزرگداشت آیتالله عالمه سیدمحمدحسین طباطبایی (۱۳۶۰ ه‍.ش)"
+ ]
+ },
+ "25": {
+ "hYear": 1448,
+ "hMonth": 6,
+ "hDay": 6,
+ "isHoliday": false,
+ "occasions": []
+ },
+ "26": {
+ "hYear": 1448,
+ "hMonth": 6,
+ "hDay": 7,
+ "isHoliday": false,
+ "occasions": []
+ },
+ "27": {
+ "hYear": 1448,
+ "hMonth": 6,
+ "hDay": 8,
+ "isHoliday": false,
+ "occasions": []
+ },
+ "28": {
+ "hYear": 1448,
+ "hMonth": 6,
+ "hDay": 9,
+ "isHoliday": false,
+ "occasions": []
+ },
+ "29": {
+ "hYear": 1448,
+ "hMonth": 6,
+ "hDay": 10,
+ "isHoliday": true,
+ "occasions": []
+ },
+ "30": {
+ "hYear": 1448,
+ "hMonth": 6,
+ "hDay": 11,
+ "isHoliday": false,
+ "occasions": [
+ "روز قهرمان ملی - روز بزرگداشت ابونصر فارابی - روز حکمت - فلسفه"
+ ]
+ }
+ },
+ "9": {
+ "1": {
+ "hYear": 1448,
+ "hMonth": 6,
+ "hDay": 12,
+ "isHoliday": false,
+ "occasions": []
+ },
+ "2": {
+ "hYear": 1448,
+ "hMonth": 6,
+ "hDay": 13,
+ "isHoliday": false,
+ "occasions": [
+ "وفات حضرت ام البنین سلام الله علیها - روز تکریم مادران - همسران شهدا"
+ ]
+ },
+ "3": {
+ "hYear": 1448,
+ "hMonth": 6,
+ "hDay": 14,
+ "isHoliday": false,
+ "occasions": []
+ },
+ "4": {
+ "hYear": 1448,
+ "hMonth": 6,
+ "hDay": 15,
+ "isHoliday": false,
+ "occasions": []
+ },
+ "5": {
+ "hYear": 1448,
+ "hMonth": 6,
+ "hDay": 16,
+ "isHoliday": false,
+ "occasions": [
+ "تشکیل بسیج مستضعفان به فرمان حضرت امام خمینی (۱۳۵۸ ه‍.ش) - روز بسیج مستضعفان"
+ ]
+ },
+ "6": {
+ "hYear": 1448,
+ "hMonth": 6,
+ "hDay": 17,
+ "isHoliday": true,
+ "occasions": []
+ },
+ "7": {
+ "hYear": 1448,
+ "hMonth": 6,
+ "hDay": 18,
+ "isHoliday": false,
+ "occasions": [
+ "روز نیروی دریایی - روز نوآوری - فناوری ایران ساخت"
+ ]
+ },
+ "8": {
+ "hYear": 1448,
+ "hMonth": 6,
+ "hDay": 19,
+ "isHoliday": false,
+ "occasions": []
+ },
+ "9": {
+ "hYear": 1448,
+ "hMonth": 6,
+ "hDay": 20,
+ "isHoliday": false,
+ "occasions": [
+ "ولادت حضرت فاطمه زهرا سلام الله علیها (هشتم قبل از هجرت) - روز زن - تولد حضرت امام خمینی رهبر کبیر انقلاب اسلامی(۱۳۲۰ ه‍.ق) - روز بزرگداشت شیخ مفید - روز جزایر سهگانه خلیج فارس)بوموسی، تنب بزرگ - تنب کوچک("
+ ]
+ },
+ "10": {
+ "hYear": 1448,
+ "hMonth": 6,
+ "hDay": 21,
+ "isHoliday": false,
+ "occasions": [
+ "شهادت آیتالله سید حسن مدرس (۱۳۱۶ ه‍.ش) - روز مجلس"
+ ]
+ },
+ "11": {
+ "hYear": 1448,
+ "hMonth": 6,
+ "hDay": 22,
+ "isHoliday": false,
+ "occasions": [
+ "شهادت میرزا کوچک خان جنگلی (۱۳۰۰ ه‍.ش)"
+ ]
+ },
+ "12": {
+ "hYear": 1448,
+ "hMonth": 6,
+ "hDay": 23,
+ "isHoliday": false,
+ "occasions": [
+ "تصویب قانون اساسی جمهوری اسلامی ایران(۱۳۵۸ ه‍.ش) - روز قانون اساسی جمهوری اسلامی ایران - روز جهانی معلوالن"
+ ]
+ },
+ "13": {
+ "hYear": 1448,
+ "hMonth": 6,
+ "hDay": 24,
+ "isHoliday": true,
+ "occasions": []
+ },
+ "14": {
+ "hYear": 1448,
+ "hMonth": 6,
+ "hDay": 25,
+ "isHoliday": false,
+ "occasions": []
+ },
+ "15": {
+ "hYear": 1448,
+ "hMonth": 6,
+ "hDay": 26,
+ "isHoliday": false,
+ "occasions": []
+ },
+ "16": {
+ "hYear": 1448,
+ "hMonth": 6,
+ "hDay": 27,
+ "isHoliday": false,
+ "occasions": [
+ "روز دانشجو"
+ ]
+ },
+ "17": {
+ "hYear": 1448,
+ "hMonth": 6,
+ "hDay": 28,
+ "isHoliday": false,
+ "occasions": []
+ },
+ "18": {
+ "hYear": 1448,
+ "hMonth": 6,
+ "hDay": 29,
+ "isHoliday": false,
+ "occasions": []
+ },
+ "19": {
+ "hYear": 1448,
+ "hMonth": 6,
+ "hDay": 30,
+ "isHoliday": false,
+ "occasions": [
+ "تشکیل شورای عالی انقلاب فرهنگی به فرمان حضرت امام خمینی (۱۳۶۳ ه‍.ش)"
+ ]
+ },
+ "20": {
+ "hYear": 1448,
+ "hMonth": 7,
+ "hDay": 1,
+ "isHoliday": true,
+ "occasions": [
+ "ولادت حضرت امام محمد باقر علیه السلام (۵۷ ه‍.ق) - شهادت سومین شهید محراب، آیتالله دستغیب به دست منافقان (۱۳۶۰ ه‍.ش)"
+ ]
+ },
+ "21": {
+ "hYear": 1448,
+ "hMonth": 7,
+ "hDay": 2,
+ "isHoliday": false,
+ "occasions": []
+ },
+ "22": {
+ "hYear": 1448,
+ "hMonth": 7,
+ "hDay": 3,
+ "isHoliday": false,
+ "occasions": [
+ "شهادت حضرت امام علی النقی الهادی علیه السلام (۲۵۴ ه‍.ق)"
+ ]
+ },
+ "23": {
+ "hYear": 1448,
+ "hMonth": 7,
+ "hDay": 4,
+ "isHoliday": false,
+ "occasions": []
+ },
+ "24": {
+ "hYear": 1448,
+ "hMonth": 7,
+ "hDay": 5,
+ "isHoliday": false,
+ "occasions": []
+ },
+ "25": {
+ "hYear": 1448,
+ "hMonth": 7,
+ "hDay": 6,
+ "isHoliday": false,
+ "occasions": [
+ "روز پژوهش"
+ ]
+ },
+ "26": {
+ "hYear": 1448,
+ "hMonth": 7,
+ "hDay": 7,
+ "isHoliday": false,
+ "occasions": []
+ },
+ "27": {
+ "hYear": 1448,
+ "hMonth": 7,
+ "hDay": 8,
+ "isHoliday": true,
+ "occasions": [
+ "شهادت آیتالله دکتر محمد مفتح (۱۳۵۸ ه‍.ش) - روز وحدت حوزه - دانشگاه - روز جهان عاری از خشونت - افراطیگری"
+ ]
+ },
+ "28": {
+ "hYear": 1448,
+ "hMonth": 7,
+ "hDay": 9,
+ "isHoliday": false,
+ "occasions": []
+ },
+ "29": {
+ "hYear": 1448,
+ "hMonth": 7,
+ "hDay": 10,
+ "isHoliday": false,
+ "occasions": [
+ "ولادت حضرت امام محمد تقی علیه السلام »جواد الائمه« (۱۹۵ ه‍.ق)"
+ ]
+ },
+ "30": {
+ "hYear": 1448,
+ "hMonth": 7,
+ "hDay": 11,
+ "isHoliday": false,
+ "occasions": [
+ "شب یلدا - ترویج فرهنگ میهمانی - پیوند با خویشان"
+ ]
+ }
+ },
+ "10": {
+ "1": {
+ "hYear": 1448,
+ "hMonth": 7,
+ "hDay": 12,
+ "isHoliday": false,
+ "occasions": []
+ },
+ "2": {
+ "hYear": 1448,
+ "hMonth": 7,
+ "hDay": 13,
+ "isHoliday": true,
+ "occasions": [
+ "ولادت حضرت امام علی علیه السلام(۲۳ سال قبل از هجرت)(تعطیل) - روز پدر - آغاز ایام البیض )اعتکاف("
+ ]
+ },
+ "3": {
+ "hYear": 1448,
+ "hMonth": 7,
+ "hDay": 14,
+ "isHoliday": false,
+ "occasions": []
+ },
+ "4": {
+ "hYear": 1448,
+ "hMonth": 7,
+ "hDay": 15,
+ "isHoliday": true,
+ "occasions": [
+ "ارتحال حضرت زینب سلام الله علیها (۶۲ ه‍.ق) - تغییر قبله مسلمین از بیت المقدس به مکه معظمه (۲ ه‍.ق) - ولادت حضرت عیسی مسیح علیه السلام - روز بزرگداشت رودکی"
+ ]
+ },
+ "5": {
+ "hYear": 1448,
+ "hMonth": 7,
+ "hDay": 16,
+ "isHoliday": false,
+ "occasions": [
+ "روز ایمنی در برابر زلزله - کاهش اثرات بالیای طبیعی"
+ ]
+ },
+ "6": {
+ "hYear": 1448,
+ "hMonth": 7,
+ "hDay": 17,
+ "isHoliday": false,
+ "occasions": []
+ },
+ "7": {
+ "hYear": 1448,
+ "hMonth": 7,
+ "hDay": 18,
+ "isHoliday": false,
+ "occasions": [
+ "تشکیل نهضت سوادآموزی به فرمان حضرت امام خمینی (۱۳۵۸ ه‍.ش)"
+ ]
+ },
+ "8": {
+ "hYear": 1448,
+ "hMonth": 7,
+ "hDay": 19,
+ "isHoliday": false,
+ "occasions": []
+ },
+ "9": {
+ "hYear": 1448,
+ "hMonth": 7,
+ "hDay": 20,
+ "isHoliday": false,
+ "occasions": [
+ "روز بصیرت - میثاق امت با والیت"
+ ]
+ },
+ "10": {
+ "hYear": 1448,
+ "hMonth": 7,
+ "hDay": 21,
+ "isHoliday": false,
+ "occasions": []
+ },
+ "11": {
+ "hYear": 1448,
+ "hMonth": 7,
+ "hDay": 22,
+ "isHoliday": true,
+ "occasions": [
+ "آغاز سال 2027 میلادی"
+ ]
+ },
+ "12": {
+ "hYear": 1448,
+ "hMonth": 7,
+ "hDay": 23,
+ "isHoliday": false,
+ "occasions": [
+ "روز بزرگداشت عالمه مصباح یزدی - روز علوم انسانی اسلامی"
+ ]
+ },
+ "13": {
+ "hYear": 1448,
+ "hMonth": 7,
+ "hDay": 24,
+ "isHoliday": false,
+ "occasions": [
+ "روز جهانی مقاومت - شهادت الگوی اخالص - عمل سردار سپهبد قاسم سلیمانی به دست استکبار جهانی"
+ ]
+ },
+ "14": {
+ "hYear": 1448,
+ "hMonth": 7,
+ "hDay": 25,
+ "isHoliday": false,
+ "occasions": [
+ "شهادت حضرت امام موسی کاظم علیه السلام (۱۸۳ ه‍.ق)"
+ ]
+ },
+ "15": {
+ "hYear": 1448,
+ "hMonth": 7,
+ "hDay": 26,
+ "isHoliday": false,
+ "occasions": []
+ },
+ "16": {
+ "hYear": 1448,
+ "hMonth": 7,
+ "hDay": 27,
+ "isHoliday": true,
+ "occasions": [
+ "مبعث حضرت رسول اکرم صلی الله علیه و آله (۱۳ سال قبل از هجرت) (تعطیل) - شهادت سیدحسین علمالهدی - همرزمان وی در هویزه - روز شهدای دانشجو"
+ ]
+ },
+ "17": {
+ "hYear": 1448,
+ "hMonth": 7,
+ "hDay": 28,
+ "isHoliday": false,
+ "occasions": []
+ },
+ "18": {
+ "hYear": 1448,
+ "hMonth": 7,
+ "hDay": 29,
+ "isHoliday": true,
+ "occasions": []
+ },
+ "19": {
+ "hYear": 1448,
+ "hMonth": 7,
+ "hDay": 30,
+ "isHoliday": false,
+ "occasions": [
+ "قیام خونین مردم قم (۱۳۵۶ ه‍.ش)"
+ ]
+ },
+ "20": {
+ "hYear": 1448,
+ "hMonth": 8,
+ "hDay": 1,
+ "isHoliday": false,
+ "occasions": [
+ "شهادت میرزاتقیخان امیرکبیر(۱۲۳۰ ه‍.ش)"
+ ]
+ },
+ "21": {
+ "hYear": 1448,
+ "hMonth": 8,
+ "hDay": 2,
+ "isHoliday": false,
+ "occasions": []
+ },
+ "22": {
+ "hYear": 1448,
+ "hMonth": 8,
+ "hDay": 3,
+ "isHoliday": false,
+ "occasions": [
+ "ولادت حضرت امام حسین علیه السلام (۴ ه‍.ق) - روز پاسدار - تشکیل شورای انقلاب به فرمان حضرت امام خمینی (۱۳۵۷ ه‍.ش)"
+ ]
+ },
+ "23": {
+ "hYear": 1448,
+ "hMonth": 8,
+ "hDay": 4,
+ "isHoliday": false,
+ "occasions": [
+ "ولادت حضرت ابوالفضل العباس علیه السلام (۲۶ ه‍.ق) - روز جانباز"
+ ]
+ },
+ "24": {
+ "hYear": 1448,
+ "hMonth": 8,
+ "hDay": 5,
+ "isHoliday": false,
+ "occasions": [
+ "ولادت حضرت امام زین العابدین علیه السلام (۳۸ ه‍.ق) - روز صحیفه سجادیه"
+ ]
+ },
+ "25": {
+ "hYear": 1448,
+ "hMonth": 8,
+ "hDay": 6,
+ "isHoliday": true,
+ "occasions": [
+ "روز تاریخنگاری انقلاب اسلامی"
+ ]
+ },
+ "26": {
+ "hYear": 1448,
+ "hMonth": 8,
+ "hDay": 7,
+ "isHoliday": false,
+ "occasions": [
+ "فرار شاه معدوم (۱۳۵۷ ه‍.ش)"
+ ]
+ },
+ "27": {
+ "hYear": 1448,
+ "hMonth": 8,
+ "hDay": 8,
+ "isHoliday": false,
+ "occasions": [
+ "شهادتنوابصفوی،طهماسبی،برادران واحدی - ذوالقدر از فداییان اسالم(۱۳۳۴ ه‍.ش)"
+ ]
+ },
+ "28": {
+ "hYear": 1448,
+ "hMonth": 8,
+ "hDay": 9,
+ "isHoliday": false,
+ "occasions": []
+ },
+ "29": {
+ "hYear": 1448,
+ "hMonth": 8,
+ "hDay": 10,
+ "isHoliday": false,
+ "occasions": []
+ },
+ "30": {
+ "hYear": 1448,
+ "hMonth": 8,
+ "hDay": 11,
+ "isHoliday": false,
+ "occasions": [
+ "ولادت حضرت علی اکبر علیه السلام (۳۳ ه‍.ق) - روز جوان"
+ ]
+ }
+ },
+ "11": {
+ "1": {
+ "hYear": 1448,
+ "hMonth": 8,
+ "hDay": 12,
+ "isHoliday": false,
+ "occasions": []
+ },
+ "2": {
+ "hYear": 1448,
+ "hMonth": 8,
+ "hDay": 13,
+ "isHoliday": true,
+ "occasions": []
+ },
+ "3": {
+ "hYear": 1448,
+ "hMonth": 8,
+ "hDay": 14,
+ "isHoliday": false,
+ "occasions": []
+ },
+ "4": {
+ "hYear": 1448,
+ "hMonth": 8,
+ "hDay": 15,
+ "isHoliday": true,
+ "occasions": [
+ "ولادت حضرت قائم عجلالله تعالی فرجه (۲۵۵ ه‍.ق)(تعطیل) - روز جهانی مستضعفان"
+ ]
+ },
+ "5": {
+ "hYear": 1448,
+ "hMonth": 8,
+ "hDay": 16,
+ "isHoliday": false,
+ "occasions": []
+ },
+ "6": {
+ "hYear": 1448,
+ "hMonth": 8,
+ "hDay": 17,
+ "isHoliday": false,
+ "occasions": [
+ "سالروز حماسه مردم آمل - روز بزرگداشت صفیالدین اُرمَوی - روز آواها - نواهای ایرانی"
+ ]
+ },
+ "7": {
+ "hYear": 1448,
+ "hMonth": 8,
+ "hDay": 18,
+ "isHoliday": false,
+ "occasions": []
+ },
+ "8": {
+ "hYear": 1448,
+ "hMonth": 8,
+ "hDay": 19,
+ "isHoliday": false,
+ "occasions": []
+ },
+ "9": {
+ "hYear": 1448,
+ "hMonth": 8,
+ "hDay": 20,
+ "isHoliday": true,
+ "occasions": []
+ },
+ "10": {
+ "hYear": 1448,
+ "hMonth": 8,
+ "hDay": 21,
+ "isHoliday": false,
+ "occasions": []
+ },
+ "11": {
+ "hYear": 1448,
+ "hMonth": 8,
+ "hDay": 22,
+ "isHoliday": false,
+ "occasions": []
+ },
+ "12": {
+ "hYear": 1448,
+ "hMonth": 8,
+ "hDay": 23,
+ "isHoliday": false,
+ "occasions": [
+ "بازگشت حضرت امام خمینی به ایران (۱۳۵۷ ه‍.ش) - آغاز دهه مبارک فجر انقلاب اسلامی"
+ ]
+ },
+ "13": {
+ "hYear": 1448,
+ "hMonth": 8,
+ "hDay": 24,
+ "isHoliday": false,
+ "occasions": []
+ },
+ "14": {
+ "hYear": 1448,
+ "hMonth": 8,
+ "hDay": 25,
+ "isHoliday": false,
+ "occasions": [
+ "روز فناوری فضایی"
+ ]
+ },
+ "15": {
+ "hYear": 1448,
+ "hMonth": 8,
+ "hDay": 26,
+ "isHoliday": false,
+ "occasions": []
+ },
+ "16": {
+ "hYear": 1448,
+ "hMonth": 8,
+ "hDay": 27,
+ "isHoliday": true,
+ "occasions": []
+ },
+ "17": {
+ "hYear": 1448,
+ "hMonth": 8,
+ "hDay": 28,
+ "isHoliday": false,
+ "occasions": []
+ },
+ "18": {
+ "hYear": 1448,
+ "hMonth": 8,
+ "hDay": 29,
+ "isHoliday": false,
+ "occasions": []
+ },
+ "19": {
+ "hYear": 1448,
+ "hMonth": 9,
+ "hDay": 1,
+ "isHoliday": false,
+ "occasions": [
+ "روز نیروی هوایی"
+ ]
+ },
+ "20": {
+ "hYear": 1448,
+ "hMonth": 9,
+ "hDay": 2,
+ "isHoliday": false,
+ "occasions": []
+ },
+ "21": {
+ "hYear": 1448,
+ "hMonth": 9,
+ "hDay": 3,
+ "isHoliday": false,
+ "occasions": []
+ },
+ "22": {
+ "hYear": 1448,
+ "hMonth": 9,
+ "hDay": 4,
+ "isHoliday": true,
+ "occasions": [
+ "پیروزی انقلاب اسلامی ایران - سقوط نظام شاهنشاهی (۱۳۵۷ ه‍.ش) (تعطیل)"
+ ]
+ },
+ "23": {
+ "hYear": 1448,
+ "hMonth": 9,
+ "hDay": 5,
+ "isHoliday": true,
+ "occasions": []
+ },
+ "24": {
+ "hYear": 1448,
+ "hMonth": 9,
+ "hDay": 6,
+ "isHoliday": false,
+ "occasions": []
+ },
+ "25": {
+ "hYear": 1448,
+ "hMonth": 9,
+ "hDay": 7,
+ "isHoliday": false,
+ "occasions": []
+ },
+ "26": {
+ "hYear": 1448,
+ "hMonth": 9,
+ "hDay": 8,
+ "isHoliday": false,
+ "occasions": []
+ },
+ "27": {
+ "hYear": 1448,
+ "hMonth": 9,
+ "hDay": 9,
+ "isHoliday": false,
+ "occasions": []
+ },
+ "28": {
+ "hYear": 1448,
+ "hMonth": 9,
+ "hDay": 10,
+ "isHoliday": false,
+ "occasions": [
+ "وفات حضرت خدیجه سلام الله علیها (۳ سال قبل از هجرت)"
+ ]
+ },
+ "29": {
+ "hYear": 1448,
+ "hMonth": 9,
+ "hDay": 11,
+ "isHoliday": false,
+ "occasions": [
+ "قیام مردم تبریز به مناسبت چهلمین روز شهادت شهدای قم (۱۳۵۶ ه‍.ش) - روز اقتصاد مقاومتی - کارآفرینی"
+ ]
+ },
+ "30": {
+ "hYear": 1448,
+ "hMonth": 9,
+ "hDay": 12,
+ "isHoliday": true,
+ "occasions": []
+ }
+ },
+ "12": {
+ "1": {
+ "hYear": 1448,
+ "hMonth": 9,
+ "hDay": 13,
+ "isHoliday": false,
+ "occasions": []
+ },
+ "2": {
+ "hYear": 1448,
+ "hMonth": 9,
+ "hDay": 14,
+ "isHoliday": false,
+ "occasions": []
+ },
+ "3": {
+ "hYear": 1448,
+ "hMonth": 9,
+ "hDay": 15,
+ "isHoliday": false,
+ "occasions": [
+ "ولادت حضرت امام حسن مجتبی علیه السلام (۳ ه‍.ق) - روز اکرام - تکریم خیرین"
+ ]
+ },
+ "4": {
+ "hYear": 1448,
+ "hMonth": 9,
+ "hDay": 16,
+ "isHoliday": false,
+ "occasions": []
+ },
+ "5": {
+ "hYear": 1448,
+ "hMonth": 9,
+ "hDay": 17,
+ "isHoliday": false,
+ "occasions": [
+ "روز بزرگداشت خواجه نصیرالدین طوسی - روز مهندسی"
+ ]
+ },
+ "6": {
+ "hYear": 1448,
+ "hMonth": 9,
+ "hDay": 18,
+ "isHoliday": false,
+ "occasions": [
+ "شب قدر"
+ ]
+ },
+ "7": {
+ "hYear": 1448,
+ "hMonth": 9,
+ "hDay": 19,
+ "isHoliday": true,
+ "occasions": [
+ "ضربت خوردن حضرت امام علی علیه السلام (۴۰ ه‍.ق) - روز نهجالبالغه"
+ ]
+ },
+ "8": {
+ "hYear": 1448,
+ "hMonth": 9,
+ "hDay": 20,
+ "isHoliday": false,
+ "occasions": [
+ "شب قدر - روز حمایت از بیماران نادر"
+ ]
+ },
+ "9": {
+ "hYear": 1448,
+ "hMonth": 9,
+ "hDay": 21,
+ "isHoliday": true,
+ "occasions": [
+ "شهادت حضرت امام علی علیه السلام (۴۰ ه‍.ق) (تعطیل)"
+ ]
+ },
+ "10": {
+ "hYear": 1448,
+ "hMonth": 9,
+ "hDay": 22,
+ "isHoliday": false,
+ "occasions": [
+ "شب قدر"
+ ]
+ },
+ "11": {
+ "hYear": 1448,
+ "hMonth": 9,
+ "hDay": 23,
+ "isHoliday": false,
+ "occasions": []
+ },
+ "12": {
+ "hYear": 1448,
+ "hMonth": 9,
+ "hDay": 24,
+ "isHoliday": false,
+ "occasions": []
+ },
+ "13": {
+ "hYear": 1448,
+ "hMonth": 9,
+ "hDay": 25,
+ "isHoliday": false,
+ "occasions": []
+ },
+ "14": {
+ "hYear": 1448,
+ "hMonth": 9,
+ "hDay": 26,
+ "isHoliday": true,
+ "occasions": [
+ "روز جهانی قدس )آخرین جمعه ماه رمضان( - روز احسان - نیکوکاری - روز ترویج فرهنگ قرضالحسنه"
+ ]
+ },
+ "15": {
+ "hYear": 1448,
+ "hMonth": 9,
+ "hDay": 27,
+ "isHoliday": false,
+ "occasions": [
+ "روز درختکاری - روز آموزش همگانی حفظ محیط زیست"
+ ]
+ },
+ "16": {
+ "hYear": 1448,
+ "hMonth": 9,
+ "hDay": 28,
+ "isHoliday": false,
+ "occasions": []
+ },
+ "17": {
+ "hYear": 1448,
+ "hMonth": 9,
+ "hDay": 29,
+ "isHoliday": false,
+ "occasions": []
+ },
+ "18": {
+ "hYear": 1448,
+ "hMonth": 9,
+ "hDay": 30,
+ "isHoliday": false,
+ "occasions": [
+ "روز بزرگداشت سید جمالالدین اسدآبادی - سالروز تأسیس کانونهای فرهنگی - هنری مساجد کشور"
+ ]
+ },
+ "19": {
+ "hYear": 1448,
+ "hMonth": 10,
+ "hDay": 1,
+ "isHoliday": true,
+ "occasions": [
+ "عید سعید فطر(تعطیل)"
+ ]
+ },
+ "20": {
+ "hYear": 1448,
+ "hMonth": 10,
+ "hDay": 2,
+ "isHoliday": true,
+ "occasions": [
+ "تعطیل به مناسبت عید سعید فطر - روز راهیان نور"
+ ]
+ },
+ "21": {
+ "hYear": 1448,
+ "hMonth": 10,
+ "hDay": 3,
+ "isHoliday": true,
+ "occasions": [
+ "روز بزرگداشت نظامی گنجوی"
+ ]
+ },
+ "22": {
+ "hYear": 1448,
+ "hMonth": 10,
+ "hDay": 4,
+ "isHoliday": false,
+ "occasions": [
+ "صدور فرمان حضرت امام خمینی مبنی بر تأسیس بنیاد شهید انقلاب اسلامی(۱۳۵۸ ه‍.ش) - روز بزرگداشت شهدا"
+ ]
+ },
+ "23": {
+ "hYear": 1448,
+ "hMonth": 10,
+ "hDay": 5,
+ "isHoliday": false,
+ "occasions": []
+ },
+ "24": {
+ "hYear": 1448,
+ "hMonth": 10,
+ "hDay": 6,
+ "isHoliday": false,
+ "occasions": []
+ },
+ "25": {
+ "hYear": 1448,
+ "hMonth": 10,
+ "hDay": 7,
+ "isHoliday": false,
+ "occasions": [
+ "روز بزرگداشت پروین اعتصامی - روز تکریم همسایگان"
+ ]
+ },
+ "26": {
+ "hYear": 1448,
+ "hMonth": 10,
+ "hDay": 8,
+ "isHoliday": false,
+ "occasions": []
+ },
+ "27": {
+ "hYear": 1448,
+ "hMonth": 10,
+ "hDay": 9,
+ "isHoliday": false,
+ "occasions": []
+ },
+ "28": {
+ "hYear": 1448,
+ "hMonth": 10,
+ "hDay": 10,
+ "isHoliday": true,
+ "occasions": []
+ },
+ "29": {
+ "hYear": 1448,
+ "hMonth": 10,
+ "hDay": 11,
+ "isHoliday": true,
+ "occasions": [
+ "روز ملی شدن صنعت نفت ایران (۱۳۲۹ ه‍.ش) (تعطیل)"
+ ]
+ }
+ }
+}

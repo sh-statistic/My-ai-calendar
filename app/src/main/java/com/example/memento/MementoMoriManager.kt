@@ -60,27 +60,21 @@ class MementoMoriManager(private val context: Context) {
             .apply()
     }
 
-    fun getManualDrilledCount(): Int {
-        return prefs.getInt(KEY_MANUAL_DRILLED_COUNT, 0)
-    }
-
-    fun addManualDrilledMonth() {
-        val current = getManualDrilledCount()
-        prefs.edit().putInt(KEY_MANUAL_DRILLED_COUNT, current + 1).apply()
-    }
-
     fun calculateProgress(): LifeProgress {
         val today = PersianCalendarHelper.getCurrentJalaliDate()
         val birthY = getBirthYear()
         val birthM = getBirthMonth()
         val totalLifetimeMonths = getTotalLifetimeMonths()
 
-        // Calculate chronological months lived
+        // Calculate actual lived months
         var rawMonths = (today.year - birthY) * 12 + (today.month - birthM)
         if (rawMonths < 0) rawMonths = 0
+        
+        // Calculate grid index (calendar months since Farvardin of birth year)
+        var gridIndex = (today.year - birthY) * 12 + (today.month - 1)
+        if (gridIndex < 0) gridIndex = 0
 
-        // Add any manually finished months
-        val totalElapsed = (rawMonths + getManualDrilledCount()).coerceIn(0, totalLifetimeMonths)
+        val totalElapsed = rawMonths.coerceIn(0, totalLifetimeMonths)
         val remaining = (totalLifetimeMonths - totalElapsed).coerceAtLeast(0)
 
         val elapsedYears = totalElapsed / 12
@@ -90,7 +84,10 @@ class MementoMoriManager(private val context: Context) {
         val remainingRemMonths = remaining % 12
 
         val percent = (totalElapsed.toFloat() / totalLifetimeMonths.toFloat()) * 100f
-        val currentMonthIdx = totalElapsed.coerceAtMost(totalLifetimeMonths - 1)
+        
+        // The grid has `totalLifetimeMonths + birthM - 1` total slots because of the grayed out pre-birth months
+        val totalGridSlots = totalLifetimeMonths + (birthM - 1)
+        val currentMonthIdx = gridIndex.coerceAtMost(totalGridSlots - 1)
 
         return LifeProgress(
             elapsedMonths = totalElapsed,
@@ -104,6 +101,15 @@ class MementoMoriManager(private val context: Context) {
             birthYear = birthY,
             birthMonth = birthM
         )
+    }
+
+    fun checkNewMonthCompleted(currentMonthIdx: Int): Boolean {
+        val lastSeen = prefs.getInt("last_seen_month", currentMonthIdx)
+        if (currentMonthIdx > lastSeen) {
+            prefs.edit().putInt("last_seen_month", currentMonthIdx).apply()
+            return true
+        }
+        return false
     }
 
     fun saveReflectionNote(monthIndex: Int, note: String) {

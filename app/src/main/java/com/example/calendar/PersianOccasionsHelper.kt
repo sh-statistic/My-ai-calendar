@@ -9,7 +9,74 @@ data class PersianOccasion(
     val customDay: Int = -1
 )
 
+data class OfficialDayData(
+    val hYear: Int,
+    val hMonth: Int,
+    val hDay: Int,
+    val isHoliday: Boolean,
+    val occasions: List<String>
+)
+
 object PersianOccasionsHelper {
+
+    private var appContext: android.content.Context? = null
+    private val officialDataCache = mutableMapOf<Int, Map<String, OfficialDayData>>()
+
+    fun init(context: android.content.Context) {
+        appContext = context.applicationContext
+        loadCustomOccasions(context)
+    }
+
+    fun loadOfficialDataForYear(context: android.content.Context, year: Int) {
+        appContext = context.applicationContext
+        if (officialDataCache.containsKey(year)) return
+        try {
+            val fileName = "occasions_$year.json"
+            val jsonString = context.assets.open(fileName).bufferedReader().use { it.readText() }
+            val jsonObject = org.json.JSONObject(jsonString)
+            val yearMap = mutableMapOf<String, OfficialDayData>()
+            val months = jsonObject.keys()
+            while (months.hasNext()) {
+                val m = months.next()
+                val daysObj = jsonObject.getJSONObject(m)
+                val days = daysObj.keys()
+                while (days.hasNext()) {
+                    val d = days.next()
+                    val dayObj = daysObj.getJSONObject(d)
+                    val occArr = dayObj.getJSONArray("occasions")
+                    val occList = mutableListOf<String>()
+                    for (i in 0 until occArr.length()) occList.add(occArr.getString(i))
+                    yearMap["$m-$d"] = OfficialDayData(
+                        hYear = dayObj.getInt("hYear"),
+                        hMonth = dayObj.getInt("hMonth"),
+                        hDay = dayObj.getInt("hDay"),
+                        isHoliday = dayObj.getBoolean("isHoliday"),
+                        occasions = occList
+                    )
+                }
+            }
+            officialDataCache[year] = yearMap
+        } catch (e: Exception) {
+            // File not found or parse error - cache empty map so we don't try to reload repeatedly
+            officialDataCache[year] = emptyMap()
+        }
+    }
+
+    private fun ensureYearLoaded(year: Int) {
+        if (!officialDataCache.containsKey(year)) {
+            val ctx = appContext
+            if (ctx != null) {
+                loadOfficialDataForYear(ctx, year)
+            }
+        }
+    }
+
+    fun getHijriDate(year: Int, month: Int, day: Int): HijriCalendarUtils.SimpleDate? {
+        ensureYearLoaded(year)
+        val officialMap = officialDataCache[year] ?: return null
+        val officialDay = officialMap["$month-$day"] ?: return null
+        return HijriCalendarUtils.SimpleDate(officialDay.hYear, officialDay.hMonth, officialDay.hDay)
+    }
 
     // Key: "Month-Day", e.g. "1-1" for 1 Farvardin
     private val SOLAR_OCCASIONS = mapOf(
@@ -150,43 +217,91 @@ object PersianOccasionsHelper {
         "12-29" to listOf(PersianOccasion("روز ملی شدن صنعت نفت ایران", isHoliday = true, isNational = true))
     )
 
-    // Hijri Islamic Occasions (Dynamic mapping for current/upcoming calendar year 1404-1406)
-    private val LUNAR_HOLIDAYS_1405 = mapOf(
-        "1-1" to listOf(PersianOccasion("عید سعید فطر", isHoliday = true, isReligious = true)),
-        "1-2" to listOf(PersianOccasion("تعطیلی به مناسبت عید سعید فطر", isHoliday = true, isReligious = true)),
-        "1-25" to listOf(PersianOccasion("شهادت حضرت امام جعفر صادق (ع)", isHoliday = true, isReligious = true)),
-        "3-6" to listOf(PersianOccasion("عید سعید قربان", isHoliday = true, isReligious = true)),
-        "3-14" to listOf(PersianOccasion("عید سعید غدیر خم", isHoliday = true, isReligious = true)),
-        "4-4" to listOf(PersianOccasion("تاسوعای حسینی (۹ محرم)", isHoliday = true, isReligious = true)),
-        "4-5" to listOf(PersianOccasion("عاشورای حسینی (۱۰ محرم)", isHoliday = true, isReligious = true)),
-        "5-14" to listOf(PersianOccasion("اربعین حسینی (۲۰ صفر)", isHoliday = true, isReligious = true)),
-        "5-22" to listOf(PersianOccasion("رحلت حضرت رسول اکرم (ص) و شهادت امام حسن مجتبی (ع)", isHoliday = true, isReligious = true)),
-        "5-24" to listOf(PersianOccasion("شهادت حضرت امام رضا (ع)", isHoliday = true, isReligious = true)),
-        "6-1" to listOf(PersianOccasion("شهادت حضرت امام حسن عسکری (ع) و آغاز امامت حضرت مهدی (عج)", isHoliday = true, isReligious = true)),
-        "6-10" to listOf(PersianOccasion("میلاد حضرت رسول اکرم (ص) و امام جعفر صادق (ع) / هفته وحدت", isHoliday = true, isReligious = true)),
-        "8-24" to listOf(PersianOccasion("شهادت حضرت فاطمه زهرا (س)", isHoliday = true, isReligious = true)),
-        "10-3" to listOf(PersianOccasion("ولادت حضرت امام علی (ع) و روز پدر", isHoliday = true, isReligious = true)),
-        "10-17" to listOf(PersianOccasion("مبعث حضرت رسول اکرم (ص)", isHoliday = true, isReligious = true)),
-        "11-5" to listOf(PersianOccasion("ولادت با سعادت حضرت قائم عجل‌الله تعالی فرجه (نیمه شعبان)", isHoliday = true, isReligious = true)),
-        "12-19" to listOf(PersianOccasion("شهادت حضرت علی (ع) و شب‌های قدر", isHoliday = true, isReligious = true))
-    )
+    // مناسبت‌های مذهبی (قمری) دیگر به صورت ثابت ذخیره نمی‌شوند.
+    // به جای آن، HijriCalendarUtils تاریخ‌ها را بر اساس سال شمسی به صورت خودکار محاسبه می‌کند.
 
-    fun getOccasionsForDate(month: Int, day: Int): List<PersianOccasion> {
+    /**
+     * دریافت تمام مناسبت‌های (شمسی + قمری + سفارشی) برای یک تاریخ مشخص.
+     * مناسبت‌های قمری به صورت خودکار بر اساس سال شمسی محاسبه می‌شوند.
+     *
+     * @param month ماه شمسی
+     * @param day روز شمسی
+     * @param year سال شمسی (برای محاسبه مناسبت‌های قمری)
+     */
+    fun getOccasionsForDate(month: Int, day: Int, year: Int = 1405): List<PersianOccasion> {
+        ensureYearLoaded(year)
         val key = "$month-$day"
-        val solar = SOLAR_OCCASIONS[key] ?: emptyList()
-        val lunar = LUNAR_HOLIDAYS_1405[key] ?: emptyList()
         val custom = customOccasions.filter { it.customMonth == month && it.customDay == day }
-        return solar + lunar + custom
+        val solar = SOLAR_OCCASIONS[key] ?: emptyList()
+        val mergedOccasions = mutableListOf<PersianOccasion>()
+        mergedOccasions.addAll(solar)
+
+        val officialMap = officialDataCache[year]
+        if (officialMap != null && officialMap.containsKey(key)) {
+            val officialDay = officialMap[key]!!
+            // Add JSON events that are not already covered by Solar (simple deduplication)
+            val jsonOccs = officialDay.occasions.map { PersianOccasion(title = it, isHoliday = officialDay.isHoliday, isNational = true) }
+            for (jOcc in jsonOccs) {
+                // If the solar list doesn't have a very similar title, add it
+                // We assume religious events from JSON will have different keywords or 'ه‍.ق'
+                val isDuplicate = solar.any { sOcc -> 
+                    jOcc.title.contains(sOcc.title) || sOcc.title.contains(jOcc.title) ||
+                    (jOcc.title.contains("نوروز") && sOcc.title.contains("نوروز"))
+                }
+                if (!isDuplicate) {
+                    mergedOccasions.add(jOcc)
+                }
+            }
+            return mergedOccasions + custom
+        }
+
+        // If JSON doesn't exist for this year, fallback to mathematical lunar calculation
+        val lunarMap = HijriCalendarUtils.getOccasionsForYear(year)
+        val lunar = lunarMap[key] ?: emptyList()
+        return mergedOccasions + lunar + custom
     }
 
-    fun isHoliday(month: Int, day: Int): Boolean {
-        val occasions = getOccasionsForDate(month, day)
-        return occasions.any { it.isHoliday }
+    /**
+     * آیا این روز تعطیل رسمی است؟
+     * @param year سال شمسی (برای محاسبه تعطیلات قمری)
+     */
+    fun isHoliday(month: Int, day: Int, year: Int = 1405): Boolean {
+        ensureYearLoaded(year)
+        val key = "$month-$day"
+        
+        var isHoliday = false
+        
+        // 1. Check Solar Fixed Holidays
+        if (SOLAR_OCCASIONS[key]?.any { it.isHoliday } == true) {
+            isHoliday = true
+        }
+
+        // 2. Check JSON Official Holidays
+        val officialMap = officialDataCache[year]
+        if (officialMap != null && officialMap.containsKey(key)) {
+            if (officialMap[key]!!.isHoliday) {
+                isHoliday = true
+            }
+        } else {
+            // 3. Fallback to Lunar Math Holidays if JSON is missing
+            val lunarMap = HijriCalendarUtils.getOccasionsForYear(year)
+            if (lunarMap[key]?.any { it.isHoliday } == true) {
+                isHoliday = true
+            }
+        }
+
+        // 4. Check Custom Holidays
+        if (customOccasions.any { it.customMonth == month && it.customDay == day && it.isHoliday }) {
+            isHoliday = true
+        }
+
+        return isHoliday
     }
 
     private var customOccasions: List<PersianOccasion> = emptyList()
 
     fun loadCustomOccasions(context: android.content.Context) {
+        appContext = context.applicationContext
         val prefs = context.getSharedPreferences("CustomOccasions", android.content.Context.MODE_PRIVATE)
         val jsonStr = prefs.getString("data", "[]") ?: "[]"
         try {
