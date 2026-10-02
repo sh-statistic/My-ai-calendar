@@ -4,6 +4,21 @@
  */
 
 const PersianOccasions = {
+  officialDataCache: {},
+
+  async loadOfficialData(year) {
+    if (this.officialDataCache[year]) return;
+    try {
+      const url = chrome.runtime?.getURL ? chrome.runtime.getURL(`occasions_${year}.json`) : `occasions_${year}.json`;
+      const res = await fetch(url);
+      if (res.ok) {
+        this.officialDataCache[year] = await res.json();
+      }
+    } catch (e) {
+      // JSON not found or error parsing
+    }
+  },
+
   SOLAR_OCCASIONS: {
     // فروردین
     "1-1": [{ title: "جشن نوروز / آغاز سال نو هجری شمسی", isHoliday: true, isNational: true }],
@@ -114,35 +129,202 @@ const PersianOccasions = {
     "12-29": [{ title: "روز ملی شدن صنعت نفت ایران", isHoliday: true, isNational: true }]
   },
 
-  LUNAR_OCCASIONS: {
-    "1-1": [{ title: "عید سعید فطر", isHoliday: true, isReligious: true }],
-    "1-2": [{ title: "تعطیلی به مناسبت عید سعید فطر", isHoliday: true, isReligious: true }],
-    "1-25": [{ title: "شهادت حضرت امام جعفر صادق (ع)", isHoliday: true, isReligious: true }],
-    "3-6": [{ title: "عید سعید قربان", isHoliday: true, isReligious: true }],
-    "3-14": [{ title: "عید سعید غدیر خم", isHoliday: true, isReligious: true }],
-    "4-4": [{ title: "تاسوعای حسینی (۹ محرم)", isHoliday: true, isReligious: true }],
-    "4-5": [{ title: "عاشورای حسینی (۱۰ محرم)", isHoliday: true, isReligious: true }],
-    "5-14": [{ title: "اربعین حسینی (۲۰ صفر)", isHoliday: true, isReligious: true }],
-    "5-22": [{ title: "رحلت حضرت رسول اکرم (ص) و شهادت امام حسن مجتبی (ع)", isHoliday: true, isReligious: true }],
-    "5-24": [{ title: "شهادت حضرت امام رضا (ع)", isHoliday: true, isReligious: true }],
-    "6-1": [{ title: "شهادت امام حسن عسکری (ع) و آغاز امامت حضرت مهدی (عج)", isHoliday: true, isReligious: true }],
-    "6-10": [{ title: "میلاد پیامبر اکرم (ص) و امام جعفر صادق (ع) / هفته وحدت", isHoliday: true, isReligious: true }],
-    "8-24": [{ title: "شهادت حضرت فاطمه زهرا (س)", isHoliday: true, isReligious: true }],
-    "10-3": [{ title: "ولادت حضرت امام علی (ع) و روز پدر", isHoliday: true, isReligious: true }],
-    "10-17": [{ title: "مبعث حضرت رسول اکرم (ص)", isHoliday: true, isReligious: true }],
-    "11-5": [{ title: "ولادت با سعادت حضرت مهدی (عج) (نیمه شعبان)", isHoliday: true, isReligious: true }],
-    "12-19": [{ title: "شهادت حضرت علی (ع) و شب قدر", isHoliday: true, isReligious: true }]
+  // ========== محاسبه خودکار مناسبت‌های قمری (Hijri ↔ Jalali) ==========
+  // مناسبت‌های مذهبی بر اساس تاریخ ثابت قمری ذخیره شده‌اند
+  // و برای هر سال شمسی به صورت خودکار محاسبه می‌شوند
+
+  HIJRI_OCCASIONS: [
+    // محرم (1)
+    { hijriMonth: 1, hijriDay: 9, title: "تاسوعای حسینی", isHoliday: true, isReligious: true },
+    { hijriMonth: 1, hijriDay: 10, title: "عاشورای حسینی", isHoliday: true, isReligious: true },
+    { hijriMonth: 1, hijriDay: 12, title: "شهادت حضرت امام زین‌العابدین (ع)", isHoliday: true, isReligious: true },
+    // صفر (2)
+    { hijriMonth: 2, hijriDay: 20, title: "اربعین حسینی", isHoliday: true, isReligious: true },
+    { hijriMonth: 2, hijriDay: 28, title: "رحلت حضرت رسول اکرم (ص) و شهادت امام حسن مجتبی (ع)", isHoliday: true, isReligious: true },
+    { hijriMonth: 2, hijriDay: 29, title: "شهادت حضرت امام رضا (ع)", isHoliday: true, isReligious: true },
+    // ربیع‌الاول (3)
+    { hijriMonth: 3, hijriDay: 8, title: "شهادت امام حسن عسکری (ع) و آغاز امامت حضرت مهدی (عج)", isHoliday: true, isReligious: true },
+    { hijriMonth: 3, hijriDay: 17, title: "میلاد پیامبر اکرم (ص) و امام جعفر صادق (ع) / هفته وحدت", isHoliday: true, isReligious: true },
+    // جمادی‌الثانی (6)
+    { hijriMonth: 6, hijriDay: 3, title: "شهادت حضرت فاطمه زهرا (س)", isHoliday: true, isReligious: true },
+    // رجب (7)
+    { hijriMonth: 7, hijriDay: 13, title: "ولادت حضرت امام علی (ع) و روز پدر", isHoliday: true, isReligious: true },
+    { hijriMonth: 7, hijriDay: 27, title: "مبعث حضرت رسول اکرم (ص)", isHoliday: true, isReligious: true },
+    // شعبان (8)
+    { hijriMonth: 8, hijriDay: 15, title: "ولادت با سعادت حضرت مهدی (عج) (نیمه شعبان)", isHoliday: true, isReligious: true },
+    // رمضان (9)
+    { hijriMonth: 9, hijriDay: 21, title: "شهادت حضرت علی (ع)", isHoliday: true, isReligious: true },
+    // شوال (10)
+    { hijriMonth: 10, hijriDay: 1, title: "عید سعید فطر", isHoliday: true, isReligious: true },
+    { hijriMonth: 10, hijriDay: 2, title: "تعطیلی به مناسبت عید سعید فطر", isHoliday: true, isReligious: true },
+    { hijriMonth: 10, hijriDay: 25, title: "شهادت حضرت امام جعفر صادق (ع)", isHoliday: true, isReligious: true },
+    // ذی‌الحجه (12)
+    { hijriMonth: 12, hijriDay: 10, title: "عید سعید قربان", isHoliday: true, isReligious: true },
+    { hijriMonth: 12, hijriDay: 18, title: "عید سعید غدیر خم", isHoliday: true, isReligious: true }
+  ],
+
+  // ===== الگوریتم‌های تبدیل تقویم =====
+
+  _PERSIAN_EPOCH: 1948320,
+  _ISLAMIC_EPOCH: 1948439,
+  _lunarCache: {},
+
+  _positiveModulo(a, b) {
+    return ((a % b) + b) % b;
   },
 
-  getOccasions(month, day) {
+  _floorDiv(a, b) {
+    return Math.floor(a / b);
+  },
+
+  /** تبدیل تاریخ شمسی به JDN */
+  _persianToJdn(year, month, day) {
+    const epbase = year - (year >= 0 ? 474 : 473);
+    const epyear = 474 + this._positiveModulo(epbase, 2820);
+
+    const daysPassed = month <= 7 ? (month - 1) * 31 : 186 + (month - 7) * 30;
+
+    return day +
+      daysPassed +
+      Math.floor((epyear * 682 - 110) / 2816) +
+      (epyear - 1) * 365 +
+      this._floorDiv(epbase, 2820) * 1029983 +
+      this._PERSIAN_EPOCH;
+  },
+
+  /** تبدیل JDN به تاریخ شمسی */
+  _jdnToPersian(jdn) {
+    const depoch = jdn - this._persianToJdn(475, 1, 1);
+    const cycle = this._floorDiv(depoch, 1029983);
+    const cyear = this._positiveModulo(depoch, 1029983);
+
+    let ycycle;
+    if (cyear === 1029982) {
+      ycycle = 2820;
+    } else {
+      const aux1 = Math.floor(cyear / 366);
+      const aux2 = cyear % 366;
+      ycycle = Math.floor((2134 * aux1 + 2816 * aux2 + 2815) / 1028522) + aux1 + 1;
+    }
+
+    let year = ycycle + 2820 * cycle + 474;
+    if (year <= 0) year--;
+
+    const yday = jdn - this._persianToJdn(year, 1, 1) + 1;
+    const month = yday <= 186 ? Math.ceil(yday / 31) : Math.ceil((yday - 186) / 30) + 6;
+    const day = jdn - this._persianToJdn(year, month, 1) + 1;
+
+    return { year, month, day };
+  },
+
+  /** تبدیل تاریخ قمری به JDN */
+  _islamicToJdn(year, month, day) {
+    return day +
+      Math.ceil(29.5001 * (month - 1)) +
+      (year - 1) * 354 +
+      Math.floor((3 + 11 * year) / 30) +
+      this._ISLAMIC_EPOCH - 1;
+  },
+
+  /** تبدیل JDN به تاریخ قمری */
+  _jdnToIslamic(jdn) {
+    const l = jdn - this._ISLAMIC_EPOCH + 1;
+    const year = Math.floor((30 * l + 10646) / 10631);
+    let month = Math.ceil((l - 29 - this._islamicToJdn(year, 1, 1) + this._ISLAMIC_EPOCH) / 29.5) + 1;
+    if (month < 1) month = 1;
+    if (month > 12) month = 12;
+    const day = jdn - this._islamicToJdn(year, month, 1) + 1;
+    return { year, month, day };
+  },
+
+  /** تبدیل تاریخ شمسی به هجری قمری */
+  persianToIslamic(year, month, day) {
     const key = `${month}-${day}`;
+    if (this.officialDataCache[year] && this.officialDataCache[year][key]) {
+      const off = this.officialDataCache[year][key];
+      return { year: off.hYear, month: off.hMonth, day: off.hDay };
+    }
+    const jdn = this._persianToJdn(year, month, day);
+    return this._jdnToIslamic(jdn);
+  },
+
+  /** آیا سال شمسی کبیسه است؟ */
+  _isPersianLeap(jy) {
+    const base = jy > 0 ? jy - 474 : jy - 473;
+    return this._positiveModulo((base + 38) * 682, 2816) < 682;
+  },
+
+  /**
+   * محاسبه خودکار مناسبت‌های قمری برای یک سال شمسی
+   * @param {number} jalaliYear سال شمسی
+   * @returns {Object} نگاشت "ماه-روز" → لیست مناسبت‌ها
+   */
+  _getLunarOccasionsForYear(jalaliYear) {
+    if (this._lunarCache[jalaliYear]) return this._lunarCache[jalaliYear];
+
+    const result = {};
+
+    // محدوده JDN سال شمسی
+    const yearStart = this._persianToJdn(jalaliYear, 1, 1);
+    const lastDay = this._isPersianLeap(jalaliYear) ? 30 : 29;
+    const yearEnd = this._persianToJdn(jalaliYear, 12, lastDay);
+
+    // سال‌های قمری همپوشان
+    const hijriStart = this._jdnToIslamic(yearStart);
+    const hijriEnd = this._jdnToIslamic(yearEnd);
+
+    for (let hijriYear = hijriStart.year; hijriYear <= hijriEnd.year; hijriYear++) {
+      for (const occ of this.HIJRI_OCCASIONS) {
+        const jdn = this._islamicToJdn(hijriYear, occ.hijriMonth, occ.hijriDay);
+
+        if (jdn >= yearStart && jdn <= yearEnd) {
+          const jalali = this._jdnToPersian(jdn);
+          const key = `${jalali.month}-${jalali.day}`;
+
+          if (!result[key]) result[key] = [];
+          result[key].push({
+            title: occ.title,
+            isHoliday: occ.isHoliday,
+            isReligious: occ.isReligious
+          });
+        }
+      }
+    }
+
+    this._lunarCache[jalaliYear] = result;
+    return result;
+  },
+
+  /**
+   * دریافت مناسبت‌های یک روز (شمسی + قمری)
+   * @param {number} month ماه شمسی
+   * @param {number} day روز شمسی
+   * @param {number} [year=1405] سال شمسی
+   */
+  getOccasions(month, day, year = 1405) {
+    const key = `${month}-${day}`;
+    if (this.officialDataCache[year] && this.officialDataCache[year][key]) {
+      const off = this.officialDataCache[year][key];
+      return off.occasions.map(title => ({ title, isHoliday: off.isHoliday, isNational: true }));
+    }
     const solar = this.SOLAR_OCCASIONS[key] || [];
-    const lunar = this.LUNAR_OCCASIONS[key] || [];
+    const lunarMap = this._getLunarOccasionsForYear(year);
+    const lunar = lunarMap[key] || [];
     return [...solar, ...lunar];
   },
 
-  isHoliday(month, day) {
-    const list = this.getOccasions(month, day);
+  /**
+   * آیا این روز تعطیل رسمی است؟
+   * @param {number} month ماه شمسی
+   * @param {number} day روز شمسی
+   * @param {number} [year=1405] سال شمسی
+   */
+  isHoliday(month, day, year = 1405) {
+    const key = `${month}-${day}`;
+    if (this.officialDataCache[year] && this.officialDataCache[year][key]) {
+      if (this.officialDataCache[year][key].isHoliday) return true;
+    }
+    const list = this.getOccasions(month, day, year);
     return list.some(o => o.isHoliday);
   }
 };

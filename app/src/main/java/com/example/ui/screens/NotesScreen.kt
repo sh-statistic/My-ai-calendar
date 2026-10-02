@@ -41,6 +41,7 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.ui.text.withStyle
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -130,6 +131,7 @@ fun NotesScreen(
                     items(filteredNotes, key = { it.id }) { note ->
                         NoteCard(
                             note = note,
+                            searchQuery = searchQuery,
                             onClick = { noteToEdit = note },
                             onEdit = { noteToEdit = note },
                             onAddToCalendar = { noteToAddToCalendar = note },
@@ -202,9 +204,26 @@ fun NotesScreen(
     }
 }
 
+fun buildHighlightedString(text: String, query: String): androidx.compose.ui.text.AnnotatedString {
+    if (query.isBlank()) return androidx.compose.ui.text.AnnotatedString(text)
+    return androidx.compose.ui.text.buildAnnotatedString {
+        val matches = query.toRegex(RegexOption.IGNORE_CASE).findAll(text)
+        var lastIndex = 0
+        for (match in matches) {
+            append(text.substring(lastIndex, match.range.first))
+            withStyle(style = androidx.compose.ui.text.SpanStyle(background = Color.Yellow.copy(alpha = 0.5f))) {
+                append(match.value)
+            }
+            lastIndex = match.range.last + 1
+        }
+        append(text.substring(lastIndex))
+    }
+}
+
 @Composable
 fun NoteCard(
     note: NoteEntity,
+    searchQuery: String,
     onClick: () -> Unit,
     onEdit: () -> Unit,
     onAddToCalendar: () -> Unit,
@@ -229,7 +248,7 @@ fun NoteCard(
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 Text(
-                    text = note.title,
+                    text = buildHighlightedString(note.title, searchQuery),
                     style = MaterialTheme.typography.titleSmall,
                     fontWeight = FontWeight.Bold,
                     color = Color(0xFF1E293B),
@@ -249,7 +268,7 @@ fun NoteCard(
             Spacer(modifier = Modifier.height(6.dp))
 
             Text(
-                text = note.content,
+                text = buildHighlightedString(note.content, searchQuery),
                 style = MaterialTheme.typography.bodySmall,
                 color = Color(0xFF334155),
                 lineHeight = 18.sp

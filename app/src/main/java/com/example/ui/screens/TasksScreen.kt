@@ -80,13 +80,13 @@ fun TasksScreen(
     val filteredTasks = when (filterState) {
         0 -> selectedDateTasks
         1 -> tasks
-        2 -> tasks.filter { !it.isCompleted }
-        3 -> tasks.filter { it.isCompleted }
+        2 -> selectedDateTasks.filter { !it.isCompleted }
+        3 -> selectedDateTasks.filter { it.isCompleted }
         else -> selectedDateTasks
     }
 
-    val completedCount = tasks.count { it.isCompleted }
-    val totalCount = tasks.size
+    val completedCount = selectedDateTasks.count { it.isCompleted }
+    val totalCount = selectedDateTasks.size
     val progress = if (totalCount > 0) (completedCount.toFloat() / totalCount).coerceIn(0f, 1f) else 0f
 
     Box(modifier = modifier.fillMaxSize()) {
@@ -167,22 +167,26 @@ fun TasksScreen(
                         FilterChip(
                             selected = filterState == 0,
                             onClick = { filterState = 0 },
-                            label = { Text("این روز (${PersianCalendarHelper.toPersianDigits(selectedDateTasks.size.toString())})", fontSize = 11.sp) }
+                            label = { Text("این روز (${PersianCalendarHelper.toPersianDigits(totalCount.toString())})", fontSize = 11.sp) },
+                            modifier = Modifier.weight(1f)
                         )
                         FilterChip(
                             selected = filterState == 1,
                             onClick = { filterState = 1 },
-                            label = { Text("همه (${PersianCalendarHelper.toPersianDigits(totalCount.toString())})", fontSize = 11.sp) }
+                            label = { Text("همه (${PersianCalendarHelper.toPersianDigits(tasks.size.toString())})", fontSize = 11.sp) },
+                            modifier = Modifier.weight(1f)
                         )
                         FilterChip(
                             selected = filterState == 2,
                             onClick = { filterState = 2 },
-                            label = { Text("در انتظار", fontSize = 11.sp) }
+                            label = { Text("در انتظار", fontSize = 11.sp) },
+                            modifier = Modifier.weight(1f)
                         )
                         FilterChip(
                             selected = filterState == 3,
                             onClick = { filterState = 3 },
-                            label = { Text("انجام‌شده", fontSize = 11.sp) }
+                            label = { Text("انجام شده", fontSize = 11.sp) },
+                            modifier = Modifier.weight(1f)
                         )
                     }
 

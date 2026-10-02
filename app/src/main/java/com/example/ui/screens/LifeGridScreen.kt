@@ -66,7 +66,7 @@ private val CardBg          = Color(0xFFFFFFFF)
 private val CardBorder      = Color(0xFFEADFCD)
 private val TextMain        = Color(0xFF3A2F1F)
 private val OrangeAccent    = Color(0xFFF59E0B)
-private val NavyElapsed     = Color(0xFF1B2A4A)
+private val NavyElapsed     = Color(0xFF111111) // Black for elapsed life
 private val FutureBlue      = Color(0xFFD5DCEA)
 private val CurrentYearBg   = Color(0xFFFDE7B0)
 private val ElapsedCardBg   = Color(0xFFFFF3C4)
@@ -92,10 +92,41 @@ fun LifeGridScreen(
     var reflectionNoteText   by remember { mutableStateOf("") }
     var justDrilledMonthIdx  by remember { mutableIntStateOf(0) }
 
-    val totalYears = progress.totalMonths / 12
+    val totalGridSlots = progress.totalMonths + (progress.birthMonth - 1)
+    val totalYears = (totalGridSlots + 11) / 12
     val decades    = (totalYears + 9) / 10
 
+    var showNewMonthPrompt by remember { mutableStateOf(false) }
+
+    androidx.compose.runtime.LaunchedEffect(progress.currentMonthIndex) {
+        if (manager.checkNewMonthCompleted(progress.currentMonthIndex)) {
+            showNewMonthPrompt = true
+        }
+    }
+
     val scrollState = rememberScrollState()
+
+    if (showNewMonthPrompt) {
+        AlertDialog(
+            onDismissRequest = { showNewMonthPrompt = false },
+            title = { Text("یک ماه دیگر گذشت...", fontWeight = FontWeight.Bold) },
+            text = { Text("ماه جدیدی از عمر شما آغاز شده است و ماه قبلی تکمیل شد! آیا می‌خواهید برای ماه گذشته یادداشتی ثبت کنید؟") },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        showNewMonthPrompt = false
+                        justDrilledMonthIdx = progress.currentMonthIndex - 1
+                        reflectionNoteText = manager.getReflectionNote(justDrilledMonthIdx) ?: ""
+                        showReflectionDialog = true
+                    },
+                    colors = ButtonDefaults.buttonColors(containerColor = OrangeAccent)
+                ) { Text("بله، یادداشت می‌نویسم") }
+            },
+            dismissButton = {
+                TextButton(onClick = { showNewMonthPrompt = false }) { Text("بعداً") }
+            }
+        )
+    }
 
     Column(
         modifier = modifier
@@ -129,13 +160,15 @@ fun LifeGridScreen(
                 SelectedYearDialogContent(
                     progress        = progress,
                     selectedYearIdx = yearIdx,
-                    onCurrentMonth  = {
-                        justDrilledMonthIdx = progress.currentMonthIndex
-                        manager.addManualDrilledMonth()
-                        progress = manager.calculateProgress()
-                        reflectionNoteText = ""
-                        selectedYearIdx = null
-                        showReflectionDialog = true
+                    onMonthClick    = { clickedMonthIdx ->
+                        justDrilledMonthIdx = clickedMonthIdx
+                        // We do not advance the current month manually anymore.
+                        // The user can only write reflection notes for elapsed months.
+                        if (clickedMonthIdx <= progress.currentMonthIndex) {
+                            reflectionNoteText = manager.getReflectionNote(clickedMonthIdx) ?: ""
+                            selectedYearIdx = null
+                            showReflectionDialog = true
+                        }
                     }
                 )
             },
@@ -330,11 +363,11 @@ private fun SummaryCard(progress: LifeProgress, onEditClick: () -> Unit) {
                             .fillMaxWidth(pct)
                             .height(7.dp)
                             .clip(RoundedCornerShape(4.dp))
-                            .background(OrangeAccent)
+                            .background(NavyElapsed)
                     )
                 }
                 Spacer(modifier = Modifier.width(8.dp))
-                Text(pctText, fontSize = 11.sp, color = OrangeAccent, fontWeight = FontWeight.Bold)
+                Text(pctText, fontSize = 11.sp, color = NavyElapsed, fontWeight = FontWeight.Bold)
             }
         }
     }
@@ -417,8 +450,11 @@ private fun WholeLifeCard(
                             val startAge = decade * 10
                             val endAge   = minOf(startAge + 9, totalYears - 1)
 
+                            val displayStart = startAge + 1
+                            val displayEnd   = minOf(startAge + 10, totalYears)
+
                             Text(
-                                "${PersianCalendarHelper.toPersianDigits(startAge.toString())} تا ${PersianCalendarHelper.toPersianDigits(endAge.toString())} سالگی",
+                                "${PersianCalendarHelper.toPersianDigits(displayStart.toString())} تا ${PersianCalendarHelper.toPersianDigits(displayEnd.toString())} سالگی",
                                 fontSize  = 10.sp, color = GrayText,
                                 modifier  = Modifier.fillMaxWidth(),
                                 textAlign = TextAlign.Start
@@ -488,11 +524,13 @@ private fun DrawScope.drawYearBlock(
     val ox = (blockWidthPx  - totalDotW) / 2f
     val oy = (blockHeightPx - totalDotH) / 2f
 
+    val totalGridSlots = progress.totalMonths + (progress.birthMonth - 1)
+    
     for (row in 0 until dotRows) {
         for (col in 0 until dotCols) {
             val monthInYear    = row * dotCols + col
             val absMonthIdx    = startMonthIdx + monthInYear
-            if (absMonthIdx >= progress.totalMonths) continue
+            if (absMonthIdx >= totalGridSlots) continue
 
             val cx = ox + col * (dotSizePx + dotPadPx) + dotSizePx / 2f
             val cy = oy + row * (dotSizePx + dotPadPx) + dotSizePx / 2f
@@ -500,6 +538,10 @@ private fun DrawScope.drawYearBlock(
             val radius = dotSizePx / 2f
 
             when {
+                absYear == 0 && monthInYear < (progress.birthMonth - 1) -> {
+                    // Draw gray dots for months before birth instead of hiding them
+                    drawCircle(Color.Gray.copy(alpha = 0.4f), radius, center)
+                }
                 absMonthIdx < currentMonthIdx -> drawCircle(NavyElapsed, radius, center)
                 absMonthIdx == currentMonthIdx -> {
                     drawCircle(OrangeAccent, radius, center)
@@ -533,7 +575,7 @@ private fun SelectedYearDialogHeader(progress: LifeProgress, selectedYearIdx: In
 private fun SelectedYearDialogContent(
     progress: LifeProgress,
     selectedYearIdx: Int,
-    onCurrentMonth: () -> Unit
+    onMonthClick: (Int) -> Unit
 ) {
     val monthNames      = PersianCalendarHelper.PERSIAN_MONTH_NAMES
     val startMonthIdx   = selectedYearIdx * 12
@@ -550,23 +592,30 @@ private fun SelectedYearDialogContent(
                     val absMonthIdx = startMonthIdx + monthInYear
                     val monthName   = monthNames.getOrElse(monthInYear) { "" }
 
-                    if (absMonthIdx >= progress.totalMonths) {
+                    val totalGridSlots = progress.totalMonths + (progress.birthMonth - 1)
+                    if (absMonthIdx >= totalGridSlots) {
+                        Spacer(modifier = Modifier.weight(1f))
+                        continue
+                    }
+
+                    if (selectedYearIdx == 0 && monthInYear < (progress.birthMonth - 1)) {
                         Spacer(modifier = Modifier.weight(1f))
                         continue
                     }
 
                     val isElapsed = absMonthIdx < currentMonthIdx
                     val isCurrent = absMonthIdx == currentMonthIdx
+                    val isClickable = isElapsed || isCurrent
                     val chipBg    = when { isElapsed -> Color(0xFF1B2A4A); isCurrent -> OrangeAccent; else -> Color(0xFFF0EDE8) }
-                    val chipText  = if (isElapsed || isCurrent) Color.White else GrayText
-                    val subtitle  = when { isElapsed -> "سپری شد"; isCurrent -> "لمس برای ثبت"; else -> "—" }
+                    val chipText  = if (isClickable) Color.White else GrayText
+                    val subtitle  = when { isElapsed -> "مشاهده/ثبت"; isCurrent -> "لمس برای ثبت"; else -> "—" }
 
                     Surface(
                         color    = chipBg,
                         shape    = RoundedCornerShape(10.dp),
                         modifier = Modifier
                             .weight(1f)
-                            .clickable(enabled = isCurrent) { if (isCurrent) onCurrentMonth() }
+                            .clickable(enabled = isClickable) { if (isClickable) onMonthClick(absMonthIdx) }
                     ) {
                         Column(
                             modifier            = Modifier.padding(vertical = 8.dp, horizontal = 4.dp),

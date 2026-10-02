@@ -180,13 +180,22 @@ document.addEventListener("DOMContentLoaded", async () => {
 
       const dow = (firstDow + day - 1) % 7;
       const isFriday = dow === 6;
-      const isHoliday = isFriday || (typeof PersianOccasions !== "undefined" && PersianOccasions.isHoliday(currentMonth, day));
+      const isHoliday = isFriday || (typeof PersianOccasions !== "undefined" && PersianOccasions.isHoliday(currentMonth, day, currentYear));
+      
+      let hijriDayHtml = "";
+      if (typeof PersianOccasions !== "undefined" && PersianOccasions.persianToIslamic) {
+        const cellHijri = PersianOccasions.persianToIslamic(currentYear, currentMonth, day);
+        hijriDayHtml = `<span class="hijri-day" style="color: var(--primary); margin-right: 4px;">${PersianDateUtil.toPersianDigits(cellHijri.day)}</span>`;
+      }
 
       const cell = document.createElement("div");
       cell.className = `calendar-cell ${isSelected ? "selected" : ""} ${isToday ? "today" : ""} ${isHoliday ? "holiday" : ""}`;
       cell.innerHTML = `
         <span class="solar-day" style="${isHoliday ? "color: var(--danger); font-weight: bold;" : ""}">${PersianDateUtil.toPersianDigits(day)}</span>
-        <span class="gregorian-day">${cellGregorian.day}</span>
+        <div style="display: flex; gap: 4px; font-size: 0.85em;">
+          ${hijriDayHtml}
+          <span class="gregorian-day">${cellGregorian.day}</span>
+        </div>
         ${hasEvents || hasTasks ? '<span class="event-dot"></span>' : ""}
       `;
 
@@ -209,7 +218,7 @@ document.addEventListener("DOMContentLoaded", async () => {
     selectedDateTitle.textContent = `${dowName} ${PersianDateUtil.toPersianDigits(formatted)}`;
     selectedGregorianDate.textContent = `تاریخ میلادی: ${selG.day} ${PersianDateUtil.GREGORIAN_MONTHS[selG.month - 1]} ${selG.year}`;
 
-    const occasions = typeof PersianOccasions !== "undefined" ? PersianOccasions.getOccasions(selectedDate.month, selectedDate.day) : [];
+    const occasions = typeof PersianOccasions !== "undefined" ? PersianOccasions.getOccasions(selectedDate.month, selectedDate.day, selectedDate.year) : [];
     let occasionsHtml = "";
     if (occasions.length > 0) {
       occasionsHtml = `
@@ -448,6 +457,7 @@ document.addEventListener("DOMContentLoaded", async () => {
   });
 
   // Initial load
+  await PersianOccasions.loadOfficialData(currentYear);
   await refreshData();
   checkServerConnection();
   setInterval(checkServerConnection, 15000);

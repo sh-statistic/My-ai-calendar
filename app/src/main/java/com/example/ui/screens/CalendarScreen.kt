@@ -62,6 +62,7 @@ import androidx.compose.ui.unit.sp
 import com.example.calendar.JalaliDate
 import com.example.calendar.PersianCalendarHelper
 import com.example.calendar.PersianOccasionsHelper
+import com.example.calendar.HijriCalendarUtils
 import com.example.data.EventEntity
 import com.example.data.TaskEntity
 import com.example.ui.MainViewModel
@@ -98,8 +99,8 @@ fun CalendarScreen(
 
     val selectedDayEvents = events.filter { it.persianDate == selectedDate.formatted }
     val selectedDayTasks = tasks.filter { it.persianDueDate == selectedDate.formatted }
-    val selectedDayOccasions = PersianOccasionsHelper.getOccasionsForDate(selectedDate.month, selectedDate.day)
-    val isSelectedDayHoliday = PersianOccasionsHelper.isHoliday(selectedDate.month, selectedDate.day)
+    val selectedDayOccasions = PersianOccasionsHelper.getOccasionsForDate(selectedDate.month, selectedDate.day, selectedDate.year)
+    val isSelectedDayHoliday = PersianOccasionsHelper.isHoliday(selectedDate.month, selectedDate.day, selectedDate.year)
 
     Box(modifier = modifier.fillMaxSize()) {
         // Single unified scrollable container so all details are visible on smaller Android 6 screens
@@ -121,6 +122,25 @@ fun CalendarScreen(
                     elevation = CardDefaults.cardElevation(defaultElevation = 1.dp)
                 ) {
                     Column(modifier = Modifier.padding(6.dp)) {
+                        
+                        // Selected Date Equivalents (Gregorian & Hijri)
+                        val sGregorian = PersianCalendarHelper.jalaliToGregorian(selectedDate.year, selectedDate.month, selectedDate.day)
+                        val sHijri = PersianOccasionsHelper.getHijriDate(selectedDate.year, selectedDate.month, selectedDate.day) ?: HijriCalendarUtils.persianToIslamic(selectedDate.year, selectedDate.month, selectedDate.day)
+                        val hijriMonths = listOf("محرم", "صفر", "ربیع‌الاول", "ربیع‌الثانی", "جمادی‌الاول", "جمادی‌الثانی", "رجب", "شعبان", "رمضان", "شوال", "ذی‌القعده", "ذی‌الحجه")
+                        val hMonthName = hijriMonths.getOrElse(sHijri.month - 1) { "" }
+                        Row(
+                            modifier = Modifier.fillMaxWidth().padding(bottom = 6.dp),
+                            horizontalArrangement = Arrangement.Center
+                        ) {
+                            Text(
+                                text = "${sGregorian.day} ${sGregorian.monthName} ${sGregorian.year}   ${PersianCalendarHelper.toPersianDigits(sHijri.year.toString())} \u200E$hMonthName\u200E ${PersianCalendarHelper.toPersianDigits(sHijri.day.toString())}",
+                                fontSize = 11.sp,
+                                fontWeight = FontWeight.SemiBold,
+                                color = MaterialTheme.colorScheme.primary,
+                                style = androidx.compose.ui.text.TextStyle(textDirection = androidx.compose.ui.text.style.TextDirection.Ltr)
+                            )
+                        }
+
                         // Weekday Titles (ش, ی, د, س, چ, پ, ج)
                         Row(
                             modifier = Modifier.fillMaxWidth(),
@@ -158,11 +178,12 @@ fun CalendarScreen(
                                     if (dayNum in 1..daysInMonth) {
                                         val cellJalali = JalaliDate(viewYear, viewMonth, dayNum)
                                         val cellGregorian = PersianCalendarHelper.jalaliToGregorian(viewYear, viewMonth, dayNum)
+                                        val cellHijri = PersianOccasionsHelper.getHijriDate(viewYear, viewMonth, dayNum) ?: HijriCalendarUtils.persianToIslamic(viewYear, viewMonth, dayNum)
                                         val isSelected = cellJalali.formatted == selectedDate.formatted
                                         val isToday = cellJalali.formatted == today.formatted
                                         val isFriday = col == 6
-                                        val isHoliday = isFriday || PersianOccasionsHelper.isHoliday(viewMonth, dayNum)
-                                        val cellOccasions = PersianOccasionsHelper.getOccasionsForDate(viewMonth, dayNum)
+                                        val isHoliday = isFriday || PersianOccasionsHelper.isHoliday(viewMonth, dayNum, viewYear)
+                                        val cellOccasions = PersianOccasionsHelper.getOccasionsForDate(viewMonth, dayNum, viewYear)
 
                                         val hasEvents = events.any { it.persianDate == cellJalali.formatted }
                                         val hasTasks = tasks.any { it.persianDueDate == cellJalali.formatted }
@@ -233,15 +254,28 @@ fun CalendarScreen(
                                                     )
                                                 }
 
-                                                // Gregorian Day (clearly visible, never clipped)
-                                                Text(
-                                                    text = cellGregorian.day.toString(),
-                                                    fontSize = 9.sp,
-                                                    lineHeight = 11.sp,
-                                                    maxLines = 1,
-                                                    softWrap = false,
-                                                    color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.8f)
-                                                )
+                                                // Gregorian & Hijri Days
+                                                Row(
+                                                    horizontalArrangement = Arrangement.spacedBy(4.dp),
+                                                    verticalAlignment = Alignment.CenterVertically
+                                                ) {
+                                                    Text(
+                                                        text = PersianCalendarHelper.toPersianDigits(cellHijri.day.toString()),
+                                                        fontSize = 9.sp,
+                                                        lineHeight = 11.sp,
+                                                        maxLines = 1,
+                                                        softWrap = false,
+                                                        color = MaterialTheme.colorScheme.primary.copy(alpha = 0.8f)
+                                                    )
+                                                    Text(
+                                                        text = cellGregorian.day.toString(),
+                                                        fontSize = 9.sp,
+                                                        lineHeight = 11.sp,
+                                                        maxLines = 1,
+                                                        softWrap = false,
+                                                        color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.8f)
+                                                    )
+                                                }
                                             }
                                         }
                                     } else {
