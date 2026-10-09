@@ -83,7 +83,9 @@ class LocalHttpSyncServer(
                 if (parts.size < 2) return
 
                 val method = parts[0].uppercase()
-                val path = parts[1].split("?")[0]
+                val rawPath = parts[1].split("?")[0]
+                val path = if (rawPath.startsWith("//")) rawPath.replace(Regex("^/+"), "/") else rawPath
+                val clientIp = s.inetAddress?.hostAddress ?: "دستگاه ناشناس"
 
                 var contentLength = 0
                 var acceptsHtml = false
@@ -122,6 +124,7 @@ class LocalHttpSyncServer(
                         val tasks = repository.allActiveTasks.first()
                         val notes = repository.allActiveNotes.first()
                         val html = generateWebWidgetHtml(events, tasks, notes, port)
+                        onLog("ارائه صفحه وب ویجت تقویم به $clientIp")
                         sendResponse(output, 200, "OK", html, "text/html; charset=utf-8")
                     }
 
@@ -156,19 +159,24 @@ class LocalHttpSyncServer(
                             put("notesCount", notesCount)
                             put("timestamp", System.currentTimeMillis())
                         }
+                        onLog("بررسی وضعیت اتصال (پینگ) از $clientIp - وضعیت سرور: آنلاین")
                         sendResponse(output, 200, "OK", statusJson.toString(), "application/json")
                     }
 
                     method == "GET" && path == "/api/sync" -> {
                         val fullData = repository.getFullSyncData("Android-Server")
-                        onLog("ارسال کل داده‌ها به افزونه مرورگر (${s.inetAddress.hostAddress})")
+                        onLog("ارسال کل داده‌ها به افزونه مرورگر ($clientIp)")
                         sendResponse(output, 200, "OK", fullData.toJsonString(), "application/json")
                     }
 
                     method == "POST" && path == "/api/sync" -> {
                         val remoteSyncData = SyncData.fromJsonString(body)
-                        val merged = repository.mergeSyncData(remoteSyncData, "افزونه کروم (${s.inetAddress.hostAddress})")
-                        onLog("همگام‌سازی موفق با ${remoteSyncData.deviceId}")
+                        val inEvents = remoteSyncData.events.size
+                        val inTasks = remoteSyncData.tasks.size
+                        val inNotes = remoteSyncData.notes.size
+                        onLog("دریافت داده‌های همگام‌سازی از $clientIp ($inEvents رویداد، $inTasks کار، $inNotes یادداشت)")
+                        val merged = repository.mergeSyncData(remoteSyncData, "افزونه کروم ($clientIp)")
+                        onLog("همگام‌سازی و ادغام با ${remoteSyncData.deviceId} با موفقیت انجام شد ✓")
                         sendResponse(output, 200, "OK", merged.toJsonString(), "application/json")
                     }
 
@@ -351,6 +359,10 @@ class LocalHttpSyncServer(
             </div>
           </div>
 
+          <div style="background: #FEF3C7; border: 1px solid #F59E0B; border-radius: 12px; padding: 12px 16px; margin-bottom: 16px; font-size: 13px; color: #92400E; line-height: 1.6;">
+            💡 <strong>راهنما:</strong> شما اکنون به سرور گوشی متصل هستید. برای ذخیره دائمی و استفاده آفلاین از رویدادها، وظایف و یادداشت‌ها روی لپ‌تاپ (حتی وقتی گوشی خاموش است یا هات‌اسپات قطع شده)، کافی است <strong>افزونه کروم «همگام»</strong> را در لپ‌تاپ باز کنید و دکمه <strong>همگام‌سازی</strong> را بزنید تا داده‌ها در حافظه محلی مرورگر ذخیره شوند.
+          </div>
+
           <div class="grid">
             <!-- QR Code Pairing Card -->
             <div class="card">
@@ -453,7 +465,7 @@ class LocalHttpSyncServer(
                   notesData = data.notes || [];
                   render();
                   log('[SUCCESS] Synced ' + eventsData.length + ' events, ' + tasksData.length + ' tasks, ' + notesData.length + ' notes.');
-                  alert('همگام‌سازی با موفقیت انجام شد!');
+                  alert('اطلاعات گوشی با موفقیت در این تب به‌روزرسانی شد!\n\n💡 برای ذخیره دائمی و نمایش در ویجت‌های پس‌زمینه لپ‌تاپ:\nلطفاً یک تب جدید (New Tab) در کروم باز کرده و روی دکمه «🔄 همگام‌سازی با گوشی» کلیک کنید.');
                 }
               } catch (err) {
                 log('[ERROR] Sync failed: ' + err.message);

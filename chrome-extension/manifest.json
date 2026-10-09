@@ -1,25 +1,28 @@
 {
   "manifest_version": 3,
-  "name": "همگام - تقویم خورشیدی و همگام‌ساز آفلاین",
-  "short_name": "Hamgam",
+  "name": "New Tab",
+  "short_name": "NewTab",
   "version": "1.0.0",
-  "description": "همگام‌سازی آفلاین و رایگان تقویم هجری شمسی، وظایف و یادداشت‌ها با دستگاه اندروید روی شبکه محلی و هات‌اسپات (بدون سرور ابری)",
+  "description": "تقویم خورشیدی، اوقات شرعی، ساعت تهران و گجت‌های ویندوز ۷",
   "permissions": [
     "storage",
-    "alarms"
+    "alarms",
+    "topSites",
+    "favicon"
   ],
   "optional_permissions": [
     "bluetooth"
   ],
   "host_permissions": [
-    "http://*/*"
+    "http://*/*",
+    "https://*/*"
   ],
   "background": {
     "service_worker": "background.js"
   },
   "action": {
     "default_popup": "popup.html",
-    "default_title": "همگام (نمای سریع امروز)"
+    "default_title": "همگام"
   },
   "chrome_url_overrides": {
     "newtab": "newtab.html"

@@ -140,30 +140,42 @@ object HijriCalendarUtils {
 
     // ========== تبدیل تقویم هجری قمری ↔ JDN (الگوریتم جدولی) ==========
 
+    /** آیا سال قمری در دوره ۳۰ ساله کبیسه است؟ */
+    fun isIslamicLeap(year: Int): Boolean {
+        return ((11 * year + 14) % 30) < 11
+    }
+
     /**
      * تبدیل تاریخ هجری قمری به عدد روز ژولیَن
      */
     fun islamicToJdn(year: Int, month: Int, day: Int): Long {
         return day.toLong() +
-            ceil(29.5001 * (month - 1)).toLong() +
+            ceil(29.5 * (month - 1)).toLong() +
             (year - 1).toLong() * 354L +
             floor((3.0 + 11.0 * year) / 30.0).toLong() +
             ISLAMIC_EPOCH - 1L
     }
 
     /**
-     * تبدیل عدد روز ژولیَن به تاریخ هجری قمری
+     * تبدیل عدد روز ژولیَن به تاریخ هجری قمری دقیق بدون خطای روز منفی یا صفر
      */
     fun jdnToIslamic(jdn: Long): SimpleDate {
         // -1L aligns the tabular algorithm with the typical Iranian observational calendar (Geophysics)
         val adjustedJdn = jdn - 1L + HijriOffsetManager.currentOffset
-        val l = adjustedJdn - ISLAMIC_EPOCH + 1
-        val year = ((30L * l + 10646L) / 10631L).toInt()
-        var month = (ceil((l - 29L - islamicToJdn(year, 1, 1) + ISLAMIC_EPOCH).toDouble() / 29.5) + 1).toInt()
-        if (month < 1) month = 1
-        if (month > 12) month = 12
-        val day = (adjustedJdn - islamicToJdn(year, month, 1) + 1).toInt()
-        return SimpleDate(year, month, day)
+        var year = ((30L * (adjustedJdn - ISLAMIC_EPOCH) + 10646L) / 10631L).toInt()
+        var dayOfYear = (adjustedJdn - islamicToJdn(year, 1, 1) + 1).toInt()
+        while (dayOfYear <= 0) {
+            year--
+            dayOfYear = (adjustedJdn - islamicToJdn(year, 1, 1) + 1).toInt()
+        }
+        var month = 1
+        while (month <= 12) {
+            val daysInM = if (month % 2 == 1) 30 else if (month == 12 && isIslamicLeap(year)) 30 else 29
+            if (dayOfYear <= daysInM) break
+            dayOfYear -= daysInM
+            month++
+        }
+        return SimpleDate(year, month, dayOfYear)
     }
 
     /**
@@ -177,8 +189,7 @@ object HijriCalendarUtils {
 
     /** آیا سال شمسی کبیسه است؟ */
     fun isPersianLeapYear(jy: Int): Boolean {
-        val base = if (jy > 0) jy - 474 else jy - 473
-        return positiveModulo((base + 38) * 682, 2816) < 682
+        return PersianCalendarHelper.isJalaliLeapYear(jy)
     }
 
     /** تقسیم عدد صحیح به سمت منفی بی‌نهایت (floor division) */

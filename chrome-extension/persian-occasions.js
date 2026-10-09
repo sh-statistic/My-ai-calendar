@@ -9,14 +9,32 @@ const PersianOccasions = {
   async loadOfficialData(year) {
     if (this.officialDataCache[year]) return;
     try {
-      const url = chrome.runtime?.getURL ? chrome.runtime.getURL(`occasions_${year}.json`) : `occasions_${year}.json`;
+      const url = typeof chrome !== "undefined" && chrome.runtime?.getURL ? chrome.runtime.getURL(`occasions_${year}.json`) : `occasions_${year}.json`;
       const res = await fetch(url);
       if (res.ok) {
-        this.officialDataCache[year] = await res.json();
+        const raw = await res.json();
+        const flat = {};
+        for (const m of Object.keys(raw)) {
+          if (typeof raw[m] === "object" && raw[m] !== null) {
+            for (const d of Object.keys(raw[m])) {
+              flat[`${m}-${d}`] = raw[m][d];
+            }
+          }
+        }
+        this.officialDataCache[year] = flat;
       }
     } catch (e) {
       // JSON not found or error parsing
     }
+  },
+
+  _getOfficialDay(year, month, day) {
+    const cache = this.officialDataCache[year];
+    if (!cache) return null;
+    const key = `${month}-${day}`;
+    if (cache[key]) return cache[key];
+    if (cache[month] && cache[month][day]) return cache[month][day];
+    return null;
   },
 
   SOLAR_OCCASIONS: {
@@ -217,31 +235,46 @@ const PersianOccasions = {
     return { year, month, day };
   },
 
+  OFFICIAL_LEAP_YEARS: new Set([
+    1210, 1214, 1218, 1222, 1226, 1230, 1234, 1238, 1243, 1247, 1251, 1255, 1259, 1263, 1267, 1271, 1276, 1280, 1284, 1288, 1292, 1296, 1300, 1304, 1309, 1313, 1317, 1321, 1325, 1329, 1333, 1337, 1342, 1346, 1350, 1354, 1358, 1362, 1366, 1370, 1375, 1379, 1383, 1387, 1391, 1395, 1399, 1403, 1408, 1412, 1416, 1420, 1424, 1428, 1432, 1436, 1441, 1445, 1449, 1453, 1457, 1461, 1465, 1469, 1474, 1478, 1482, 1486, 1490, 1494, 1498
+  ]),
+
+  /** آیا سال قمری در دوره ۳۰ ساله کبیسه است؟ */
+  _isIslamicLeap(year) {
+    return ((11 * year + 14) % 30) < 11;
+  },
+
   /** تبدیل تاریخ قمری به JDN */
   _islamicToJdn(year, month, day) {
     return day +
-      Math.ceil(29.5001 * (month - 1)) +
+      Math.ceil(29.5 * (month - 1)) +
       (year - 1) * 354 +
       Math.floor((3 + 11 * year) / 30) +
       this._ISLAMIC_EPOCH - 1;
   },
 
-  /** تبدیل JDN به تاریخ قمری */
+  /** تبدیل JDN به تاریخ قمری دقیق بدون خطای روز منفی یا صفر */
   _jdnToIslamic(jdn) {
-    const l = jdn - this._ISLAMIC_EPOCH + 1;
-    const year = Math.floor((30 * l + 10646) / 10631);
-    let month = Math.ceil((l - 29 - this._islamicToJdn(year, 1, 1) + this._ISLAMIC_EPOCH) / 29.5) + 1;
-    if (month < 1) month = 1;
-    if (month > 12) month = 12;
-    const day = jdn - this._islamicToJdn(year, month, 1) + 1;
-    return { year, month, day };
+    let year = Math.floor((30 * (jdn - this._ISLAMIC_EPOCH) + 10646) / 10631);
+    let dayOfYear = jdn - this._islamicToJdn(year, 1, 1) + 1;
+    while (dayOfYear <= 0) {
+      year--;
+      dayOfYear = jdn - this._islamicToJdn(year, 1, 1) + 1;
+    }
+    let month = 1;
+    while (month <= 12) {
+      const daysInM = (month % 2 === 1) ? 30 : ((month === 12 && this._isIslamicLeap(year)) ? 30 : 29);
+      if (dayOfYear <= daysInM) break;
+      dayOfYear -= daysInM;
+      month++;
+    }
+    return { year, month, day: dayOfYear };
   },
 
   /** تبدیل تاریخ شمسی به هجری قمری */
   persianToIslamic(year, month, day) {
-    const key = `${month}-${day}`;
-    if (this.officialDataCache[year] && this.officialDataCache[year][key]) {
-      const off = this.officialDataCache[year][key];
+    const off = this._getOfficialDay(year, month, day);
+    if (off) {
       return { year: off.hYear, month: off.hMonth, day: off.hDay };
     }
     const jdn = this._persianToJdn(year, month, day);
@@ -250,6 +283,9 @@ const PersianOccasions = {
 
   /** آیا سال شمسی کبیسه است؟ */
   _isPersianLeap(jy) {
+    if (jy >= 1206 && jy <= 1498) {
+      return this.OFFICIAL_LEAP_YEARS.has(jy);
+    }
     const base = jy > 0 ? jy - 474 : jy - 473;
     return this._positiveModulo((base + 38) * 682, 2816) < 682;
   },
@@ -302,11 +338,11 @@ const PersianOccasions = {
    * @param {number} [year=1405] سال شمسی
    */
   getOccasions(month, day, year = 1405) {
-    const key = `${month}-${day}`;
-    if (this.officialDataCache[year] && this.officialDataCache[year][key]) {
-      const off = this.officialDataCache[year][key];
-      return off.occasions.map(title => ({ title, isHoliday: off.isHoliday, isNational: true }));
+    const off = this._getOfficialDay(year, month, day);
+    if (off) {
+      return (off.occasions || []).map(title => ({ title, isHoliday: !!off.isHoliday, isNational: true }));
     }
+    const key = `${month}-${day}`;
     const solar = this.SOLAR_OCCASIONS[key] || [];
     const lunarMap = this._getLunarOccasionsForYear(year);
     const lunar = lunarMap[key] || [];
@@ -320,10 +356,8 @@ const PersianOccasions = {
    * @param {number} [year=1405] سال شمسی
    */
   isHoliday(month, day, year = 1405) {
-    const key = `${month}-${day}`;
-    if (this.officialDataCache[year] && this.officialDataCache[year][key]) {
-      if (this.officialDataCache[year][key].isHoliday) return true;
-    }
+    const off = this._getOfficialDay(year, month, day);
+    if (off && off.isHoliday) return true;
     const list = this.getOccasions(month, day, year);
     return list.some(o => o.isHoliday);
   }

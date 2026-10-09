@@ -1,20 +1,24 @@
 :root {
-  /* Calming, elegant Soft Light Palette (Eye-Friendly, Warm Cream) */
-  --bg-main: #F7F5F0;             /* Warm cream / off-white (no blinding white, no dark) */
-  --bg-card: #FAF8F5;             /* Soothing card surface */
-  --bg-card-hover: #F2EFE8;
-  --border-color: #DFD9CD;        /* Soft stone border */
-  --text-main: #2D3748;           /* Gentle, high-contrast dark-gray text */
-  --text-muted: #64748B;          /* Soft secondary slate */
+  /* Google Standard Theme Variables */
+  --google-bg: #FFFFFF;
+  --google-text: #202124;
+  --google-text-sub: #5f6368;
+  --google-search-border: #dfe1e5;
+  --google-search-shadow: 0 1px 6px rgba(32,33,36,.20);
+  --google-blue: #1a73e8;
+
+  /* Windows 7 Aero Glass / Modern Glassmorphism Palette */
+  --gadget-bg: rgba(255, 255, 255, 0.80);
+  --gadget-bg-hover: rgba(255, 255, 255, 0.92);
+  --gadget-border: rgba(220, 226, 235, 0.85);
+  --gadget-shadow: 0 8px 32px 0 rgba(31, 38, 135, 0.12);
+  --gadget-header-bg: rgba(241, 245, 249, 0.78);
+  
   --primary: #D97706;             /* Warm solar amber */
   --primary-hover: #B45309;
-  --primary-light: #FEF3C7;       /* Soft amber pastel */
-  --secondary: #0D9488;           /* Persian teal */
-  --secondary-light: #CCFBF1;
-  --sky: #0284C7;                 /* Persian blue */
-  --sky-light: #E0F2FE;
-  --success: #16A34A;
-  --success-light: #DCFCE7;
+  --primary-light: #FEF3C7;
+  --text-main: #1E293B;
+  --text-muted: #64748B;
   --danger: #DC2626;
   --danger-light: #FEE2E2;
 }
@@ -23,411 +27,1426 @@
   box-sizing: border-box;
   margin: 0;
   padding: 0;
-  font-family: -apple-system, BlinkMacSystemFont, "Vazirmatn", "Segoe UI", Roboto, Tahoma, sans-serif;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Google Sans", "Vazirmatn", Helvetica, Arial, sans-serif;
 }
 
-body {
-  background: var(--bg-main);
-  color: var(--text-main);
+body.desktop-body {
+  background: var(--google-bg);
+  color: var(--google-text);
   min-height: 100vh;
-  direction: rtl;
-  display: flex;
-  flex-direction: column;
+  position: relative;
+  overflow-x: hidden;
+  user-select: none;
 }
 
-header {
-  background: rgba(250, 248, 245, 0.92);
-  backdrop-filter: blur(12px);
-  border-bottom: 1px solid var(--border-color);
-  padding: 14px 28px;
+/* ========================================================================= */
+/* 1. GOOGLE OFFICIAL HEADER & TOP BAR */
+/* ========================================================================= */
+.google-top-bar {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  position: sticky;
-  top: 0;
-  z-index: 100;
-  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.02);
+  padding: 12px 20px;
+  position: relative;
+  z-index: 10;
 }
 
-.logo-area {
+.top-bar-left, .top-bar-right {
   display: flex;
   align-items: center;
-  gap: 12px;
+  gap: 15px;
 }
 
-.logo-symbol {
-  width: 38px;
-  height: 38px;
-  background: linear-gradient(135deg, var(--primary), var(--primary-hover));
-  border-radius: 10px;
+.w7-top-gadgets-btn {
+  background: transparent;
+  border: 1px solid transparent;
+  padding: 5px 12px;
+  border-radius: 18px;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 13px;
+  color: #5f6368;
+  cursor: pointer;
+  transition: all 0.2s;
+  user-select: none;
+  font-family: inherit;
+}
+.w7-top-gadgets-btn:hover {
+  background: rgba(60, 64, 67, 0.08);
+  border-color: #dadce0;
+  color: #202124;
+}
+
+.top-link {
+  color: #1f1f1f;
+  text-decoration: none;
+  font-size: 13px;
+  line-height: 24px;
+  cursor: pointer;
+  font-weight: 400;
+  transition: opacity 0.2s;
+}
+.top-link:hover {
+  text-decoration: underline;
+}
+
+.icon-btn-round {
+  background: transparent;
+  border: none;
+  border-radius: 50%;
+  width: 40px;
+  height: 40px;
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 20px;
-  font-weight: 900;
-  color: #FFFBEB;
-  box-shadow: 0 3px 10px rgba(217, 119, 6, 0.25);
+  cursor: pointer;
+  transition: background 0.2s;
+}
+.icon-btn-round:hover {
+  background: rgba(60,64,67,0.08);
 }
 
-.logo-text h1 {
+.avatar-link {
+  text-decoration: none;
+  display: flex;
+  align-items: center;
+}
+.avatar-circle {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  background: #15803d;
+  color: #ffffff;
+  font-weight: 700;
+  font-size: 14px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+}
+.avatar-real-img {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  object-fit: cover;
+  cursor: pointer;
+  box-shadow: 0 1px 2px rgba(0,0,0,0.1);
+  transition: transform 0.15s;
+}
+.avatar-real-img:hover {
+  transform: scale(1.05);
+}
+
+/* Google Apps Drawer Dropdown */
+.google-apps-dropdown {
+  position: absolute;
+  top: 56px;
+  right: 60px;
+  width: 320px;
+  background: #ffffff;
+  border-radius: 28px;
+  box-shadow: 0 4px 20px rgba(0,0,0,0.15);
+  border: 1px solid #e0e0e0;
+  padding: 16px;
+  z-index: 999;
+}
+.apps-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 12px;
+}
+.app-item {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-decoration: none;
+  color: #3c4043;
+  font-size: 12px;
+  padding: 10px 4px;
+  border-radius: 12px;
+  transition: background 0.15s;
+}
+.app-item:hover {
+  background: #f1f3f4;
+}
+.app-icon {
+  width: 38px;
+  height: 38px;
+  margin-bottom: 6px;
+  background-size: contain;
+  background-repeat: no-repeat;
+  background-position: center;
+}
+.app-icon.g-search { background-image: url('https://www.google.com/favicon.ico'); }
+.app-icon.g-maps { background-image: url('https://ssl.gstatic.com/images/branding/product/1x/maps_512dp.png'); }
+.app-icon.g-yt { background-image: url('https://www.youtube.com/s/desktop/742b6292/img/favicon.ico'); }
+.app-icon.g-play { background-image: url('https://ssl.gstatic.com/images/branding/product/1x/play_512dp.png'); }
+.app-icon.g-news { background-image: url('https://ssl.gstatic.com/images/branding/product/1x/news_512dp.png'); }
+.app-icon.g-gmail { background-image: url('https://ssl.gstatic.com/images/branding/product/1x/gmail_512dp.png'); }
+.app-icon.g-meet { background-image: url('https://ssl.gstatic.com/images/branding/product/1x/meet_512dp.png'); }
+.app-icon.g-drive { background-image: url('https://ssl.gstatic.com/images/branding/product/1x/drive_512dp.png'); }
+.app-icon.g-cal { background-image: url('https://ssl.gstatic.com/images/branding/product/1x/calendar_512dp.png'); }
+.app-icon.g-photos { background-image: url('https://ssl.gstatic.com/images/branding/product/1x/photos_512dp.png'); }
+.app-icon.g-trans { background-image: url('https://ssl.gstatic.com/images/branding/product/1x/translate_512dp.png'); }
+.app-icon.g-gemini { background-image: url('https://www.gstatic.com/lamda/images/gemini_sparkle_v002_d4735304ff6292a690345.svg'); }
+
+/* ========================================================================= */
+/* 2. GOOGLE CENTER WORKSPACE (SEARCH & SHORTCUTS) */
+/* ========================================================================= */
+.google-center-workspace {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  margin: 36px auto 0 auto;
+  max-width: 680px;
+  width: 100%;
+  padding: 0 16px;
+  position: relative;
+  z-index: 5;
+}
+
+.google-logo-wrapper {
+  margin-bottom: 28px;
+  display: flex;
+  justify-content: center;
+}
+.google-official-img {
+  width: 272px;
+  height: 92px;
+  display: block;
+  user-select: none;
+}
+.google-official-img.is-doodle {
+  width: auto;
+  max-width: 480px;
+  max-height: 160px;
+  height: auto;
+  border-radius: 12px;
+}
+
+.google-search-box {
+  width: 100%;
+  max-width: 624px;
+  height: 48px;
+  background: #ffffff;
+  border: 1px solid #dfe1e5;
+  border-radius: 24px;
+  display: flex;
+  align-items: center;
+  padding: 0 14px;
+  box-shadow: none;
+  transition: box-shadow 0.2s, border-color 0.2s;
+}
+.google-search-box:hover, .google-search-box:focus-within {
+  box-shadow: 0 1px 6px rgba(32,33,36,0.20);
+  border-color: rgba(223,225,229,0);
+}
+
+.search-add-btn {
+  background: transparent;
+  border: none;
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-right: 10px;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+.search-add-btn:hover {
+  background: rgba(0,0,0,0.05);
+}
+
+.search-input {
+  flex: 1;
+  border: none;
+  outline: none;
+  font-size: 16px;
+  color: #1f1f1f;
+  background: transparent;
+}
+.search-input::placeholder {
+  color: #5f6368;
+}
+
+.search-tools {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.tool-btn {
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: background 0.2s;
+}
+.tool-btn:hover {
+  background: rgba(0,0,0,0.06);
+}
+
+/* AI Mode Pill (Exact match to screenshot) */
+.ai-mode-pill {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  background: #ffffff;
+  border: 1px solid #dadce0;
+  color: #1f1f1f;
+  padding: 4px 12px;
+  border-radius: 16px;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  margin-left: 4px;
+  transition: all 0.2s;
+}
+.ai-mode-pill svg {
+  color: #1f1f1f;
+}
+.ai-mode-pill:hover {
+  background: #f8fafd;
+  border-color: #bdc1c6;
+  box-shadow: 0 1px 3px rgba(60,64,67,0.15);
+}
+
+/* AI Quick Action Chips (Do more with AI Mode & Create images) */
+.ai-chips-row {
+  display: flex;
+  gap: 12px;
+  margin-top: 18px;
+  width: 100%;
+  max-width: 624px;
+}
+
+.ai-chip {
+  flex: 1;
+  background: #f0f4f9;
+  border: none;
+  border-radius: 16px;
+  padding: 10px 16px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  cursor: pointer;
+  transition: background 0.2s;
+}
+.ai-chip:hover {
+  background: #e4ebf5;
+}
+
+.ai-chip-icon {
+  font-size: 20px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.banana-icon {
+  font-size: 22px;
+}
+
+.ai-chip-title {
+  font-size: 13px;
+  font-weight: 600;
+  color: #1f1f1f;
+  line-height: 18px;
+}
+.ai-chip-sub {
+  font-size: 11px;
+  color: #5f6368;
+  line-height: 16px;
+}
+
+/* Shortcuts Grid (Exact Match to user's screenshot) */
+.shortcuts-container {
+  display: flex;
+  justify-content: center;
+  align-items: flex-start;
+  gap: 14px;
+  margin-top: 26px;
+  width: 100%;
+  max-width: 624px;
+  flex-wrap: nowrap;
+}
+
+.shortcut-tile {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  width: 76px;
+  cursor: pointer;
+  border-radius: 8px;
+  padding: 8px 2px;
+  position: relative;
+  transition: background 0.15s;
+}
+.shortcut-tile:hover {
+  background: rgba(32,33,36,0.06);
+}
+
+.shortcut-tile-link {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  width: 100%;
+  text-decoration: none;
+  cursor: pointer;
+  color: inherit;
+}
+
+.shortcut-remove-btn {
+  position: absolute;
+  top: 2px;
+  right: 6px;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  background: rgba(95, 99, 104, 0.85);
+  color: #ffffff;
+  border: none;
+  font-size: 10px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  opacity: 0;
+  transition: opacity 0.15s, background 0.15s;
+  z-index: 5;
+}
+.shortcut-tile:hover .shortcut-remove-btn {
+  opacity: 1;
+}
+.shortcut-remove-btn:hover {
+  background: #dc2626;
+  transform: scale(1.1);
+}
+
+.shortcut-icon-circle {
+  width: 48px;
+  height: 48px;
+  border-radius: 50%;
+  background: #f1f3f4;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-bottom: 8px;
+  overflow: hidden;
+  transition: background 0.2s;
+  position: relative;
+}
+.shortcut-tile:hover .shortcut-icon-circle {
+  background: #e4e7eb;
+}
+
+.shortcut-icon-circle img {
+  width: 26px;
+  height: 26px;
+  object-fit: contain;
+  display: block;
+}
+
+.shortcut-fallback-letter {
   font-size: 18px;
-  font-weight: 800;
+  font-weight: 700;
+  color: #5f6368;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  height: 100%;
+  user-select: none;
+}
+
+.shortcut-brand-svg {
+  width: 24px;
+  height: 24px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.shortcut-brand-svg svg, .shortcut-brand-svg img {
+  width: 24px;
+  height: 24px;
+  border-radius: 4px;
+}
+
+.shortcut-title {
+  font-size: 11px;
+  color: #3c4043;
+  max-width: 74px;
+  text-overflow: ellipsis;
+  overflow: hidden;
+  white-space: nowrap;
+  text-align: center;
+  line-height: 14px;
+}
+
+/* ========================================================================= */
+/* 3. WINDOWS 7 DRAGGABLE GADGETS (AERO GLASS / GLASSMORPHISM) */
+/* ========================================================================= */
+.gadgets-layer {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+  z-index: 20;
+}
+
+.w7-gadget {
+  position: absolute;
+  pointer-events: auto;
+  background: var(--gadget-bg);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border: 1px solid var(--gadget-border);
+  border-radius: 16px;
+  box-shadow: var(--gadget-shadow);
+  width: 260px;
+  transition: box-shadow 0.2s, transform 0.1s;
+  user-select: none;
+  direction: rtl;
+}
+
+.w7-gadget:hover {
+  background: var(--gadget-bg-hover);
+  box-shadow: 0 12px 38px 0 rgba(31, 38, 135, 0.20);
+}
+
+.w7-gadget.dragging {
+  opacity: 0.92;
+  cursor: grabbing !important;
+  transform: scale(1.02);
+  box-shadow: 0 16px 48px rgba(0,0,0,0.22);
+  z-index: 9999 !important;
+}
+
+.w7-gadget-header {
+  padding: 8px 12px;
+  background: var(--gadget-header-bg);
+  border-top-left-radius: 16px;
+  border-top-right-radius: 16px;
+  border-bottom: 1px solid rgba(226, 232, 240, 0.7);
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  cursor: grab;
+}
+
+.w7-gadget-title {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  font-weight: 700;
   color: var(--text-main);
 }
 
-.logo-text p {
+.w7-gadget-controls {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.w7-btn-min, .w7-btn-close {
+  background: transparent;
+  border: none;
+  width: 18px;
+  height: 18px;
+  border-radius: 4px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
   font-size: 11px;
+  cursor: pointer;
+  color: var(--text-muted);
+  transition: all 0.15s;
+}
+.w7-btn-min:hover { background: #e2e8f0; color: #1e293b; }
+.w7-btn-close:hover { background: #fee2e2; color: #dc2626; }
+
+.w7-gadget-body {
+  padding: 12px;
+}
+
+.w7-gadget.minimized .w7-gadget-body {
+  display: none;
+}
+
+/* ─── Gadget 0: Windows 7 Frameless Analog Clock Specific Styles ───────── */
+#gadgetClock.w7-clock-frameless {
+  width: auto !important;
+  background: transparent !important;
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
+  border: none !important;
+  box-shadow: none !important;
+  cursor: grab;
+  position: absolute;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  transition: transform 0.15s;
+}
+
+#gadgetClock.w7-clock-frameless:hover {
+  background: transparent !important;
+  box-shadow: none !important;
+}
+
+#gadgetClock.w7-clock-frameless.dragging {
+  cursor: grabbing !important;
+  transform: scale(1.03);
+}
+
+.w7-clock-hover-close {
+  position: absolute;
+  top: 4px;
+  right: 4px;
+  width: 22px;
+  height: 22px;
+  background: rgba(239, 68, 68, 0.85);
+  color: #fff;
+  border: none;
+  border-radius: 50%;
+  font-size: 11px;
+  font-weight: bold;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  opacity: 0;
+  transition: opacity 0.2s, transform 0.15s;
+  z-index: 10;
+  box-shadow: 0 2px 6px rgba(0,0,0,0.25);
+}
+
+#gadgetClock:hover .w7-clock-hover-close {
+  opacity: 1;
+}
+
+.w7-clock-hover-close:hover {
+  background: #dc2626;
+  transform: scale(1.15);
+}
+
+.w7-analog-clock-container {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  cursor: grab;
+}
+
+.w7-clock-face {
+  display: block;
+  user-select: none;
+}
+
+.w7-digital-clock-sub {
+  margin-top: 4px;
+  font-size: 11px;
+  font-weight: 700;
+  color: #334155;
+  background: rgba(255, 255, 255, 0.75);
+  backdrop-filter: blur(8px);
+  padding: 2px 8px;
+  border-radius: 10px;
+  border: 1px solid rgba(203, 213, 225, 0.8);
+  font-family: monospace, -apple-system, sans-serif;
+  direction: ltr;
+  box-shadow: 0 2px 6px rgba(0,0,0,0.06);
+}
+
+/* ─── Gadget 1: Solar Calendar Specific Styles ─────────────────────────── */
+#gadgetCalendar {
+  width: 270px;
+}
+
+.cal-mini-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 8px;
+}
+
+.cal-title-main {
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--primary);
+}
+.cal-title-sub {
+  font-size: 9px;
   color: var(--text-muted);
 }
 
-.sync-bar {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  background: #EFECE4;
-  border: 1px solid var(--border-color);
-  border-radius: 30px;
-  padding: 5px 14px;
+.cal-nav-btn {
+  background: #f1f5f9;
+  border: 1px solid #e2e8f0;
+  border-radius: 6px;
+  width: 24px;
+  height: 24px;
+  cursor: pointer;
+  font-size: 10px;
 }
+.cal-nav-btn:hover { background: #e2e8f0; }
 
-.ip-input {
-  background: transparent;
-  border: none;
-  color: var(--primary-hover);
-  font-size: 12px;
-  font-weight: 600;
-  outline: none;
-  width: 170px;
-  direction: ltr;
+.calendar-grid-w7 {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  gap: 3px;
   text-align: center;
-  font-family: monospace;
 }
 
-.btn-primary {
-  background: linear-gradient(135deg, var(--primary), var(--primary-hover));
-  color: #FFFBEB;
-  border: none;
-  font-weight: 700;
-  padding: 6px 14px;
-  border-radius: 20px;
-  cursor: pointer;
-  font-size: 12px;
-  transition: opacity 0.2s;
-  box-shadow: 0 2px 6px rgba(217, 119, 6, 0.2);
-}
-
-.btn-primary:hover {
-  opacity: 0.92;
-}
-
-.btn-secondary {
-  background: var(--bg-card);
-  border: 1px solid var(--border-color);
-  color: var(--text-main);
-  padding: 6px 12px;
-  border-radius: 20px;
-  cursor: pointer;
+.cal-w7-cell {
+  padding: 4px 1px;
+  border-radius: 6px;
   font-size: 11px;
   font-weight: 600;
-  transition: all 0.2s;
+  cursor: pointer;
+  position: relative;
+  transition: background 0.15s;
+}
+.cal-w7-cell:hover {
+  background: #e2e8f0;
+}
+.cal-w7-cell.header {
+  color: var(--text-muted);
+  font-size: 10px;
+  cursor: default;
+  background: transparent !important;
+}
+.cal-w7-cell.friday {
+  color: var(--danger);
+}
+.cal-w7-cell.holiday {
+  color: var(--danger);
+  font-weight: bold;
+}
+.cal-w7-cell.today {
+  background: var(--primary);
+  color: #fff !important;
+  box-shadow: 0 2px 6px rgba(217,119,6,0.3);
+}
+.cal-w7-cell.selected:not(.today) {
+  border: 1px solid var(--primary);
+  background: var(--primary-light);
+}
+.cal-w7-cell.empty {
+  cursor: default;
 }
 
-.btn-secondary:hover {
-  background: var(--bg-card-hover);
-  border-color: var(--text-muted);
+.cal-selected-info {
+  margin-top: 8px;
+  border-top: 1px solid #e2e8f0;
+  padding-top: 6px;
+}
+.cal-sel-title { font-size: 11px; font-weight: 700; color: var(--text-main); }
+.cal-sel-sub { font-size: 9px; color: var(--text-muted); margin-bottom: 4px; }
+.cal-events-box { font-size: 10px; color: #b45309; line-height: 14px; max-height: 48px; overflow-y: auto; }
+
+.cal-today-btn {
+  width: 100%;
+  margin-top: 8px;
+  background: #f8fafc;
+  border: 1px solid #cbd5e1;
+  border-radius: 8px;
+  padding: 4px;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--text-main);
+  cursor: pointer;
+}
+.cal-today-btn:hover { background: #e2e8f0; }
+
+/* ─── Gadget 2: Prayer Times ───────────────────────────────────────────── */
+#gadgetPrayer {
+  width: 250px;
+}
+
+.prayer-gadget-top {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 8px;
+}
+
+.w7-city-select {
+  border: 1px solid #cbd5e1;
+  border-radius: 6px;
+  font-size: 11px;
+  padding: 2px 6px;
+  background: #fff;
+  outline: none;
+}
+
+.w7-next-badge {
+  font-size: 9px;
+  font-weight: 700;
+  background: var(--primary-light);
+  color: var(--primary-hover);
+  padding: 2px 6px;
+  border-radius: 8px;
+}
+
+.prayer-times-list {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.p-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 11px;
+  padding: 4px 8px;
+  border-radius: 6px;
+  background: rgba(248, 250, 252, 0.6);
+}
+.p-row.active {
+  background: #fef3c7;
+  border: 1px solid #fde68a;
+  font-weight: bold;
+}
+
+/* ─── Gadget 3: Tasks ──────────────────────────────────────────────────── */
+#gadgetTasks {
+  width: 250px;
+}
+
+.w7-task-badge {
+  background: #e0f2fe;
+  color: #0284c7;
+  font-size: 10px;
+  padding: 1px 6px;
+  border-radius: 8px;
+}
+
+.w7-task-list {
+  max-height: 140px;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin-bottom: 8px;
+}
+
+.w7-task-item {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 11px;
+  background: rgba(248, 250, 252, 0.7);
+  padding: 4px 6px;
+  border-radius: 6px;
+}
+.w7-task-item.completed span {
+  text-decoration: line-through;
+  color: var(--text-muted);
+}
+
+.w7-input-row {
+  display: flex;
+  gap: 4px;
+}
+
+.w7-text-input {
+  flex: 1;
+  border: 1px solid #cbd5e1;
+  border-radius: 6px;
+  padding: 4px 8px;
+  font-size: 11px;
+  outline: none;
+  background: #fff;
+}
+
+.w7-action-btn {
+  background: var(--primary);
+  color: white;
+  border: none;
+  border-radius: 6px;
+  width: 26px;
+  height: 26px;
+  font-weight: bold;
+  cursor: pointer;
+}
+.w7-action-btn:hover { background: var(--primary-hover); }
+
+/* ─── Gadget 4: Windows 7 Yellow Sticky Note ───────────────────────────── */
+#gadgetNote {
+  width: 240px;
+  background: #FEF9C3 !important;
+  border-color: #FDE047 !important;
+  box-shadow: 0 8px 24px rgba(161, 98, 7, 0.15) !important;
+}
+
+.sticky-header {
+  background: #FEF08A !important;
+  border-bottom: 1px solid #FACC15 !important;
+}
+
+.sticky-body {
+  padding: 8px !important;
+}
+
+.w7-sticky-textarea {
+  width: 100%;
+  height: 90px;
+  border: none;
+  outline: none;
+  background: transparent;
+  resize: vertical;
+  font-size: 12px;
+  line-height: 18px;
+  color: #713f12;
+  font-family: inherit;
+}
+
+.sticky-footer {
+  display: flex;
+  justify-content: flex-end;
+  margin-top: 4px;
+}
+
+/* ─── Gadget 5: Sync Controller ────────────────────────────────────────── */
+#gadgetSync {
+  width: 230px;
 }
 
 .status-dot {
   width: 8px;
   height: 8px;
   border-radius: 50%;
-  background: var(--danger);
+  background: #ef4444;
   display: inline-block;
+  margin-right: 4px;
 }
-
 .status-dot.online {
-  background: var(--success);
-  box-shadow: 0 0 6px var(--success);
+  background: #22c55e;
 }
 
-main {
-  flex: 1;
-  padding: 24px 28px;
-  display: grid;
-  grid-template-columns: 1.55fr 1fr;
-  gap: 24px;
-  max-width: 1600px;
-  margin: 0 auto;
+.w7-ip-input {
   width: 100%;
+  border: 1px solid #cbd5e1;
+  border-radius: 6px;
+  padding: 4px 6px;
+  font-size: 11px;
+  direction: ltr;
+  text-align: center;
+  font-family: monospace;
 }
 
-.card {
-  background: var(--bg-card);
-  border: 1px solid var(--border-color);
+.w7-sync-btn {
+  background: var(--primary);
+  color: #fff;
+  border: none;
+  border-radius: 6px;
+  padding: 5px 8px;
+  font-size: 11px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: opacity 0.2s;
+}
+.w7-sync-btn:hover { opacity: 0.9; }
+
+/* ========================================================================= */
+/* 4. WINDOWS 7 GADGET GALLERY MODAL */
+/* ========================================================================= */
+.w7-modal-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background: rgba(15, 23, 42, 0.45);
+  backdrop-filter: blur(4px);
+  z-index: 99999;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  direction: rtl;
+}
+
+.w7-modal-card {
+  background: #fff;
   border-radius: 16px;
+  width: 400px;
+  box-shadow: 0 20px 40px rgba(0,0,0,0.25);
   padding: 20px;
-  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.03);
 }
 
-.card-header {
+.w7-modal-header {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  margin-bottom: 16px;
+  border-bottom: 1px solid #e2e8f0;
+  padding-bottom: 10px;
 }
-
-.card-title {
-  font-size: 16px;
-  font-weight: 700;
-  display: flex;
-  align-items: center;
-  gap: 8px;
+.w7-modal-header h3 {
+  font-size: 15px;
   color: var(--text-main);
 }
+.w7-modal-close {
+  background: transparent;
+  border: none;
+  font-size: 14px;
+  cursor: pointer;
+  color: var(--text-muted);
+}
 
-/* Calendar Grid */
-.calendar-nav {
+.w7-gallery-items {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin: 16px 0;
+}
+
+.gallery-toggle-item {
   display: flex;
   align-items: center;
   gap: 10px;
+  font-size: 13px;
+  cursor: pointer;
+  padding: 8px 12px;
+  background: #f8fafc;
+  border-radius: 8px;
+  border: 1px solid #e2e8f0;
+}
+.gallery-toggle-item:hover {
+  background: #f1f5f9;
 }
 
-.nav-arrow {
-  background: var(--bg-card);
-  border: 1px solid var(--border-color);
-  color: var(--text-main);
-  width: 32px;
-  height: 32px;
+.w7-modal-footer {
+  display: flex;
+  justify-content: space-between;
+  border-top: 1px solid #e2e8f0;
+  padding-top: 14px;
+}
+
+.w7-btn-reset {
+  background: transparent;
+  border: 1px solid #cbd5e1;
+  color: var(--text-muted);
   border-radius: 8px;
+  padding: 6px 12px;
+  font-size: 12px;
   cursor: pointer;
+}
+.w7-btn-reset:hover {
+  background: #f1f5f9;
+  color: var(--text-main);
+}
+
+.w7-btn-primary {
+  background: var(--primary);
+  color: white;
+  border: none;
+  border-radius: 8px;
+  padding: 6px 16px;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+}
+.w7-btn-primary:hover {
+  background: var(--primary-hover);
+}
+
+/* Chrome Style Add Shortcut Modal */
+.shortcut-modal-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100vw;
+  height: 100vh;
+  background: rgba(0, 0, 0, 0.4);
+  backdrop-filter: blur(4px);
+  -webkit-backdrop-filter: blur(4px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+}
+
+.shortcut-modal-card {
+  background: #ffffff;
+  border-radius: 14px;
+  width: 380px;
+  max-width: 90vw;
+  box-shadow: 0 12px 36px rgba(0, 0, 0, 0.22);
+  padding: 20px;
+  direction: rtl;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.shortcut-modal-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+.shortcut-modal-header h4 {
+  font-size: 15px;
+  font-weight: 700;
+  color: #1f1f1f;
+}
+.shortcut-modal-close {
+  background: transparent;
+  border: none;
+  font-size: 16px;
+  color: #5f6368;
+  cursor: pointer;
+  padding: 4px;
+  border-radius: 50%;
   display: flex;
   align-items: center;
   justify-content: center;
   transition: background 0.15s;
 }
-
-.nav-arrow:hover {
-  background: var(--bg-card-hover);
+.shortcut-modal-close:hover {
+  background: #f1f3f4;
 }
 
-.calendar-grid {
-  display: grid;
-  grid-template-columns: repeat(7, 1fr);
-  gap: 6px;
-  text-align: center;
-}
-
-.weekday-header {
-  font-size: 12px;
-  font-weight: 700;
-  color: var(--text-muted);
-  padding: 6px 0;
-}
-
-.weekday-header.friday {
-  color: var(--danger);
-}
-
-.calendar-cell {
-  background: var(--bg-main);
-  border: 1.5px solid transparent;
-  border-radius: 10px;
-  padding: 8px 4px;
-  min-height: 56px;
+.shortcut-modal-body {
   display: flex;
   flex-direction: column;
-  justify-content: center;
-  align-items: center;
+  gap: 12px;
+}
+.shortcut-input-label {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 12px;
+  color: #475569;
+  font-weight: 500;
+}
+.shortcut-input-label input {
+  padding: 8px 12px;
+  border: 1px solid #cbd5e1;
+  border-radius: 8px;
+  font-size: 13px;
+  font-family: inherit;
+  outline: none;
+  transition: border-color 0.2s, box-shadow 0.2s;
+  direction: ltr;
+  text-align: left;
+}
+.shortcut-input-label input:focus {
+  border-color: #1a73e8;
+  box-shadow: 0 0 0 2px rgba(26, 115, 232, 0.2);
+}
+
+.shortcut-modal-footer {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  margin-top: 6px;
+}
+.shortcut-modal-footer .btn-cancel {
+  background: transparent;
+  border: 1px solid #cbd5e1;
+  color: #475569;
+  padding: 6px 14px;
+  border-radius: 8px;
+  font-size: 12px;
+  font-weight: 600;
   cursor: pointer;
-  transition: all 0.15s ease-in-out;
-  position: relative;
+  transition: background 0.15s;
+}
+.shortcut-modal-footer .btn-cancel:hover {
+  background: #f1f5f9;
+}
+.shortcut-modal-footer .btn-save {
+  background: #1a73e8;
+  border: none;
+  color: #ffffff;
+  padding: 6px 16px;
+  border-radius: 8px;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+.shortcut-modal-footer .btn-save:hover {
+  background: #1557b0;
 }
 
-.calendar-cell:hover {
-  background: var(--bg-card-hover);
-  border-color: var(--border-color);
-}
-
-.calendar-cell.selected {
-  background: var(--primary-light);
-  border-color: var(--primary);
-}
-
-.calendar-cell.today {
-  border-color: var(--secondary);
-  background: var(--secondary-light);
-}
-
-.solar-day {
-  font-size: 15px;
+/* ========================================================================= */
+/* 8. HEADER SYNC BUTTON & EVENT MODAL & LIVE NOTIFICATIONS */
+/* ========================================================================= */
+.w7-top-sync-btn {
+  background: rgba(217, 119, 6, 0.1);
+  border: 1px solid rgba(217, 119, 6, 0.35);
+  color: #b45309;
+  padding: 5px 14px;
+  border-radius: 18px;
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  font-size: 12.5px;
   font-weight: 700;
-  color: var(--text-main);
+  cursor: pointer;
+  transition: all 0.2s;
+  user-select: none;
+  font-family: inherit;
+}
+.w7-top-sync-btn:hover {
+  background: rgba(217, 119, 6, 0.2);
+  border-color: #d97706;
+  color: #92400e;
+  box-shadow: 0 2px 8px rgba(217, 119, 6, 0.2);
+}
+.w7-top-sync-btn.spinning svg {
+  animation: spinSync 1s linear infinite;
+}
+@keyframes spinSync {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
 }
 
-.calendar-cell.selected .solar-day {
-  color: var(--primary-hover);
-}
-
-.gregorian-day {
+/* Mini Add Event Button in Calendar */
+.cal-add-event-mini-btn {
+  background: var(--primary-light);
+  color: var(--primary-dark);
+  border: 1px solid rgba(217, 119, 6, 0.3);
   font-size: 10px;
-  color: var(--text-muted);
-  margin-top: 2px;
+  font-weight: 700;
+  padding: 2px 8px;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: all 0.15s;
+  font-family: inherit;
+}
+.cal-add-event-mini-btn:hover {
+  background: #fde68a;
+  color: #92400e;
 }
 
-.event-dot {
+/* Calendar Event Item */
+.cal-event-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  background: #ffffff;
+  border: 1px solid #e2e8f0;
+  border-right-width: 3.5px;
+  border-radius: 6px;
+  padding: 4px 6px;
+  margin-top: 4px;
+  font-size: 10.5px;
+  gap: 6px;
+}
+.cal-event-content {
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.cal-event-title {
+  font-weight: 700;
+  color: #1e293b;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.cal-event-time {
+  font-size: 9px;
+  color: #64748b;
+  direction: ltr;
+  text-align: right;
+}
+.cal-event-delete-btn {
+  background: transparent;
+  border: none;
+  color: #94a3b8;
+  font-size: 12px;
+  cursor: pointer;
+  padding: 2px 4px;
+  border-radius: 4px;
+  transition: all 0.15s;
+  line-height: 1;
+}
+.cal-event-delete-btn:hover {
+  background: #fee2e2;
+  color: #dc2626;
+}
+
+/* Task Item Enhancement with delete button and time */
+.w7-task-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 4px 2px;
+  border-bottom: 1px dashed rgba(226, 232, 240, 0.7);
+  font-size: 11px;
+}
+.w7-task-item-left {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex: 1;
+  overflow: hidden;
+}
+.w7-task-item.completed span {
+  text-decoration: line-through;
+  color: #94a3b8;
+}
+.w7-task-delete-btn {
+  background: transparent;
+  border: none;
+  color: #cbd5e1;
+  font-size: 11px;
+  cursor: pointer;
+  padding: 1px 4px;
+  border-radius: 4px;
+  transition: all 0.15s;
+}
+.w7-task-delete-btn:hover {
+  background: #fee2e2;
+  color: #dc2626;
+}
+.w7-task-time-badge {
+  font-size: 9px;
+  background: #f1f5f9;
+  color: #64748b;
+  padding: 1px 4px;
+  border-radius: 4px;
+  margin-right: 4px;
+}
+
+/* Sync Toast Notification */
+.sync-toast {
+  position: fixed;
+  bottom: 24px;
+  left: 50%;
+  transform: translateX(-50%) translateY(100px);
+  background: #1e293b;
+  color: #ffffff;
+  padding: 10px 20px;
+  border-radius: 24px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.25);
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 12.5px;
+  font-weight: 600;
+  z-index: 10000;
+  opacity: 0;
+  transition: transform 0.3s cubic-bezier(0.16, 1, 0.3, 1), opacity 0.3s;
+  pointer-events: none;
+}
+.sync-toast.show {
+  transform: translateX(-50%) translateY(0);
+  opacity: 1;
+}
+.sync-toast.success {
+  background: #15803d;
+}
+.sync-toast.error {
+  background: #b91c1c;
+}
+
+/* ========================================================================= */
+/* 9. CALENDAR EVENT INDICATOR DOT & NOTES LIST STYLING */
+/* ========================================================================= */
+.cal-dot-indicator {
+  display: block;
   width: 5px;
   height: 5px;
-  background: var(--primary);
   border-radius: 50%;
-  margin-top: 3px;
+  background: #2563eb;
+  margin: 1px auto 0 auto;
+  box-shadow: 0 0 4px rgba(37, 99, 235, 0.6);
+}
+.cal-w7-cell.today .cal-dot-indicator {
+  background: #ffffff;
+  box-shadow: 0 0 4px rgba(255, 255, 255, 0.9);
+}
+.cal-w7-cell.holiday .cal-dot-indicator {
+  background: #dc2626;
 }
 
-/* Tasks & Notes Column */
-.side-column {
+/* Sticky Note Gadget - Multi-Notes List */
+.w7-notes-list {
   display: flex;
   flex-direction: column;
-  gap: 20px;
-}
-
-.task-list {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-  max-height: 220px;
+  gap: 6px;
+  max-height: 140px;
   overflow-y: auto;
+  margin-bottom: 8px;
+  padding-right: 2px;
 }
-
-.task-row {
-  background: var(--bg-main);
-  border: 1px solid var(--border-color);
+.w7-notes-list::-webkit-scrollbar {
+  width: 4px;
+}
+.w7-notes-list::-webkit-scrollbar-thumb {
+  background: #cbd5e1;
+  border-radius: 4px;
+}
+.w7-note-card {
+  background: #fef9c3;
+  border: 1px solid #fef08a;
+  border-right: 3.5px solid #eab308;
   border-radius: 8px;
-  padding: 10px 12px;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  border-right: 3px solid var(--sky);
+  padding: 6px 8px;
+  position: relative;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.04);
+  transition: transform 0.1s, box-shadow 0.1s;
 }
-
-.task-row.done span {
-  text-decoration: line-through;
-  color: var(--text-muted);
+.w7-note-card:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 2px 6px rgba(0,0,0,0.08);
 }
-
-.notes-grid {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 10px;
-  max-height: 240px;
-  overflow-y: auto;
-}
-
-.sticky-note {
-  background: #FEF3C7;
-  color: #2D3748;
-  border: 1px solid #E2D9C8;
-  border-radius: 10px;
-  padding: 12px;
-  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.04);
-  font-size: 12px;
-  line-height: 1.4;
-}
-
-.sticky-note strong {
-  display: block;
-  margin-bottom: 4px;
-  color: #1E293B;
-}
-
-.quick-inputs {
-  display: flex;
-  gap: 8px;
-  margin-top: 10px;
-}
-
-.quick-inputs input {
-  flex: 1;
-  background: var(--bg-main);
-  border: 1px solid var(--border-color);
-  border-radius: 8px;
-  padding: 8px 12px;
-  color: var(--text-main);
-  outline: none;
-  font-size: 12px;
-}
-
-.quick-inputs input:focus {
-  border-color: var(--primary);
-}
-
-/* Prayer Times Card Styling */
-.prayer-dashboard-card {
-  background: var(--bg-card);
-  border: 1px solid var(--border-color);
-  border-radius: 16px;
-  padding: 16px 20px;
-  margin-bottom: 20px;
-  box-shadow: 0 2px 8px rgba(0,0,0,0.02);
-}
-
-.prayer-dash-header {
+.w7-note-card-header {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  margin-bottom: 12px;
+  margin-bottom: 3px;
 }
-
-.city-dash-select {
-  background: var(--bg-main);
-  border: 1px solid var(--border-color);
-  color: var(--text-main);
-  padding: 6px 12px;
-  border-radius: 8px;
-  font-size: 12px;
+.w7-note-card-title {
   font-weight: 700;
-  outline: none;
+  font-size: 11px;
+  color: #713f12;
+}
+.w7-note-card-date {
+  font-size: 9px;
+  color: #a16207;
+  direction: ltr;
+}
+.w7-note-card-content {
+  font-size: 10.5px;
+  color: #854d0e;
+  line-height: 15px;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+.w7-note-delete-btn {
+  background: transparent;
+  border: none;
+  color: #ca8a04;
+  font-size: 11px;
   cursor: pointer;
+  padding: 1px 4px;
+  border-radius: 4px;
+  line-height: 1;
 }
-
-.prayer-dash-grid {
-  display: grid;
-  grid-template-columns: repeat(6, 1fr);
-  gap: 8px;
+.w7-note-delete-btn:hover {
+  background: #fef08a;
+  color: #dc2626;
 }
-
-.prayer-dash-cell {
-  background: var(--bg-main);
-  border: 1.5px solid transparent;
-  border-radius: 10px;
-  padding: 8px;
-  text-align: center;
-}
-
-.prayer-dash-cell.active {
-  background: var(--primary-light);
-  border-color: var(--primary);
-}
-
-.prayer-dash-cell .p-title {
-  font-size: 11px;
-  color: var(--text-muted);
-  margin-bottom: 4px;
-}
-
-.prayer-dash-cell .p-val {
-  font-size: 13px;
-  font-weight: 800;
-  color: var(--text-main);
-}
-
-.prayer-dash-cell.active .p-val {
-  color: var(--primary-hover);
-}
-
-footer {
-  text-align: center;
-  padding: 14px;
-  font-size: 11px;
-  color: var(--text-muted);
-  border-top: 1px solid var(--border-color);
-  background: var(--bg-card);
+.w7-new-note-box {
+  background: rgba(254, 240, 138, 0.4);
+  border: 1px dashed #facc15;
+  border-radius: 8px;
+  padding: 6px;
 }

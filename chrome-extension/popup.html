@@ -123,8 +123,8 @@
       <span>همگام</span>
     </div>
     <div style="display: flex; gap: 4px;">
-      <button id="btnSync" class="btn" title="همگام‌سازی سریع با وای‌فای">🔄 همگام</button>
-      <button id="btnBleSync" class="btn btn-blue" title="اتصال با بلوتوث">📡 بلوتوث</button>
+      <button id="btnSync" class="btn" title="همگام‌سازی سریع محلی">🔄 همگام</button>
+      <button id="btnBleSync" class="btn btn-blue" title="باز کردن صفحه کامل همگام‌سازی">📱 سینک</button>
     </div>
   </header>
 
@@ -173,6 +173,18 @@
   </div>
   <div class="items-list" id="tasksList">
     <div class="empty-state">وظیفه‌ای ثبت نشده است.</div>
+  </div>
+  <div style="display: flex; gap: 4px; margin-bottom: 8px;">
+    <input type="text" id="popupTaskInput" placeholder="کار جدید..." style="flex: 1; padding: 4px 6px; border: 1px solid var(--surface-border); border-radius: 6px; font-size: 11px;">
+    <button id="btnPopupAddTask" class="btn" style="padding: 4px 8px;">+ افزودن</button>
+  </div>
+
+  <div class="section-title">
+    <span>یادداشت‌ها</span>
+    <span id="notesCount">۰</span>
+  </div>
+  <div class="items-list" id="popupNotesList" style="max-height: 90px;">
+    <div class="empty-state">یادداشتی ثبت نشده است.</div>
   </div>
 
   <div class="section-title">یادداشت فوری</div>

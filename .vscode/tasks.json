@@ -1,0 +1,29 @@
+{
+  "version": "2.0.0",
+  "tasks": [
+    {
+      "label": "Build & Install & Run",
+      "type": "shell",
+      "windows": {
+        "options": {
+          "shell": {
+            "executable": "powershell.exe",
+            "args": ["-NoProfile", "-ExecutionPolicy", "Bypass", "-Command"]
+          }
+        }
+      },
+      "command": ".\\gradlew.bat installDebug; if ($?) { & 'C:\\Users\\Ai\\AppData\\Local\\Android\\Sdk\\platform-tools\\adb.exe' shell monkey -p com.aistudio.localsync.pkwnvt -c android.intent.category.LAUNCHER 1 }",
+      "group": {
+        "kind": "build",
+        "isDefault": true
+      },
+      "presentation": {
+        "echo": true,
+        "reveal": "always",
+        "focus": false,
+        "panel": "shared"
+      },
+      "problemMatcher": []
+    }
+  ]
+}

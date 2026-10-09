@@ -11,31 +11,31 @@ function persianToJdn(year, month, day) {
     return day + daysPassed + Math.floor((epyear * 682 - 110) / 2816) + (epyear - 1) * 365 + floorDiv(epbase, 2820) * 1029983 + PERSIAN_EPOCH;
 }
 
+function isIslamicLeap(year) {
+    return ((11 * year + 14) % 30) < 11;
+}
+
 function islamicToJdn(year, month, day) {
-    return day + Math.ceil(29.5001 * (month - 1)) + (year - 1) * 354 + Math.floor((3 + 11 * year) / 30) + ISLAMIC_EPOCH - 1;
+    return day + Math.ceil(29.5 * (month - 1)) + (year - 1) * 354 + Math.floor((3 + 11 * year) / 30) + ISLAMIC_EPOCH - 1;
 }
 
-function jdnToIslamic_js(jdn) {
-    const l = jdn - ISLAMIC_EPOCH + 1;
-    const year = Math.floor((30 * l + 10646) / 10631);
-    let month = Math.floor((24 * (l - 29 - islamicToJdn(year, 1, 1) + ISLAMIC_EPOCH) + 23) / 709) + 1;
-    if (month < 1) month = 1;
-    if (month > 12) month = 12;
-    const day = jdn - islamicToJdn(year, month, 1) + 1;
-    return { year, month, day };
-}
-
-function jdnToIslamic_kt(jdn) {
-    const l = jdn - ISLAMIC_EPOCH + 1;
-    const year = Math.floor((30 * l + 10646) / 10631);
-    let month = Math.ceil((l - 29 - islamicToJdn(year, 1, 1) + ISLAMIC_EPOCH) / 29.5) + 1;
-    if (month < 1) month = 1;
-    if (month > 12) month = 12;
-    const day = jdn - islamicToJdn(year, month, 1) + 1;
-    return { year, month, day };
+function jdnToIslamicExact(jdn) {
+    let year = Math.floor((30 * (jdn - ISLAMIC_EPOCH) + 10646) / 10631);
+    let dayOfYear = jdn - islamicToJdn(year, 1, 1) + 1;
+    while (dayOfYear <= 0) {
+        year--;
+        dayOfYear = jdn - islamicToJdn(year, 1, 1) + 1;
+    }
+    let month = 1;
+    while (month <= 12) {
+        const daysInM = (month % 2 === 1) ? 30 : ((month === 12 && isIslamicLeap(year)) ? 30 : 29);
+        if (dayOfYear <= daysInM) break;
+        dayOfYear -= daysInM;
+        month++;
+    }
+    return { year, month, day: dayOfYear };
 }
 
 const jdn = persianToJdn(1405, 11, 4);
-console.log("JDN:", jdn);
-console.log("JS jdnToIslamic:", jdnToIslamic_js(jdn));
-console.log("KT jdnToIslamic:", jdnToIslamic_kt(jdn));
+console.log("JDN 1405/11/4:", jdn);
+console.log("Exact Islamic Date:", jdnToIslamicExact(jdn));

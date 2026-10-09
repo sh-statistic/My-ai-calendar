@@ -92,7 +92,7 @@ document.addEventListener("DOMContentLoaded", async () => {
 
     // Events for today
     const todayEvents = (data.events || []).filter(
-      (e) => !e.isDeleted && e.persianDate === jalaliFormatted
+      (e) => !e.isDeleted && PersianDateUtil.normalizePersianDate(e.persianDate) === jalaliFormatted
     );
     eventsCount.textContent = PersianDateUtil.toPersianDigits(todayEvents.length);
 
@@ -150,6 +150,33 @@ document.addEventListener("DOMContentLoaded", async () => {
     } else {
       tasksList.innerHTML = `<div class="empty-state">کاری برای امروز ثبت نشده است.</div>`;
     }
+
+    // Notes
+    const popupNotesList = document.getElementById("popupNotesList");
+    const notesCount = document.getElementById("notesCount");
+    const activeNotes = (data.notes || []).filter((n) => !n.isDeleted);
+    if (notesCount) notesCount.textContent = PersianDateUtil.toPersianDigits(activeNotes.length);
+
+    if (popupNotesList) {
+      if (activeNotes.length > 0) {
+        popupNotesList.innerHTML = activeNotes
+          .slice(0, 5)
+          .map(
+            (n) => `
+          <div class="item-card" style="border-right-color: ${n.colorHex || '#f59e0b'}; background: #fefce8;">
+            <div>
+              <strong>${n.title || "یادداشت"}</strong>
+              <div style="font-size: 10px; color: #854d0e; white-space: pre-wrap;">${n.content}</div>
+            </div>
+            ${n.persianDate ? `<span style="font-size: 9px; color: #a16207;">${PersianDateUtil.toPersianDigits(n.persianDate)}</span>` : ""}
+          </div>
+        `
+          )
+          .join("");
+      } else {
+        popupNotesList.innerHTML = `<div class="empty-state">یادداشتی ذخیره نشده است.</div>`;
+      }
+    }
   }
 
   await loadData();
@@ -182,13 +209,59 @@ document.addEventListener("DOMContentLoaded", async () => {
     }, 2500);
   });
 
+  // Save Quick Task in Popup
+  const popupTaskInput = document.getElementById("popupTaskInput");
+  const btnPopupAddTask = document.getElementById("btnPopupAddTask");
+  if (btnPopupAddTask && popupTaskInput) {
+    btnPopupAddTask.addEventListener("click", async () => {
+      const text = popupTaskInput.value.trim();
+      if (!text) return;
+
+      const data = await SyncClient.getLocalData();
+      const newTask = {
+        id: "task_" + Date.now() + "_" + Math.random().toString(36).substring(2, 7),
+        title: text,
+        isCompleted: false,
+        persianDueDate: jalaliFormatted,
+        priority: "متوسط",
+        category: "عمومی",
+        updatedAt: Date.now(),
+        isDeleted: false
+      };
+
+      const tasks = data.tasks || [];
+      tasks.unshift(newTask);
+      await SyncClient.saveLocalData(data.events, tasks, data.notes);
+
+      popupTaskInput.value = "";
+      syncStatus.textContent = "کار ذخیره شد (آفلاین)";
+      await loadData();
+      setTimeout(() => {
+        syncStatus.textContent = "آماده همگام‌سازی محلی";
+      }, 2500);
+    });
+  }
+
   // Wi-Fi Sync Button
   btnSync.addEventListener("click", async () => {
     btnSync.disabled = true;
-    syncStatus.textContent = "درحال اتصال به گوشی...";
+    syncStatus.textContent = "درحال شناسایی گوشی...";
     try {
-      const currentUrl = await SyncClient.getServerUrl();
-      const result = await SyncClient.syncWithAndroid(currentUrl);
+      let result = await SyncClient.syncWithAndroid();
+
+      if (!result.success) {
+        const savedUrl = await SyncClient.getServerUrl();
+        const manualUrl = prompt(
+          "اتصال خودکار به گوشی برقرار نشد.\nلطفاً آدرس IP سروری که در گوشی نمایش داده شده را وارد کنید:\n(مثلاً: http://192.168.43.1:8080)",
+          savedUrl || "http://192.168.43.1:8080"
+        );
+        if (manualUrl && manualUrl.trim()) {
+          syncStatus.textContent = "درحال اتصال...";
+          await SyncClient.setServerUrl(manualUrl.trim());
+          result = await SyncClient.syncWithAndroid(manualUrl.trim());
+        }
+      }
+
       if (result.success) {
         syncStatus.textContent = `همگام شد! (${PersianDateUtil.toPersianDigits(result.eventsCount)} رویداد)`;
         await loadData();
@@ -202,19 +275,13 @@ document.addEventListener("DOMContentLoaded", async () => {
     }
   });
 
-  // Bluetooth Sync Button
+  // Bluetooth Sync Button (مرورگر کروم پنجره بلوتوث را در پاپ‌آپ مسدود می‌کند، لذا در تب کامل باز می‌شود)
   if (btnBleSync) {
-    btnBleSync.addEventListener("click", async () => {
-      syncStatus.textContent = "درحال جستجوی بلوتوث گوشی...";
-      try {
-        btnBleSync.disabled = true;
-        const res = await SyncClient.syncWithBluetooth();
-        syncStatus.textContent = `همگام‌سازی دوطرفه بلوتوث با موفقیت انجام شد ✓`;
-        await loadData();
-      } catch (err) {
-        syncStatus.textContent = "اتصال بلوتوث ناموفق: " + err.message;
-      } finally {
-        btnBleSync.disabled = false;
+    btnBleSync.addEventListener("click", () => {
+      if (typeof chrome !== "undefined" && chrome.tabs && chrome.tabs.create) {
+        chrome.tabs.create({ url: "sync.html" });
+      } else {
+        window.open("sync.html", "_blank");
       }
     });
   }

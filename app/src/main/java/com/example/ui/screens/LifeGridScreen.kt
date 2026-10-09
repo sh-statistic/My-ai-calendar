@@ -471,7 +471,7 @@ private fun WholeLifeCard(
                                         continue
                                     }
                                     val isSelected    = absYear == selectedYearIdx
-                                    val isCurrentYear = absYear == progress.elapsedYears
+                                    val isCurrentYear = absYear == (progress.currentMonthIndex / 12)
                                     val yearBg        = if (isCurrentYear) CurrentYearBg else Color.Transparent
                                     val borderColor   = if (isSelected) NavyElapsed else Color.Transparent
                                     val borderWidth   = if (isSelected) 1.5.dp else 0.dp

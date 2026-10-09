@@ -1,0 +1,528 @@
+<!DOCTYPE html>
+<html lang="fa" dir="rtl">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>همگام‌سازی با گوشی - همگام</title>
+  <style>
+    :root {
+      --bg: #f8fafc;
+      --card-bg: #ffffff;
+      --border: #e2e8f0;
+      --text: #1e293b;
+      --text-muted: #64748b;
+      --primary: #d97706;
+      --primary-hover: #b45309;
+      --blue: #2563eb;
+      --blue-hover: #1d4ed8;
+      --green: #16a34a;
+      --red: #dc2626;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Google Sans", "Vazirmatn", sans-serif; }
+    body {
+      background: var(--bg);
+      color: var(--text);
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      padding: 30px 16px;
+    }
+    .sync-container {
+      width: 100%;
+      max-width: 720px;
+      display: flex;
+      flex-direction: column;
+      gap: 18px;
+    }
+    .header-card {
+      background: var(--card-bg);
+      border: 1px solid var(--border);
+      border-radius: 16px;
+      padding: 22px;
+      text-align: center;
+      box-shadow: 0 4px 16px rgba(0,0,0,0.04);
+    }
+    .header-card h1 {
+      font-size: 21px;
+      color: var(--primary);
+      margin-bottom: 6px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+    }
+    .header-card p {
+      font-size: 13px;
+      color: var(--text-muted);
+      line-height: 1.6;
+    }
+
+    /* Live Status Badge */
+    .status-banner {
+      background: var(--card-bg);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 12px 18px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+    }
+    .status-indicator {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-size: 13px;
+      font-weight: 700;
+    }
+    .status-dot {
+      width: 12px;
+      height: 12px;
+      border-radius: 50%;
+      background: #94a3b8;
+      transition: background 0.2s;
+    }
+    .status-dot.online { background: #22c55e; box-shadow: 0 0 8px #22c55e; }
+    .status-dot.busy { background: #eab308; box-shadow: 0 0 8px #eab308; animation: pulse 1s infinite; }
+    .status-dot.error { background: #ef4444; box-shadow: 0 0 8px #ef4444; }
+
+    @keyframes pulse {
+      0%, 100% { opacity: 1; transform: scale(1); }
+      50% { opacity: 0.6; transform: scale(1.2); }
+    }
+
+    .main-sync-card {
+      background: var(--card-bg);
+      border: 2px solid var(--primary);
+      border-radius: 16px;
+      padding: 22px;
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+      box-shadow: 0 6px 20px rgba(217, 119, 6, 0.08);
+      position: relative;
+    }
+    .card-badge {
+      position: absolute;
+      top: 14px;
+      left: 14px;
+      font-size: 11px;
+      background: #fef3c7;
+      color: #b45309;
+      padding: 4px 10px;
+      border-radius: 14px;
+      font-weight: bold;
+    }
+
+    .input-section {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+    .input-label {
+      font-size: 13px;
+      font-weight: 700;
+      color: #334155;
+    }
+    .input-row {
+      display: flex;
+      gap: 10px;
+      flex-wrap: wrap;
+    }
+    .input-row input {
+      flex: 1;
+      min-width: 240px;
+      padding: 10px 14px;
+      border: 1.5px solid #cbd5e1;
+      border-radius: 10px;
+      font-size: 14px;
+      direction: ltr;
+      font-weight: 600;
+      outline: none;
+      transition: border-color 0.2s, box-shadow 0.2s;
+    }
+    .input-row input:focus {
+      border-color: var(--primary);
+      box-shadow: 0 0 0 3px rgba(217, 119, 6, 0.15);
+    }
+
+    .actions-row {
+      display: flex;
+      gap: 10px;
+      flex-wrap: wrap;
+    }
+
+    .btn {
+      padding: 10px 18px;
+      border-radius: 10px;
+      border: none;
+      font-size: 13px;
+      font-weight: 700;
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      transition: all 0.15s;
+      user-select: none;
+    }
+    .btn:disabled {
+      opacity: 0.6;
+      cursor: not-allowed;
+    }
+    .btn-primary {
+      background: var(--primary);
+      color: white;
+      flex: 1;
+    }
+    .btn-primary:hover:not(:disabled) { background: var(--primary-hover); }
+    .btn-secondary {
+      background: #f1f5f9;
+      color: #334155;
+      border: 1px solid #cbd5e1;
+    }
+    .btn-secondary:hover:not(:disabled) { background: #e2e8f0; }
+
+    /* Instructions Box */
+    .steps-box {
+      background: #f8fafc;
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 14px 18px;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      font-size: 12.5px;
+      color: #475569;
+      line-height: 1.7;
+    }
+    .steps-box ol {
+      margin-right: 20px;
+    }
+
+    /* VPN Notice */
+    .vpn-box {
+      background: #eff6ff;
+      border: 1px solid #bfdbfe;
+      border-radius: 12px;
+      padding: 14px 18px;
+      font-size: 12.5px;
+      color: #1e3a8a;
+      line-height: 1.7;
+    }
+
+    /* Terminal-style live logger */
+    .log-box {
+      background: #0f172a;
+      border-radius: 12px;
+      padding: 16px;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      box-shadow: 0 4px 20px rgba(0,0,0,0.15);
+    }
+    .log-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      border-bottom: 1px solid #1e293b;
+      padding-bottom: 8px;
+    }
+    .log-title {
+      font-size: 12px;
+      font-weight: 700;
+      color: #94a3b8;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+    .log-clear-btn {
+      background: transparent;
+      border: none;
+      color: #64748b;
+      font-size: 11px;
+      cursor: pointer;
+    }
+    .log-clear-btn:hover { color: #94a3b8; }
+    .log-content {
+      color: #38bdf8;
+      font-family: Consolas, "Courier New", monospace;
+      font-size: 12px;
+      min-height: 110px;
+      max-height: 220px;
+      overflow-y: auto;
+      line-height: 1.6;
+      direction: ltr;
+      text-align: left;
+      white-space: pre-wrap;
+    }
+    .log-entry-info { color: #38bdf8; }
+    .log-entry-success { color: #4ade80; font-weight: bold; }
+    .log-entry-warn { color: #facc15; }
+    .log-entry-error { color: #f87171; font-weight: bold; }
+  </style>
+</head>
+<body>
+
+  <div class="sync-container">
+    
+    <div class="header-card">
+      <h1><span>📱</span> مرکز همگام‌سازی اپلیکیشن و افزونه</h1>
+      <p>
+        همگام‌سازی آفلاین، ایمن و مستقیم رویدادهای تقویم، وظایف و یادداشت‌ها با دیتابیس گوشی
+      </p>
+    </div>
+
+    <!-- Live Status Banner -->
+    <div class="status-banner">
+      <div class="status-indicator">
+        <div class="status-dot" id="statusDot"></div>
+        <span id="statusText">در انتظار بررسی اتصال به گوشی...</span>
+      </div>
+      <div style="font-size: 11px; color: var(--text-muted);" id="lastSyncInfo">
+        آخرین همگام‌سازی: هنوز انجام نشده
+      </div>
+    </div>
+
+    <!-- Main Sync Control Card -->
+    <div class="main-sync-card">
+      <span class="card-badge">اتصال آفلاین محلی (۱۰۰٪ سریع)</span>
+      
+      <div class="input-section">
+        <label class="input-label" for="serverUrlInput">
+          آدرس سرور گوشی (دقیقاً همان آدرسی که در صفحه همگام‌سازی اپ گوشی نوشته شده است):
+        </label>
+        <div class="input-row">
+          <input type="text" id="serverUrlInput" placeholder="http://192.168.1.100:8080" autocomplete="off">
+        </div>
+      </div>
+
+      <div class="actions-row">
+        <button id="btnTestPing" class="btn btn-secondary">
+          <span>🔍</span> تست اتصال (Ping)
+        </button>
+        <button id="btnAutoScan" class="btn btn-secondary" title="جستجوی خودکار آی‌پی گوشی در شبکه محلی">
+          <span>⚡</span> جستجوی خودکار گوشی
+        </button>
+        <button id="btnStartSync" class="btn btn-primary">
+          <span>🔄</span> شروع همگام‌سازی فوری
+        </button>
+      </div>
+    </div>
+
+    <!-- Instructions Guide -->
+    <div class="steps-box">
+      <strong>📋 مراحل اتصال (فقط ۳ مرحله ساده):</strong>
+      <ol>
+        <li>اپلیکیشن <strong>«همگام»</strong> را روی گوشی باز کنید و وارد بخش <strong>همگام‌سازی</strong> شوید.</li>
+        <li>آدرس آی‌پی نمایش داده شده در گوشی (مثلاً <code>http://192.168.1.105:8080</code>) را در کادر بالا بنویسید.</li>
+        <li>دکمه <strong>«شروع همگام‌سازی فوری»</strong> را بزنید؛ تمام اطلاعات در ۱ ثانیه جابه‌جا و یکی می‌شوند!</li>
+      </ol>
+    </div>
+
+    <!-- Windscribe / VPN Tip -->
+    <div class="vpn-box">
+      <strong>💡 نکته بسیار مهم درباره ویندسکرایب (Windscribe) یا فیلترشکن لپ‌تاپ:</strong><br>
+      • فیلترشکن ممکن است ارتباط شبکه محلی با گوشی را بلاک کند. برای حل این موضوع:<br>
+      • <strong>روش ۱ (سریع‌ترین):</strong> فقط برای <strong>۳ ثانیه</strong> ویندسکرایب را Disconnect کنید، دکمه همگام‌سازی را بزنید، و دوباره Connect کنید.<br>
+      • <strong>روش ۲ (همیشگی):</strong> در برنامه Windscribe به تنظیمات (Settings ⚙️) > Connection بروید و تیک گزینه <strong>«Allow LAN Traffic»</strong> را فعال کنید تا همزمان با روشن بودن VPN، شبکه محلی باز بماند.
+    </div>
+
+    <!-- Live Terminal Logger -->
+    <div class="log-box">
+      <div class="log-header">
+        <div class="log-title">
+          <span>📟</span> لاگ زنده لحظه‌ای (Console Log)
+        </div>
+        <button class="log-clear-btn" id="btnClearLog">پاک‌سازی لاگ</button>
+      </div>
+      <div class="log-content" id="logConsole">آماده برای تست اتصال و همگام‌سازی...</div>
+    </div>
+
+  </div>
+
+  <script src="persian-date.js"></script>
+  <script src="sync-client.js"></script>
+  <script>
+    const logConsole = document.getElementById("logConsole");
+    const serverUrlInput = document.getElementById("serverUrlInput");
+    const btnTestPing = document.getElementById("btnTestPing");
+    const btnAutoScan = document.getElementById("btnAutoScan");
+    const btnStartSync = document.getElementById("btnStartSync");
+    const btnClearLog = document.getElementById("btnClearLog");
+    const statusDot = document.getElementById("statusDot");
+    const statusText = document.getElementById("statusText");
+    const lastSyncInfo = document.getElementById("lastSyncInfo");
+
+    function log(msg, type = "info") {
+      const time = new Date().toLocaleTimeString();
+      let colorClass = "log-entry-info";
+      let icon = "ℹ️";
+      if (type === "success") { colorClass = "log-entry-success"; icon = "✅"; }
+      if (type === "warn") { colorClass = "log-entry-warn"; icon = "⚠️"; }
+      if (type === "error") { colorClass = "log-entry-error"; icon = "❌"; }
+
+      const line = `[${time}] ${icon} ${msg}\n`;
+      logConsole.textContent += line;
+      logConsole.scrollTop = logConsole.scrollHeight;
+    }
+
+    if (btnClearLog) {
+      btnClearLog.addEventListener("click", () => {
+        logConsole.textContent = "";
+      });
+    }
+
+    function setStatus(state, text) {
+      statusDot.className = "status-dot " + state;
+      statusText.textContent = text;
+    }
+
+    // مقداردهی اولیه آدرس سرور
+    (async () => {
+      try {
+        const savedUrl = await SyncClient.getServerUrl();
+        if (serverUrlInput) serverUrlInput.value = savedUrl;
+        
+        const storage = await SyncClient.getStorage(["lastSyncTimestamp", "lastSyncStatus"]);
+        if (storage.lastSyncTimestamp) {
+          const d = new Date(storage.lastSyncTimestamp);
+          lastSyncInfo.textContent = `آخرین همگام‌سازی: ${d.toLocaleTimeString()} (${d.toLocaleDateString('fa-IR')})`;
+        }
+      } catch (_) {}
+    })();
+
+    // ۱. تست پینگ و بررسی ارتباط با گوشی
+    btnTestPing.addEventListener("click", async () => {
+      let url = serverUrlInput.value.trim();
+      if (!url) {
+        alert("لطفاً ابتدا آدرس سرور گوشی را وارد کنید.");
+        return;
+      }
+      if (!url.startsWith("http://") && !url.startsWith("https://")) {
+        url = "http://" + url;
+        serverUrlInput.value = url;
+      }
+
+      btnTestPing.disabled = true;
+      setStatus("busy", "در حال ارسال پینگ به گوشی...");
+      log(`ارسال درخواست وضعیت به ${url}/api/status ...`, "info");
+
+      const startTime = Date.now();
+      const statusRes = await SyncClient.pingServer(url, 3500);
+      const pingMs = Date.now() - startTime;
+
+      if (statusRes && statusRes.status === "online") {
+        setStatus("online", `گوشی در دسترس است! (${pingMs}ms)`);
+        log(`پاسخ سرور دریافت شد (${pingMs} میلی‌ثانیه): ${JSON.stringify(statusRes)}`, "success");
+        log(`اطلاعات گوشی: اپلیکیشن «${statusRes.app || 'همگام'}» | رویدادها: ${statusRes.eventsCount} | وظایف: ${statusRes.tasksCount}`, "success");
+      } else {
+        setStatus("error", "ارتباط با گوشی برقرار نشد");
+        log(`پاسخی از ${url} در مدت ${pingMs}ms دریافت نشد!`, "error");
+        log(`علت‌های متداول: ۱. اپ در گوشی باز نیست ۲. آی‌پی گوشی تغییر کرده ۳. فیلترشکن لپ‌تاپ (Windscribe) شبکه محلی را مسدود کرده است.`, "warn");
+      }
+
+      btnTestPing.disabled = false;
+    });
+
+    // ۲. جستجوی خودکار آی‌پی گوشی در شبکه محلی
+    btnAutoScan.addEventListener("click", async () => {
+      btnAutoScan.disabled = true;
+      setStatus("busy", "در حال اسکن خودکار شبکه محلی...");
+      log("شروع اسکن آدرس‌های متداول گوشی در شبکه محلی...", "info");
+
+      // لیست آدرس‌های پرتکرار (هات‌اسپات و مودم‌های خانگی)
+      const currentIp = serverUrlInput.value.trim().replace(/^https?:\/\//i, "").split(":")[0] || "192.168.1.100";
+      const baseSubnet = currentIp.substring(0, currentIp.lastIndexOf("."));
+
+      const candidateIps = [
+        "http://192.168.43.1:8080",  // هات‌اسپات استاندارد اندروید
+        "http://192.168.1.100:8080",
+        "http://192.168.1.101:8080",
+        "http://192.168.1.102:8080",
+        "http://192.168.1.105:8080",
+        "http://192.168.0.100:8080",
+        "http://192.168.0.101:8080",
+        "http://192.168.0.102:8080",
+        `http://${baseSubnet}.100:8080`,
+        `http://${baseSubnet}.101:8080`,
+        `http://${baseSubnet}.102:8080`,
+        `http://${baseSubnet}.105:8080`,
+        `http://${baseSubnet}.2:8080`,
+        `http://${baseSubnet}.3:8080`
+      ];
+
+      const uniqueCandidates = [...new Set(candidateIps)];
+      let foundUrl = null;
+
+      log(`در حال تست موازی ${uniqueCandidates.length} آدرس احتمالی...`, "info");
+
+      const checks = uniqueCandidates.map(async (u) => {
+        const res = await SyncClient.pingServer(u, 2000);
+        if (res && res.status === "online") {
+          foundUrl = u;
+        }
+      });
+
+      await Promise.all(checks);
+
+      if (foundUrl) {
+        serverUrlInput.value = foundUrl;
+        await SyncClient.setServerUrl(foundUrl);
+        setStatus("online", `گوشی پیدا شد: ${foundUrl}`);
+        log(`گوشی با موفقیت در آدرس ${foundUrl} پیدا شد! ✓`, "success");
+      } else {
+        setStatus("warn", "گوشی در اسکن خودکار یافت نشد");
+        log("گوشی در اسکن خودکار یافت نشد. لطفاً مستقیماً وارد اپ گوشی شوید و آدرس نوشته‌شده در آن را تایپ کنید.", "warn");
+      }
+
+      btnAutoScan.disabled = false;
+    });
+
+    // ۳. همگام‌سازی فوری دوطرفه با لاگ زنده لحظه‌ای
+    btnStartSync.addEventListener("click", async () => {
+      let customUrl = serverUrlInput.value.trim();
+      if (!customUrl) {
+        alert("لطفاً آدرس سرور گوشی را وارد کنید.");
+        return;
+      }
+      if (!customUrl.startsWith("http://") && !customUrl.startsWith("https://")) {
+        customUrl = "http://" + customUrl;
+        serverUrlInput.value = customUrl;
+      }
+
+      btnStartSync.disabled = true;
+      setStatus("busy", "در حال همگام‌سازی با گوشی...");
+      log(`=== شروع فرآیند همگام‌سازی با ${customUrl} ===`, "info");
+
+      try {
+        await SyncClient.setServerUrl(customUrl);
+
+        const res = await SyncClient.syncWithAndroid(customUrl, (step) => {
+          log(step, "info");
+        });
+
+        if (res.success) {
+          setStatus("online", "همگام‌سازی با موفقیت انجام شد ✓");
+          log(`عملیات با موفقیت ۱۰۰٪ پایان یافت!`, "success");
+          log(`آمار داده‌های یکپارچه: ${res.eventsCount} رویداد | ${res.tasksCount} وظیفه | ${res.notesCount} یادداشت`, "success");
+          
+          const now = new Date();
+          lastSyncInfo.textContent = `آخرین همگام‌سازی: ${now.toLocaleTimeString()}`;
+          alert(`همگام‌سازی با موفقیت انجام شد!\n\nتعداد داده‌ها:\n• ${res.eventsCount} رویداد\n• ${res.tasksCount} وظیفه روزانه\n• ${res.notesCount} یادداشت`);
+        } else {
+          setStatus("error", "خطا در همگام‌سازی");
+          log(`خطا در همگام‌سازی: ${res.error}`, "error");
+          alert("خطا در همگام‌سازی:\n" + res.error);
+        }
+      } catch (err) {
+        setStatus("error", "خطای غیرمنتظره");
+        log(`استثنای شبکه: ${err.message}`, "error");
+      } finally {
+        btnStartSync.disabled = false;
+      }
+    });
+  </script>
+</body>
+</html>
