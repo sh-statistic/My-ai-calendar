@@ -4,6 +4,7 @@ import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.setContent
+import androidx.activity.SystemBarStyle
 import androidx.activity.enableEdgeToEdge
 import androidx.activity.viewModels
 import androidx.compose.animation.Crossfade
@@ -16,6 +17,7 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
@@ -81,7 +83,16 @@ class MainActivity : ComponentActivity() {
     @OptIn(ExperimentalMaterial3Api::class)
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        enableEdgeToEdge()
+        enableEdgeToEdge(
+            statusBarStyle = SystemBarStyle.light(
+                android.graphics.Color.TRANSPARENT,
+                android.graphics.Color.TRANSPARENT
+            ),
+            navigationBarStyle = SystemBarStyle.light(
+                android.graphics.Color.TRANSPARENT,
+                android.graphics.Color.TRANSPARENT
+            )
+        )
 
         setContent {
             MyApplicationTheme {
@@ -119,17 +130,16 @@ class MainActivity : ComponentActivity() {
                         modifier = Modifier.fillMaxSize(),
                         topBar = {
                             if (selectedTab == 0) {
-                                // COMBINED Space-Saving Top Bar for Calendar (Zero wasted vertical space, safe from status bar overlap)
+                                // Space-Saving Top Bar for Calendar (Surface extends behind status bar, content safely padded)
                                 Surface(
                                     color = MaterialTheme.colorScheme.surface,
                                     shadowElevation = 2.dp,
-                                    modifier = Modifier
-                                        .fillMaxWidth()
-                                        .statusBarsPadding()
+                                    modifier = Modifier.fillMaxWidth()
                                 ) {
                                     Column(
                                         modifier = Modifier
                                             .fillMaxWidth()
+                                            .statusBarsPadding()
                                             .padding(horizontal = 8.dp, vertical = 6.dp)
                                     ) {
                                         Row(
@@ -319,69 +329,81 @@ class MainActivity : ComponentActivity() {
                             }
                         },
                         bottomBar = {
-                            // 5 Clean Bottom Navigation Tabs
-                            NavigationBar(
+                            // 5 Clean Compact Bottom Navigation Tabs (56dp height + precise navigation bars padding)
+                            Surface(
+                                color = MaterialTheme.colorScheme.surface,
+                                shadowElevation = 4.dp,
+                                tonalElevation = 2.dp,
                                 modifier = Modifier
+                                    .fillMaxWidth()
                                     .testTag("bottom_nav_bar")
-                                    .height(60.dp) // کاهش ارتفاع نوار (پیش‌فرض ۸۰ است)
                             ) {
-                                NavigationBarItem(
-                                    selected = selectedTab == 0,
-                                    onClick = { selectedTab = 0 },
-                                    icon = { Icon(Icons.Default.CalendarMonth, contentDescription = "تقویم", modifier = Modifier.size(20.dp)) },
-                                    label = { Text("تقویم", fontSize = 10.sp, maxLines = 1) },
-                                    alwaysShowLabel = false,
-                                    modifier = Modifier.testTag("nav_calendar")
-                                )
-                                NavigationBarItem(
-                                    selected = selectedTab == 1,
-                                    onClick = { selectedTab = 1 },
-                                    icon = { Icon(Icons.Default.Checklist, contentDescription = "وظایف", modifier = Modifier.size(20.dp)) },
-                                    label = { Text("وظایف", fontSize = 10.sp, maxLines = 1) },
-                                    alwaysShowLabel = false,
-                                    modifier = Modifier.testTag("nav_tasks")
-                                )
-                                NavigationBarItem(
-                                    selected = selectedTab == 2,
-                                    onClick = { selectedTab = 2 },
-                                    icon = { Icon(Icons.Default.NoteAlt, contentDescription = "یادداشت‌ها", modifier = Modifier.size(20.dp)) },
-                                    label = { Text("یادداشت", fontSize = 10.sp, maxLines = 1) },
-                                    alwaysShowLabel = false,
-                                    modifier = Modifier.testTag("nav_notes")
-                                )
-                                NavigationBarItem(
-                                    selected = selectedTab == 3,
-                                    onClick = { selectedTab = 3 },
-                                    icon = {
-                                        Icon(
-                                            Icons.Default.HourglassBottom,
-                                            contentDescription = "عمر من",
-                                            modifier = Modifier.size(20.dp),
-                                            tint = if (selectedTab == 3) Color(0xFFF59E0B) else MaterialTheme.colorScheme.onSurfaceVariant
-                                        )
-                                    },
-                                    label = { Text("عمر من", fontSize = 10.sp, maxLines = 1, fontWeight = if (selectedTab == 3) FontWeight.Bold else FontWeight.Normal) },
-                                    alwaysShowLabel = false,
-                                    modifier = Modifier.testTag("nav_memento_mori")
-                                )
-                                NavigationBarItem(
-                                    selected = selectedTab == 4,
-                                    onClick = { selectedTab = 4 },
-                                    icon = {
-                                        BadgedBox(
-                                            badge = {
-                                                if (isServerRunning) {
-                                                    Badge(containerColor = Color(0xFF10B981))
+                                Row(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .navigationBarsPadding()
+                                        .height(56.dp),
+                                    horizontalArrangement = Arrangement.SpaceAround,
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    NavigationBarItem(
+                                        selected = selectedTab == 0,
+                                        onClick = { selectedTab = 0 },
+                                        icon = { Icon(Icons.Default.CalendarMonth, contentDescription = "تقویم", modifier = Modifier.size(20.dp)) },
+                                        label = { Text("تقویم", fontSize = 10.sp, maxLines = 1) },
+                                        alwaysShowLabel = false,
+                                        modifier = Modifier.testTag("nav_calendar")
+                                    )
+                                    NavigationBarItem(
+                                        selected = selectedTab == 1,
+                                        onClick = { selectedTab = 1 },
+                                        icon = { Icon(Icons.Default.Checklist, contentDescription = "وظایف", modifier = Modifier.size(20.dp)) },
+                                        label = { Text("وظایف", fontSize = 10.sp, maxLines = 1) },
+                                        alwaysShowLabel = false,
+                                        modifier = Modifier.testTag("nav_tasks")
+                                    )
+                                    NavigationBarItem(
+                                        selected = selectedTab == 2,
+                                        onClick = { selectedTab = 2 },
+                                        icon = { Icon(Icons.Default.NoteAlt, contentDescription = "یادداشت‌ها", modifier = Modifier.size(20.dp)) },
+                                        label = { Text("یادداشت", fontSize = 10.sp, maxLines = 1) },
+                                        alwaysShowLabel = false,
+                                        modifier = Modifier.testTag("nav_notes")
+                                    )
+                                    NavigationBarItem(
+                                        selected = selectedTab == 3,
+                                        onClick = { selectedTab = 3 },
+                                        icon = {
+                                            Icon(
+                                                Icons.Default.HourglassBottom,
+                                                contentDescription = "عمر من",
+                                                modifier = Modifier.size(20.dp),
+                                                tint = if (selectedTab == 3) Color(0xFFF59E0B) else MaterialTheme.colorScheme.onSurfaceVariant
+                                            )
+                                        },
+                                        label = { Text("عمر من", fontSize = 10.sp, maxLines = 1, fontWeight = if (selectedTab == 3) FontWeight.Bold else FontWeight.Normal) },
+                                        alwaysShowLabel = false,
+                                        modifier = Modifier.testTag("nav_memento_mori")
+                                    )
+                                    NavigationBarItem(
+                                        selected = selectedTab == 4,
+                                        onClick = { selectedTab = 4 },
+                                        icon = {
+                                            BadgedBox(
+                                                badge = {
+                                                    if (isServerRunning) {
+                                                        Badge(containerColor = Color(0xFF10B981))
+                                                    }
                                                 }
+                                            ) {
+                                                Icon(Icons.Default.Settings, contentDescription = "تنظیمات", modifier = Modifier.size(20.dp))
                                             }
-                                        ) {
-                                            Icon(Icons.Default.Settings, contentDescription = "تنظیمات", modifier = Modifier.size(20.dp))
-                                        }
-                                    },
-                                    label = { Text("تنظیمات", fontSize = 10.sp, maxLines = 1) },
-                                    alwaysShowLabel = false,
-                                    modifier = Modifier.testTag("nav_settings")
-                                )
+                                        },
+                                        label = { Text("تنظیمات", fontSize = 10.sp, maxLines = 1) },
+                                        alwaysShowLabel = false,
+                                        modifier = Modifier.testTag("nav_settings")
+                                    )
+                                }
                             }
                         }
                     ) { innerPadding ->

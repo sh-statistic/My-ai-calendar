@@ -1,3 +1,0 @@
-@echo off
-echo Starting Emulator (Small_Phone)...
-C:\Users\Ai\AppData\Local\Android\Sdk\emulator\emulator.exe -avd Small_Phone

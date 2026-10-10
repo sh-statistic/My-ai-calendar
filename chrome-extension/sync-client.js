@@ -1,7 +1,7 @@
 /**
  * Zero-Cost Serverless Offline Sync Client for Chrome Extension
  * Uses chrome.storage.local for 100% offline data persistence on device
- * Syncs directly with Android embedded HTTP server over local Wi-Fi / Hotspot / Web Bluetooth BLE
+ * Syncs directly with Android embedded HTTP server over local Wi-Fi / Hotspot
  */
 
 const SyncClient = {
@@ -210,105 +210,7 @@ const SyncClient = {
         lastSyncError: errMsg
       });
 
-      return {
-        success: false,
-        error: errMsg
       };
-    }
-  },
-
-  /**
-   * Complete Two-Way Web Bluetooth BLE sync:
-   * 1. Sends Chrome extension changes to Android Room DB via Bluetooth characteristic write
-   * 2. Reads latest merged Android database via Bluetooth characteristic read
-   */
-  async syncWithBluetooth() {
-    if (!navigator.bluetooth) {
-      throw new Error("مرورگر شما از قابلیت Web Bluetooth پشتیبانی نمی‌کند یا دسترسی به آن در این محیط محدود است.");
-    }
-
-    const SERVICE_UUID = "0000fff0-0000-1000-8000-00805f9b34fb";
-    const SYNC_CHAR_UUID = "0000fff1-0000-1000-8000-00805f9b34fb";
-
-    try {
-      let device;
-      try {
-        device = await navigator.bluetooth.requestDevice({
-          filters: [
-            { services: [SERVICE_UUID] },
-            { namePrefix: "Hamgam" }
-          ],
-          optionalServices: [SERVICE_UUID]
-        });
-      } catch (_) {
-        // Fallback: جستجوی گسترده تمامی دستگاه‌های در دسترس با سرویس اختصاصی
-        device = await navigator.bluetooth.requestDevice({
-          acceptAllDevices: true,
-          optionalServices: [SERVICE_UUID]
-        });
-      }
-
-      if (!device) {
-        throw new Error("دستگاهی برای اتصال انتخاب نشد.");
-      }
-
-      if (!device.gatt) {
-        throw new Error("دستگاه انتخاب شده از پروتکل GATT پشتیبانی نمی‌کند.");
-      }
-
-      const server = await device.gatt.connect();
-      const service = await server.getPrimaryService(SERVICE_UUID);
-      const characteristic = await service.getCharacteristic(SYNC_CHAR_UUID);
-
-      // 1. ارسال تغییرات محلی افزونه به گوشی
-      const localData = await this.getLocalData();
-      const jsonStr = JSON.stringify(localData);
-      const encoder = new TextEncoder();
-      const dataBytes = encoder.encode(jsonStr);
-
-      try {
-        if (characteristic.writeValueWithResponse) {
-          await characteristic.writeValueWithResponse(dataBytes);
-        } else {
-          await characteristic.writeValue(dataBytes);
-        }
-      } catch (_) {
-        // ادامه برای خواندن
-      }
-
-      // 2. دریافت داده‌های همگام‌شده دیتابیس از گوشی
-      const value = await characteristic.readValue();
-      const decoder = new TextDecoder("utf-8");
-      const receivedJson = decoder.decode(value);
-
-      if (receivedJson && receivedJson.trim().startsWith("{")) {
-        const mergedData = JSON.parse(receivedJson);
-        await this.setStorage({
-          events: mergedData.events || [],
-          tasks: mergedData.tasks || [],
-          notes: mergedData.notes || [],
-          lastSyncTimestamp: Date.now(),
-          lastSyncStatus: "success"
-        });
-
-        return {
-          success: true,
-          deviceName: device.name || "گوشی اندروید",
-          eventsCount: (mergedData.events || []).length,
-          tasksCount: (mergedData.tasks || []).length,
-          notesCount: (mergedData.notes || []).length
-        };
-      }
-
-      return { success: true, deviceName: device.name || "گوشی اندروید" };
-    } catch (err) {
-      if (err.name === "NotFoundError" || (err.message && err.message.includes("User cancelled"))) {
-        throw new Error("پنجره انتخاب دستگاه لغو شد یا گوشی در لیست بلوتوث پیدا نشد.");
-      }
-      if (err.name === "SecurityError") {
-        throw new Error("دسترسی به بلوتوث توسط مرورگر مسدود شده است.");
-      }
-      throw err;
     }
   }
 };

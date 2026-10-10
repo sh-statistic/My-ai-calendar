@@ -2,6 +2,8 @@ package com.example.ui.screens
 
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -24,6 +26,7 @@ import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.CalendarMonth
 import androidx.compose.material.icons.filled.CalendarToday
 import androidx.compose.material.icons.filled.CheckCircle
+import androidx.compose.material.icons.filled.DateRange
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material3.Card
@@ -52,6 +55,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextDecoration
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.calendar.PersianCalendarHelper
@@ -68,25 +72,43 @@ fun TasksScreen(
     val tasks by viewModel.activeTasks.collectAsState()
     val selectedDate by viewModel.selectedDate.collectAsState()
 
-    var filterState by remember { mutableIntStateOf(0) } // 0: Selected Date, 1: All, 2: Pending, 3: Completed
+    var filterState by remember { mutableIntStateOf(0) } // 0: Selected Date, 1: This Week, 2: All, 3: Pending, 4: Completed
     var showAddTaskDialog by remember { mutableStateOf(false) }
     var taskToEdit by remember { mutableStateOf<TaskEntity?>(null) }
 
     val dayOfWeekIdx = PersianCalendarHelper.getPersianDayOfWeek(selectedDate.year, selectedDate.month, selectedDate.day)
     val dayOfWeekName = PersianCalendarHelper.WEEKDAY_NAMES_PERSIAN.getOrElse(dayOfWeekIdx) { "روز" }
 
+    // Week range calculation (Saturday to Friday)
+    val weekDates = remember(selectedDate) {
+        PersianCalendarHelper.getWeekDates(selectedDate.year, selectedDate.month, selectedDate.day)
+    }
+    val weekFormattedDates = remember(weekDates) {
+        weekDates.map { it.formatted }.toSet()
+    }
+    val firstWeekDay = weekDates.first()
+    val lastWeekDay = weekDates.last()
+    val weekRangeText = "${PersianCalendarHelper.toPersianDigits(firstWeekDay.day.toString())} ${firstWeekDay.monthName} تا ${PersianCalendarHelper.toPersianDigits(lastWeekDay.day.toString())} ${lastWeekDay.monthName}"
+
     val selectedDateTasks = tasks.filter { it.persianDueDate == selectedDate.formatted }
+    val weekTasks = tasks.filter { it.persianDueDate in weekFormattedDates }.sortedBy { it.persianDueDate }
 
     val filteredTasks = when (filterState) {
         0 -> selectedDateTasks
-        1 -> tasks
-        2 -> selectedDateTasks.filter { !it.isCompleted }
-        3 -> selectedDateTasks.filter { it.isCompleted }
+        1 -> weekTasks
+        2 -> tasks
+        3 -> tasks.filter { !it.isCompleted }
+        4 -> tasks.filter { it.isCompleted }
         else -> selectedDateTasks
     }
 
-    val completedCount = selectedDateTasks.count { it.isCompleted }
-    val totalCount = selectedDateTasks.size
+    val currentScopeTasks = when (filterState) {
+        0 -> selectedDateTasks
+        1 -> weekTasks
+        else -> tasks
+    }
+    val completedCount = currentScopeTasks.count { it.isCompleted }
+    val totalCount = currentScopeTasks.size
     val progress = if (totalCount > 0) (completedCount.toFloat() / totalCount).coerceIn(0f, 1f) else 0f
 
     Box(modifier = modifier.fillMaxSize()) {
@@ -101,51 +123,146 @@ fun TasksScreen(
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(horizontal = 10.dp, vertical = 6.dp),
+                        .padding(horizontal = 8.dp, vertical = 6.dp),
                     horizontalArrangement = Arrangement.SpaceBetween,
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    IconButton(onClick = { viewModel.nextDay() }, modifier = Modifier.size(32.dp)) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowForward, contentDescription = "روز قبل", modifier = Modifier.size(18.dp))
-                    }
-
-                    Row(
-                        verticalAlignment = Alignment.CenterVertically,
-                        modifier = Modifier.clickable { filterState = 0 }
+                    // 1. Right side: Week tasks button (Fixed ergonomic dimensions)
+                    Surface(
+                        color = if (filterState == 1) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.primaryContainer,
+                        shape = RoundedCornerShape(10.dp),
+                        modifier = Modifier
+                            .height(34.dp)
+                            .clickable { filterState = if (filterState == 1) 0 else 1 }
+                            .testTag("btn_week_tasks")
                     ) {
-                        Icon(Icons.Default.CalendarMonth, contentDescription = null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(16.dp))
-                        Spacer(modifier = Modifier.width(6.dp))
-                        Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                            Text(
-                                text = "$dayOfWeekName ${selectedDate.formattedPersian}",
-                                style = MaterialTheme.typography.titleSmall,
-                                fontWeight = FontWeight.Bold,
-                                color = MaterialTheme.colorScheme.primary
+                        Row(
+                            modifier = Modifier.padding(horizontal = 9.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Icon(
+                                Icons.Default.DateRange,
+                                contentDescription = "وظایف هفته",
+                                tint = if (filterState == 1) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.primary,
+                                modifier = Modifier.size(15.dp)
                             )
+                            Spacer(modifier = Modifier.width(4.dp))
                             Text(
-                                text = "${PersianCalendarHelper.toPersianDigits(selectedDateTasks.size.toString())} وظیفه برای این تاریخ",
-                                fontSize = 10.sp,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                                text = "وظایف هفته",
+                                fontSize = 11.sp,
+                                fontWeight = FontWeight.Bold,
+                                maxLines = 1,
+                                softWrap = false,
+                                color = if (filterState == 1) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onPrimaryContainer
                             )
                         }
                     }
 
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        Surface(
-                            color = MaterialTheme.colorScheme.primary,
-                            shape = RoundedCornerShape(8.dp),
-                            modifier = Modifier.clickable { viewModel.setToday() }
+                    // 2. Center: Date display with previous/next day arrows (Fills remaining space stably)
+                    Row(
+                        modifier = Modifier
+                            .weight(1f)
+                            .padding(horizontal = 4.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.Center
+                    ) {
+                        // Right Arrow: Previous day or previous week in RTL
+                        IconButton(
+                            onClick = {
+                                if (filterState == 1) {
+                                    viewModel.previousWeek()
+                                } else {
+                                    viewModel.previousDay()
+                                }
+                            },
+                            modifier = Modifier.size(28.dp)
+                        ) {
+                            Icon(
+                                Icons.AutoMirrored.Filled.ArrowForward,
+                                contentDescription = if (filterState == 1) "هفته قبل" else "روز قبل",
+                                modifier = Modifier.size(16.dp)
+                            )
+                        }
+
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.Center,
+                            modifier = Modifier
+                                .weight(1f, fill = false)
+                                .clickable { filterState = 0 }
+                        ) {
+                            Icon(
+                                if (filterState == 1) Icons.Default.DateRange else Icons.Default.CalendarMonth,
+                                contentDescription = null,
+                                tint = MaterialTheme.colorScheme.primary,
+                                modifier = Modifier.size(14.dp)
+                            )
+                            Spacer(modifier = Modifier.width(3.dp))
+                            Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                                Text(
+                                    text = if (filterState == 1) weekRangeText else "$dayOfWeekName ${selectedDate.formattedPersian}",
+                                    style = MaterialTheme.typography.titleSmall,
+                                    fontWeight = FontWeight.Bold,
+                                    fontSize = 12.sp,
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis,
+                                    color = MaterialTheme.colorScheme.primary
+                                )
+                                Text(
+                                    text = if (filterState == 1)
+                                        "${PersianCalendarHelper.toPersianDigits(weekTasks.size.toString())} وظیفه این هفته"
+                                    else
+                                        "${PersianCalendarHelper.toPersianDigits(selectedDateTasks.size.toString())} وظیفه امروز",
+                                    fontSize = 10.sp,
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                            }
+                        }
+
+                        // Left Arrow: Next day or next week in RTL
+                        IconButton(
+                            onClick = {
+                                if (filterState == 1) {
+                                    viewModel.nextWeek()
+                                } else {
+                                    viewModel.nextDay()
+                                }
+                            },
+                            modifier = Modifier.size(28.dp)
+                        ) {
+                            Icon(
+                                Icons.AutoMirrored.Filled.ArrowBack,
+                                contentDescription = if (filterState == 1) "هفته بعد" else "روز بعد",
+                                modifier = Modifier.size(16.dp)
+                            )
+                        }
+                    }
+
+                    // 3. Left side: Today button (Fixed ergonomic dimensions)
+                    Surface(
+                        color = MaterialTheme.colorScheme.primary,
+                        shape = RoundedCornerShape(10.dp),
+                        modifier = Modifier
+                            .height(34.dp)
+                            .clickable {
+                                viewModel.setToday()
+                                filterState = 0
+                            }
+                    ) {
+                        Box(
+                            contentAlignment = Alignment.Center,
+                            modifier = Modifier.padding(horizontal = 12.dp)
                         ) {
                             Text(
                                 text = "امروز",
-                                fontSize = 10.sp,
+                                fontSize = 11.sp,
                                 fontWeight = FontWeight.Bold,
-                                color = MaterialTheme.colorScheme.onPrimary,
-                                modifier = Modifier.padding(horizontal = 6.dp, vertical = 3.dp)
+                                maxLines = 1,
+                                softWrap = false,
+                                color = MaterialTheme.colorScheme.onPrimary
                             )
-                        }
-                        IconButton(onClick = { viewModel.previousDay() }, modifier = Modifier.size(32.dp)) {
-                            Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "روز بعد", modifier = Modifier.size(18.dp))
                         }
                     }
                 }
@@ -159,41 +276,44 @@ fun TasksScreen(
                 modifier = Modifier.fillMaxWidth()
             ) {
                 Column(modifier = Modifier.padding(horizontal = 14.dp, vertical = 10.dp)) {
-                    // Filter Chips (Including Date Filter)
+                    // Filter Chips (Including Date & Week Filter with Horizontal Scroll)
                     Row(
-                        modifier = Modifier.fillMaxWidth(),
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .horizontalScroll(rememberScrollState()),
                         horizontalArrangement = Arrangement.spacedBy(6.dp)
                     ) {
                         FilterChip(
                             selected = filterState == 0,
                             onClick = { filterState = 0 },
-                            label = { Text("این روز (${PersianCalendarHelper.toPersianDigits(totalCount.toString())})", fontSize = 11.sp) },
-                            modifier = Modifier.weight(1f)
+                            label = { Text("این روز (${PersianCalendarHelper.toPersianDigits(selectedDateTasks.size.toString())})", fontSize = 11.sp) }
                         )
                         FilterChip(
                             selected = filterState == 1,
                             onClick = { filterState = 1 },
-                            label = { Text("همه (${PersianCalendarHelper.toPersianDigits(tasks.size.toString())})", fontSize = 11.sp) },
-                            modifier = Modifier.weight(1f)
+                            label = { Text("این هفته (${PersianCalendarHelper.toPersianDigits(weekTasks.size.toString())})", fontSize = 11.sp) }
                         )
                         FilterChip(
                             selected = filterState == 2,
                             onClick = { filterState = 2 },
-                            label = { Text("در انتظار", fontSize = 11.sp) },
-                            modifier = Modifier.weight(1f)
+                            label = { Text("همه (${PersianCalendarHelper.toPersianDigits(tasks.size.toString())})", fontSize = 11.sp) }
                         )
                         FilterChip(
                             selected = filterState == 3,
                             onClick = { filterState = 3 },
-                            label = { Text("انجام شده", fontSize = 11.sp) },
-                            modifier = Modifier.weight(1f)
+                            label = { Text("در انتظار", fontSize = 11.sp) }
+                        )
+                        FilterChip(
+                            selected = filterState == 4,
+                            onClick = { filterState = 4 },
+                            label = { Text("انجام شده", fontSize = 11.sp) }
                         )
                     }
 
                     Spacer(modifier = Modifier.height(6.dp))
 
                     LinearProgressIndicator(
-                        progress = progress,
+                        progress = { progress },
                         modifier = Modifier
                             .fillMaxWidth()
                             .height(4.dp),
@@ -221,10 +341,11 @@ fun TasksScreen(
                         )
                         Spacer(modifier = Modifier.height(8.dp))
                         Text(
-                            text = if (filterState == 0)
-                                "هیچ وظیفه‌ای برای $dayOfWeekName ${selectedDate.formattedPersian} ثبت نشده است."
-                            else
-                                "وظیفه‌ای در این دسته‌بندی یافت نشد.",
+                            text = when (filterState) {
+                                0 -> "هیچ وظیفه‌ای برای $dayOfWeekName ${selectedDate.formattedPersian} ثبت نشده است."
+                                1 -> "هیچ وظیفه‌ای برای این هفته ($weekRangeText) ثبت نشده است."
+                                else -> "وظیفه‌ای در این دسته‌بندی یافت نشد."
+                            },
                             style = MaterialTheme.typography.bodyMedium,
                             color = MaterialTheme.colorScheme.outline
                         )
@@ -232,7 +353,10 @@ fun TasksScreen(
                         OutlinedButton(onClick = { showAddTaskDialog = true }) {
                             Icon(Icons.Default.Add, contentDescription = null, modifier = Modifier.size(16.dp))
                             Spacer(modifier = Modifier.width(4.dp))
-                            Text("افزودن وظیفه برای $dayOfWeekName", fontSize = 11.sp)
+                            Text(
+                                text = if (filterState == 1) "افزودن وظیفه برای این هفته" else "افزودن وظیفه برای $dayOfWeekName",
+                                fontSize = 11.sp
+                            )
                         }
                     }
                 }

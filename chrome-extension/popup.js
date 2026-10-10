@@ -13,7 +13,7 @@ document.addEventListener("DOMContentLoaded", async () => {
   const noteInput = document.getElementById("noteInput");
   const btnSaveNote = document.getElementById("btnSaveNote");
   const btnSync = document.getElementById("btnSync");
-  const btnBleSync = document.getElementById("btnBleSync");
+  const btnFullSync = document.getElementById("btnFullSync");
   const syncStatus = document.getElementById("syncStatus");
   const qrImg = document.getElementById("qrImg");
   const serverInfoText = document.getElementById("serverInfoText");
@@ -275,9 +275,9 @@ document.addEventListener("DOMContentLoaded", async () => {
     }
   });
 
-  // Bluetooth Sync Button (مرورگر کروم پنجره بلوتوث را در پاپ‌آپ مسدود می‌کند، لذا در تب کامل باز می‌شود)
-  if (btnBleSync) {
-    btnBleSync.addEventListener("click", () => {
+  // Full Sync Page Button (باز کردن صفحه کامل همگام‌سازی در تب جدید)
+  if (btnFullSync) {
+    btnFullSync.addEventListener("click", () => {
       if (typeof chrome !== "undefined" && chrome.tabs && chrome.tabs.create) {
         chrome.tabs.create({ url: "sync.html" });
       } else {

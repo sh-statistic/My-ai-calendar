@@ -140,7 +140,7 @@ class LocalHttpSyncServer(
                             "default_popup": "popup.html",
                             "default_icon": "icon.png"
                           },
-                          "permissions": ["bluetooth", "storage"]
+                          "permissions": ["storage"]
                         }
                         """.trimIndent()
                         sendResponse(output, 200, "OK", manifestJson, "application/json")
@@ -355,7 +355,6 @@ class LocalHttpSyncServer(
             </div>
             <div class="sync-bar">
               <button class="btn" onclick="syncData()">🔄 همگام‌سازی وای‌فای</button>
-              <button class="btn btn-blue" onclick="syncBluetooth()">📡 همگام‌سازی با بلوتوث (BLE)</button>
             </div>
           </div>
 
@@ -377,14 +376,14 @@ class LocalHttpSyncServer(
               </div>
             </div>
 
-            <!-- Bluetooth & Chrome Extension Info -->
+            <!-- Chrome Extension & Wi-Fi Info -->
             <div class="card">
               <div class="card-title">
-                <span>⚡ اتصال افزونه مرورگر و بلوتوث</span>
+                <span>⚡ اتصال افزونه مرورگر و شبکه محلی</span>
                 <span class="badge"><span class="status-tag"></span>سرور فعال</span>
               </div>
               <p style="font-size: 13px; color: var(--text-muted); line-height: 22px;">
-                این ویجت داده‌های تقویم، کارهای روزانه و یادداشت‌ها را مستقیماً از طریق شبکه محلی Wi-Fi و بلوتوث کم‌مصرف (BLE) با گوشی همراه مبادله می‌کند.
+                این ویجت داده‌های تقویم، کارهای روزانه و یادداشت‌ها را مستقیماً از طریق شبکه محلی Wi-Fi / هات‌اسپات با گوشی همراه مبادله می‌کند.
               </p>
               <div style="margin-top: 14px; display: flex; gap: 8px;">
                 <button class="btn btn-outline" onclick="addNewTask()">+ افزودن کار سریع</button>
@@ -392,7 +391,7 @@ class LocalHttpSyncServer(
               </div>
               <div style="margin-top: 14px;">
                 <p style="font-size: 12px; font-weight: bold; margin-bottom: 6px;">گزارش زنده فعالیت:</p>
-                <div class="log-box" id="logBox">[OK] Server listening on local port $port<br>[READY] Ready for Wi-Fi and Web Bluetooth pairing.</div>
+                <div class="log-box" id="logBox">[OK] Server listening on local port $port<br>[READY] Ready for local Wi-Fi synchronization.</div>
               </div>
             </div>
 
@@ -472,27 +471,7 @@ class LocalHttpSyncServer(
               }
             }
 
-            async function syncBluetooth() {
-              log('[BLE] Checking Web Bluetooth API...');
-              if (!navigator.bluetooth) {
-                alert('مرورگر شما از Web Bluetooth پشتیبانی نمی‌کند یا بلوتوث خاموش است.');
-                return;
-              }
-              try {
-                log('[BLE] Requesting Hamgam Bluetooth Device (0000FFF0)...');
-                const device = await navigator.bluetooth.requestDevice({
-                  filters: [{ services: ['0000fff0-0000-1000-8000-00805f9b34fb'] }]
-                });
-                log('[BLE] Connected to ' + device.name);
-                const server = await device.gatt.connect();
-                const service = await server.getPrimaryService('0000fff0-0000-1000-8000-00805f9b34fb');
-                const char = await service.getCharacteristic('0000fff1-0000-1000-8000-00805f9b34fb');
-                log('[BLE] Exchanging Bluetooth sync packet...');
-                alert('اتصال بلوتوث برقرار شد و داده‌ها همگام شدند!');
-              } catch (e) {
-                log('[BLE ERROR] ' + e.message);
-              }
-            }
+
 
             async function addNewTask() {
               const title = prompt('عنوان کار جدید را وارد کنید:');

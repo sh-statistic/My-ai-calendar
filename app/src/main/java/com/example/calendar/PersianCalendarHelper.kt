@@ -201,4 +201,26 @@ object PersianCalendarHelper {
             cal.get(Calendar.DAY_OF_MONTH)
         )
     }
+
+    /**
+     * Returns the 7 Jalali dates for the entire Persian week containing the given date.
+     * The week starts on Saturday (شنبه, index 0) and ends on Friday (جمعه, index 6).
+     */
+    fun getWeekDates(jYear: Int, jMonth: Int, jDay: Int): List<JalaliDate> {
+        val dow = getPersianDayOfWeek(jYear, jMonth, jDay)
+        val greg = jalaliToGregorian(jYear, jMonth, jDay)
+        val cal = Calendar.getInstance().apply {
+            set(greg.year, greg.month - 1, greg.day)
+            add(Calendar.DAY_OF_MONTH, -dow)
+        }
+        val weekDates = mutableListOf<JalaliDate>()
+        for (i in 0..6) {
+            val gy = cal.get(Calendar.YEAR)
+            val gm = cal.get(Calendar.MONTH) + 1
+            val gd = cal.get(Calendar.DAY_OF_MONTH)
+            weekDates.add(gregorianToJalali(gy, gm, gd))
+            cal.add(Calendar.DAY_OF_MONTH, 1)
+        }
+        return weekDates
+    }
 }

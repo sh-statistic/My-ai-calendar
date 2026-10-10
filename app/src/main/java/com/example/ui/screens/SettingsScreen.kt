@@ -29,8 +29,6 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Alarm
 import androidx.compose.material.icons.filled.AutoAwesome
-import androidx.compose.material.icons.filled.Bluetooth
-import androidx.compose.material.icons.filled.BluetoothSearching
 import androidx.compose.material.icons.filled.CloudOff
 import androidx.compose.material.icons.filled.CloudQueue
 import androidx.compose.material.icons.filled.ContentCopy
@@ -109,7 +107,6 @@ fun SettingsScreen(
     val isServerRunning by viewModel.isServerRunning.collectAsState()
     val serverIp by viewModel.serverIp.collectAsState()
     val serverPort by viewModel.serverPort.collectAsState()
-    val isBleAdvertising by viewModel.isBleAdvertising.collectAsState()
     val logs by viewModel.activityLogList.collectAsState()
     val dbLogs by viewModel.syncLogs.collectAsState()
 
@@ -195,59 +192,7 @@ fun SettingsScreen(
                 Box(modifier = Modifier.fillMaxWidth().height(1.dp).background(MaterialTheme.colorScheme.surfaceVariant))
                 Spacer(modifier = Modifier.height(12.dp))
 
-                // --- 1.2 Bluetooth BLE ---
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        Icon(
-                            if (isBleAdvertising) Icons.Default.BluetoothSearching else Icons.Default.Bluetooth,
-                            contentDescription = null,
-                            tint = if (isBleAdvertising) Color(0xFF3B82F6) else Color.Gray,
-                            modifier = Modifier.size(20.dp)
-                        )
-                        Spacer(modifier = Modifier.width(8.dp))
-                        Column {
-                            Text("بلوتوث (BLE)", style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.Bold)
-                            Text(
-                                text = if (isBleAdvertising) "آماده انتقال" else "خاموش",
-                                style = MaterialTheme.typography.labelSmall,
-                                color = if (isBleAdvertising) Color(0xFF2563EB) else Color.Gray
-                            )
-                        }
-                    }
-                    Switch(checked = isBleAdvertising, onCheckedChange = { viewModel.toggleBleAdvertising() })
-                }
-
-                if (isBleAdvertising) {
-                    Spacer(modifier = Modifier.height(8.dp))
-                    Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        Button(
-                            onClick = {
-                                viewModel.triggerBleSyncPush()
-                                Toast.makeText(context, "بسته داده‌ها برای بلوتوث ارسال شد", Toast.LENGTH_SHORT).show()
-                            },
-                            colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF2563EB)),
-                            modifier = Modifier.weight(1f)
-                        ) { Text("ارسال بلوتوث", fontSize = 10.sp) }
-
-                        OutlinedButton(
-                            onClick = {
-                                viewModel.triggerBleSyncPull()
-                                Toast.makeText(context, "داده‌های بلوتوث بازخوانی شد", Toast.LENGTH_SHORT).show()
-                            },
-                            modifier = Modifier.weight(1f)
-                        ) { Text("دریافت", fontSize = 10.sp) }
-                    }
-                }
-
-                Spacer(modifier = Modifier.height(12.dp))
-                Box(modifier = Modifier.fillMaxWidth().height(1.dp).background(MaterialTheme.colorScheme.surfaceVariant))
-                Spacer(modifier = Modifier.height(12.dp))
-
-                // --- 1.3 Google Calendar ---
+                // --- 1.2 Google Calendar ---
                 val googleCalendars by viewModel.googleCalendars.collectAsState()
                 val selectedGCalName by viewModel.selectedGoogleCalName.collectAsState()
                 val isSyncing by viewModel.isSyncing.collectAsState()

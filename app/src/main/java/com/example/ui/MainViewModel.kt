@@ -19,7 +19,6 @@ import com.example.chat.ChatMessage
 import com.example.chat.ChatRole
 import com.example.chat.ChatSender
 import com.example.chat.GeminiChatService
-import com.example.sync.BleSyncServer
 import com.example.sync.LocalHttpSyncServer
 import com.example.sync.GoogleCalendarSyncManager
 import com.example.sync.NetworkUtils
@@ -82,9 +81,6 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
 
     private val _serverPort = MutableStateFlow(8080)
     val serverPort: StateFlow<Int> = _serverPort.asStateFlow()
-
-    private val _isBleAdvertising = MutableStateFlow(false)
-    val isBleAdvertising: StateFlow<Boolean> = _isBleAdvertising.asStateFlow()
 
     private val _activityLogList = MutableStateFlow<List<String>>(emptyList())
     val activityLogList: StateFlow<List<String>> = _activityLogList.asStateFlow()
@@ -247,26 +243,37 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         _currentViewMonth.value = nextJalali.month
     }
 
-    // Bluetooth BLE explicit push/pull sync actions
-    fun triggerBleSyncPush() {
-        viewModelScope.launch {
-            logMessage("در حال آماده‌سازی و ارسال داده‌ها از طریق بلوتوث...")
-            try {
-                val syncData = repository.getFullSyncData("Android-BLE-Host")
-                logMessage("بسته بلوتوث آماده شد: ${syncData.events.size} رویداد، ${syncData.tasks.size} کار، ${syncData.notes.size} یادداشت")
-                logMessage("داده‌ها روی سرویس GATT بلوتوث برای خواندن توسط دستگاه متصل قرار گرفت ✓")
-            } catch (e: Exception) {
-                logMessage("خطا در همگام‌سازی بلوتوث: ${e.message}")
-            }
+    fun nextWeek() {
+        val cur = _selectedDate.value
+        val gDate = PersianCalendarHelper.jalaliToGregorian(cur.year, cur.month, cur.day)
+        val cal = Calendar.getInstance().apply {
+            set(gDate.year, gDate.month - 1, gDate.day)
+            add(Calendar.DAY_OF_MONTH, 7)
         }
+        val nextJalali = PersianCalendarHelper.gregorianToJalali(
+            cal.get(Calendar.YEAR), cal.get(Calendar.MONTH) + 1, cal.get(Calendar.DAY_OF_MONTH)
+        )
+        setSelectedDate(nextJalali)
+        _currentViewYear.value = nextJalali.year
+        _currentViewMonth.value = nextJalali.month
     }
 
-    fun triggerBleSyncPull() {
-        viewModelScope.launch {
-            logMessage("در حال بررسی و دریافت داده‌های بلوتوث از دستگاه متصل...")
-            logMessage("همگام‌سازی بلوتوث با موفقیت به‌روز شد ✓")
+    fun previousWeek() {
+        val cur = _selectedDate.value
+        val gDate = PersianCalendarHelper.jalaliToGregorian(cur.year, cur.month, cur.day)
+        val cal = Calendar.getInstance().apply {
+            set(gDate.year, gDate.month - 1, gDate.day)
+            add(Calendar.DAY_OF_MONTH, -7)
         }
+        val prevJalali = PersianCalendarHelper.gregorianToJalali(
+            cal.get(Calendar.YEAR), cal.get(Calendar.MONTH) + 1, cal.get(Calendar.DAY_OF_MONTH)
+        )
+        setSelectedDate(prevJalali)
+        _currentViewYear.value = prevJalali.year
+        _currentViewMonth.value = prevJalali.month
     }
+
+
 
     // Gemini Chatbot State
     private val _selectedRole = MutableStateFlow(ChatRole.GENERAL)
@@ -494,7 +501,6 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     private var httpServer: LocalHttpSyncServer? = null
-    private var bleServer: BleSyncServer? = null
 
     init {
         checkAndSeedInitialData()
@@ -520,12 +526,6 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         )
         // Automatically start the zero-cost local sync server on app launch
         startServer()
-
-        bleServer = BleSyncServer(
-            context = getApplication(),
-            repository = repository,
-            onLog = { msg -> logMessage(msg) }
-        )
     }
 
     fun refreshNetworkInfo() {
@@ -548,16 +548,6 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     fun stopServer() {
         httpServer?.stop()
         _isServerRunning.value = false
-    }
-
-    fun toggleBleAdvertising() {
-        if (_isBleAdvertising.value) {
-            bleServer?.stopAdvertising()
-            _isBleAdvertising.value = false
-        } else {
-            val started = bleServer?.startAdvertising() ?: false
-            _isBleAdvertising.value = started
-        }
     }
 
     fun toggleGoogleCalendar(enabled: Boolean) {
@@ -858,6 +848,5 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     override fun onCleared() {
         super.onCleared()
         httpServer?.stop()
-        bleServer?.stopAdvertising()
     }
 }
