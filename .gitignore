@@ -21,10 +21,10 @@ local.properties
 *.local
 
 # Keystore & sensitive signing files
-*.keystore
 *.jks
 *.key
-debug.keystore
+*.keystore
+!debug.keystore
 
 # Android Studio / IntelliJ IDEA
 .idea/
