@@ -41,8 +41,10 @@ import androidx.compose.material.icons.filled.Sync
 import androidx.compose.material.icons.filled.Upload
 import androidx.compose.material.icons.filled.Event
 import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.SystemUpdate
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Checkbox
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
@@ -58,6 +60,7 @@ import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -113,6 +116,15 @@ fun SettingsScreen(
     val isGoogleCalendarEnabled by viewModel.isGoogleCalendarEnabled.collectAsState()
 
     val fajrSettings by viewModel.fajrAlarmSettings.collectAsState()
+    val isCheckingUpdate by viewModel.isCheckingUpdate.collectAsState()
+    val updateStatusMessage by viewModel.updateStatusMessage.collectAsState()
+
+    LaunchedEffect(updateStatusMessage) {
+        updateStatusMessage?.let { msg ->
+            Toast.makeText(context, msg, Toast.LENGTH_LONG).show()
+            viewModel.clearUpdateStatusMessage()
+        }
+    }
 
     var showPairingDialog by remember { mutableStateOf(false) }
     var showBackupDialog by remember { mutableStateOf(false) }
@@ -648,29 +660,57 @@ fun SettingsScreen(
             }
         }
 
-        // Technical Specs
+        // Technical Specs & Update Checker
         Card(
             colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)),
             shape = RoundedCornerShape(16.dp),
             modifier = Modifier.fillMaxWidth()
         ) {
-            Column(modifier = Modifier.padding(14.dp)) {
+            Column(modifier = Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.SpaceBetween,
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    Text("نسخه برنامه: ${com.example.calendar.PersianCalendarHelper.toPersianDigits(com.example.BuildConfig.VERSION_NAME)}", style = MaterialTheme.typography.bodySmall, fontWeight = FontWeight.Bold)
-                    
+                    Column {
+                        Text("نسخه برنامه: ${com.example.calendar.PersianCalendarHelper.toPersianDigits(com.example.BuildConfig.VERSION_NAME)}", style = MaterialTheme.typography.bodySmall, fontWeight = FontWeight.Bold)
+                        Text("بررسی خودکار دوره‌ای با پشتیبان‌گیری ایمن", fontSize = 10.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    }
+
+                    OutlinedButton(
+                        onClick = { viewModel.checkForAppUpdate(isManual = true) },
+                        enabled = !isCheckingUpdate
+                    ) {
+                        if (isCheckingUpdate) {
+                            CircularProgressIndicator(modifier = Modifier.size(14.dp), strokeWidth = 2.dp)
+                            Spacer(modifier = Modifier.width(6.dp))
+                            Text("در حال بررسی...", fontSize = 10.sp)
+                        } else {
+                            Icon(Icons.Default.SystemUpdate, contentDescription = null, modifier = Modifier.size(14.dp))
+                            Spacer(modifier = Modifier.width(4.dp))
+                            Text("بررسی نسخه جدید", fontSize = 10.sp)
+                        }
+                    }
+                }
+
+                Box(modifier = Modifier.fillMaxWidth().height(1.dp).background(MaterialTheme.colorScheme.surfaceVariant))
+
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text("سازگار با گیت‌هاب ریلیز", fontSize = 9.sp, color = MaterialTheme.colorScheme.outline)
+
                     val uriHandler = LocalUriHandler.current
                     Row(
                         verticalAlignment = Alignment.CenterVertically,
                         modifier = Modifier
                             .clip(RoundedCornerShape(8.dp))
-                            .clickable { uriHandler.openUri("https://github.com/sh-statistic") }
+                            .clickable { uriHandler.openUri("https://github.com/sh-statistic/My-ai-calendar") }
                             .padding(4.dp)
                     ) {
-                        Text("created by: sh-statistic", style = MaterialTheme.typography.bodySmall, fontSize = 9.sp)
+                        Text("مخزن: sh-statistic/My-ai-calendar", style = MaterialTheme.typography.bodySmall, fontSize = 9.sp)
                         Spacer(modifier = Modifier.width(4.dp))
                         Icon(
                             painter = painterResource(id = com.example.R.drawable.ic_github),

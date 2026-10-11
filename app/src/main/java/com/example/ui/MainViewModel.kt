@@ -28,6 +28,8 @@ import com.example.prayer.IranianCity
 import com.example.prayer.NextPrayerInfo
 import com.example.prayer.PrayerTimes
 import com.example.prayer.PrayerTimesCalculator
+import com.example.update.AppUpdateManager
+import com.example.update.UpdateInfo
 import com.example.alarm.EventAlarmScheduler
 import java.util.Calendar
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -113,6 +115,16 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
 
     private val _nextPrayerInfo = MutableStateFlow(calculateNextPrayerInfo())
     val nextPrayerInfo: StateFlow<NextPrayerInfo> = _nextPrayerInfo.asStateFlow()
+
+    // In-App GitHub Update & Safety Auto-Backup
+    private val _availableUpdate = MutableStateFlow<UpdateInfo?>(null)
+    val availableUpdate: StateFlow<UpdateInfo?> = _availableUpdate.asStateFlow()
+
+    private val _isCheckingUpdate = MutableStateFlow(false)
+    val isCheckingUpdate: StateFlow<Boolean> = _isCheckingUpdate.asStateFlow()
+
+    private val _updateStatusMessage = MutableStateFlow<String?>(null)
+    val updateStatusMessage: StateFlow<String?> = _updateStatusMessage.asStateFlow()
 
     private fun calculateCurrentPrayerTimes(): PrayerTimes {
         val date = _selectedDate?.value ?: PersianCalendarHelper.getCurrentJalaliDate()
@@ -506,6 +518,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         checkAndSeedInitialData()
         refreshNetworkInfo()
         initServer()
+        checkForAppUpdate(isManual = false)
     }
 
     private fun logMessage(msg: String) {
@@ -763,6 +776,17 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         viewModelScope.launch {
             val existingEvents = repository.allActiveEvents.first()
             if (existingEvents.isEmpty()) {
+                // Try auto-restoring from safety backup first!
+                val safetyBackup = AppUpdateManager.getLatestSafetyBackup(getApplication())
+                if (!safetyBackup.isNullOrBlank()) {
+                    importBackupJson(safetyBackup) { success, msg ->
+                        if (success) {
+                            logMessage("اطلاعات شما با موفقیت از پشتیبان اضطراری بازگردانی شد ✓")
+                        }
+                    }
+                    return@launch
+                }
+
                 val today = PersianCalendarHelper.getCurrentJalaliDate()
                 val gToday = PersianCalendarHelper.getCurrentGregorianDate()
 
@@ -841,6 +865,47 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 for (n in seedNotes) repository.insertNote(n)
 
                 repository.recordLog("سیستم محلی", "راه‌اندازی اولیه و آماده‌سازی پایگاه‌داده آفلاین", 7, true)
+            }
+        }
+    }
+
+    fun checkForAppUpdate(isManual: Boolean = false) {
+        viewModelScope.launch {
+            if (isManual) _isCheckingUpdate.value = true
+            try {
+                val update = AppUpdateManager.checkForUpdates(getApplication(), isManual)
+                if (update != null && update.isAvailable) {
+                    _availableUpdate.value = update
+                } else if (isManual) {
+                    _updateStatusMessage.value = "برنامه شما به‌روز است (نسخه فعلی: ${com.example.BuildConfig.VERSION_NAME})"
+                }
+            } catch (e: Exception) {
+                if (isManual) {
+                    _updateStatusMessage.value = "خطا در بررسی نسخه جدید: ${e.message}"
+                }
+            } finally {
+                if (isManual) _isCheckingUpdate.value = false
+            }
+        }
+    }
+
+    fun dismissUpdateDialog() {
+        _availableUpdate.value = null
+    }
+
+    fun clearUpdateStatusMessage() {
+        _updateStatusMessage.value = null
+    }
+
+    fun startUpdateWithSafetyBackup(context: android.content.Context, updateInfo: UpdateInfo) {
+        viewModelScope.launch {
+            exportBackupJson { json ->
+                val saved = AppUpdateManager.performSafetyBackup(context, json)
+                if (saved) {
+                    logMessage("پشتیبان اضطراری پیش از به‌روزرسانی ذخیره شد ✓")
+                }
+                AppUpdateManager.startDownload(context, updateInfo.downloadUrl, updateInfo.apkName)
+                _availableUpdate.value = null
             }
         }
     }

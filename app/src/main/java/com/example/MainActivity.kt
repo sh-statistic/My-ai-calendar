@@ -422,6 +422,25 @@ class MainActivity : ComponentActivity() {
                             }
                         }
                     }
+
+                    // In-App Update Dialog with Automatic Safety Backup
+                    val availableUpdate by viewModel.availableUpdate.collectAsState()
+                    val context = androidx.compose.ui.platform.LocalContext.current
+                    val uriHandler = androidx.compose.ui.platform.LocalUriHandler.current
+
+                    availableUpdate?.let { updateInfo ->
+                        com.example.ui.components.UpdateDialog(
+                            updateInfo = updateInfo,
+                            onDismiss = { viewModel.dismissUpdateDialog() },
+                            onConfirmUpdate = {
+                                viewModel.startUpdateWithSafetyBackup(context, updateInfo)
+                            },
+                            onOpenBrowser = {
+                                viewModel.dismissUpdateDialog()
+                                uriHandler.openUri(updateInfo.downloadUrl)
+                            }
+                        )
+                    }
                 }
             }
         }
