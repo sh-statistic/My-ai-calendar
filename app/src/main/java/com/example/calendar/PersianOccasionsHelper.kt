@@ -6,7 +6,8 @@ data class PersianOccasion(
     val isReligious: Boolean = false,
     val isNational: Boolean = false,
     val customMonth: Int = -1,
-    val customDay: Int = -1
+    val customDay: Int = -1,
+    val originalTitle: String = ""
 )
 
 data class OfficialDayData(
@@ -228,37 +229,97 @@ object PersianOccasionsHelper {
      * @param day روز شمسی
      * @param year سال شمسی (برای محاسبه مناسبت‌های قمری)
      */
+    private val COMMON_STOP_WORDS = setOf(
+        "روز", "جشن", "بزرگداشت", "ملی", "جهانی", "سالروز", "شهادت", "ولادت", "یادروز", "تاسیس", "آغاز", "پایان", "ایران"
+    )
+
+    private fun normalizeTitle(text: String): String {
+        return text.trim()
+            .replace("\u200C", "") // حذف نیم‌فاصله‌ها
+            .replace("‌", "")
+            .replace("ي", "ی")
+            .replace("ك", "ک")
+            .replace("  ", " ")
+    }
+
+    /**
+     * بررسی هوشمند اینکه آیا دو عنوان مناسبت به یک رویداد اشاره دارند یا خیر.
+     * اگر یکی باشند true برمی‌گرداند (هیچ تکراری ایجاد نمی‌شود).
+     * اگر رویداد متفاوتی باشد false برمی‌گرداند (در آپدیت‌های آینده به عنوان مناسبت جدید اضافه می‌شود).
+     */
+    fun isSameOccasion(t1: String, t2: String): Boolean {
+        val s1 = normalizeTitle(t1)
+        val s2 = normalizeTitle(t2)
+        if (s1.isEmpty() || s2.isEmpty()) return false
+        if (s1 == s2) return true
+
+        // استخراج کلمات کلیدی اختصاصی (بدون کلمات عمومی تقویم مثل "روز" و "بزرگداشت")
+        val words1 = s1.split(" ", "/", "،", "-").map { it.trim() }.filter { it.length > 2 && it !in COMMON_STOP_WORDS }
+        val words2 = s2.split(" ", "/", "،", "-").map { it.trim() }.filter { it.length > 2 && it !in COMMON_STOP_WORDS }
+        val common = words1.intersect(words2.toSet())
+        if (common.isNotEmpty()) {
+            return true
+        }
+
+        // بررسی زیررشته برای عناوینی با طول مشخص
+        if (s1.length >= 6 && s2.length >= 6) {
+            if (s1.contains(s2) || s2.contains(s1)) return true
+        }
+
+        return false
+    }
+
     fun getOccasionsForDate(month: Int, day: Int, year: Int = 1405): List<PersianOccasion> {
         ensureYearLoaded(year)
         val key = "$month-$day"
         val custom = customOccasions.filter { it.customMonth == month && it.customDay == day }
-        val solar = SOLAR_OCCASIONS[key] ?: emptyList()
+
+        // بررسی اینکه آیا مناسبت رسمی ورودی، قبلاً با یکی از مناسبت‌های ثبت‌شده/سفارشی یا پنهان‌شده یکی است یا خیر
+        fun isCoveredByCustomOrHidden(officialTitle: String): Boolean {
+            // ۱. بررسی در عناوین صریحاً پنهان‌شده
+            if (hiddenOccasions.any { isSameOccasion(it, officialTitle) }) return true
+
+            // ۲. بررسی در مناسبت‌های ثبت‌شده کاربر برای این روز
+            for (c in custom) {
+                // اگر کاربر قبلاً این مناسبت را ویرایش کرده یا عنوان سفارشی با این مناسبت یکی است
+                if (c.originalTitle.isNotBlank() && isSameOccasion(c.originalTitle, officialTitle)) return true
+                if (isSameOccasion(c.title, officialTitle)) return true
+            }
+            return false
+        }
+
+        // ۱. واکشی مناسبت‌های شمسی که با موارد ثبت‌شده کاربر یکی نیستند
+        val solar = (SOLAR_OCCASIONS[key] ?: emptyList()).filter { !isCoveredByCustomOrHidden(it.title) }
         val mergedOccasions = mutableListOf<PersianOccasion>()
         mergedOccasions.addAll(solar)
 
+        // ۲. واکشی مناسبت‌های رسمی JSON که با موارد ثبت‌شده کاربر یکی نیستند
         val officialMap = officialDataCache[year]
         if (officialMap != null && officialMap.containsKey(key)) {
             val officialDay = officialMap[key]!!
-            // Add JSON events that are not already covered by Solar (simple deduplication)
-            val jsonOccs = officialDay.occasions.map { PersianOccasion(title = it, isHoliday = officialDay.isHoliday, isNational = true) }
+            val jsonOccs = officialDay.occasions
+                .filter { !isCoveredByCustomOrHidden(it) }
+                .map { PersianOccasion(title = it, isHoliday = officialDay.isHoliday, isNational = true) }
             for (jOcc in jsonOccs) {
-                // If the solar list doesn't have a very similar title, add it
-                // We assume religious events from JSON will have different keywords or 'ه‍.ق'
-                val isDuplicate = solar.any { sOcc -> 
-                    jOcc.title.contains(sOcc.title) || sOcc.title.contains(jOcc.title) ||
-                    (jOcc.title.contains("نوروز") && sOcc.title.contains("نوروز"))
-                }
+                val isDuplicate = mergedOccasions.any { sOcc -> isSameOccasion(jOcc.title, sOcc.title) }
                 if (!isDuplicate) {
                     mergedOccasions.add(jOcc)
                 }
             }
-            return mergedOccasions + custom
+        } else {
+            // ۳. در صورت عدم وجود فایل JSON، مناسبت‌های قمری واکشی می‌شوند
+            val lunarMap = HijriCalendarUtils.getOccasionsForYear(year)
+            val lunar = (lunarMap[key] ?: emptyList()).filter { !isCoveredByCustomOrHidden(it.title) }
+            for (lOcc in lunar) {
+                val isDuplicate = mergedOccasions.any { mOcc -> isSameOccasion(lOcc.title, mOcc.title) }
+                if (!isDuplicate) {
+                    mergedOccasions.add(lOcc)
+                }
+            }
         }
 
-        // If JSON doesn't exist for this year, fallback to mathematical lunar calculation
-        val lunarMap = HijriCalendarUtils.getOccasionsForYear(year)
-        val lunar = lunarMap[key] ?: emptyList()
-        return mergedOccasions + lunar + custom
+        // مناسبت‌های سفارشی اولویت دارند؛ سپس مناسبت‌های رسمی جدید و غیرهمپوشان اضافه می‌شوند
+        return (custom + mergedOccasions).distinctBy { normalizeTitle(it.title) }
     }
 
     /**
@@ -266,39 +327,12 @@ object PersianOccasionsHelper {
      * @param year سال شمسی (برای محاسبه تعطیلات قمری)
      */
     fun isHoliday(month: Int, day: Int, year: Int = 1405): Boolean {
-        ensureYearLoaded(year)
-        val key = "$month-$day"
-        
-        var isHoliday = false
-        
-        // 1. Check Solar Fixed Holidays
-        if (SOLAR_OCCASIONS[key]?.any { it.isHoliday } == true) {
-            isHoliday = true
-        }
-
-        // 2. Check JSON Official Holidays
-        val officialMap = officialDataCache[year]
-        if (officialMap != null && officialMap.containsKey(key)) {
-            if (officialMap[key]!!.isHoliday) {
-                isHoliday = true
-            }
-        } else {
-            // 3. Fallback to Lunar Math Holidays if JSON is missing
-            val lunarMap = HijriCalendarUtils.getOccasionsForYear(year)
-            if (lunarMap[key]?.any { it.isHoliday } == true) {
-                isHoliday = true
-            }
-        }
-
-        // 4. Check Custom Holidays
-        if (customOccasions.any { it.customMonth == month && it.customDay == day && it.isHoliday }) {
-            isHoliday = true
-        }
-
-        return isHoliday
+        val occasions = getOccasionsForDate(month, day, year)
+        return occasions.any { it.isHoliday }
     }
 
     private var customOccasions: List<PersianOccasion> = emptyList()
+    private var hiddenOccasions: MutableSet<String> = mutableSetOf()
 
     fun loadCustomOccasions(context: android.content.Context) {
         appContext = context.applicationContext
@@ -315,11 +349,25 @@ object PersianOccasionsHelper {
                         isHoliday = obj.optBoolean("isHoliday", false),
                         isNational = true,
                         customMonth = obj.optInt("month", -1),
-                        customDay = obj.optInt("day", -1)
+                        customDay = obj.optInt("day", -1),
+                        originalTitle = obj.optString("originalTitle", "")
                     )
                 )
             }
-            customOccasions = list
+            // پاکسازی رکوردهای تکراری ذخیره‌شده
+            customOccasions = list.distinctBy { "${it.title.trim()}_${it.customMonth}_${it.customDay}" }
+        } catch (e: Exception) {
+            e.printStackTrace()
+        }
+
+        val hiddenJson = prefs.getString("hidden_data", "[]") ?: "[]"
+        try {
+            val hArr = org.json.JSONArray(hiddenJson)
+            val hSet = mutableSetOf<String>()
+            for (i in 0 until hArr.length()) {
+                hSet.add(hArr.getString(i))
+            }
+            hiddenOccasions = hSet
         } catch (e: Exception) {
             e.printStackTrace()
         }
@@ -327,16 +375,77 @@ object PersianOccasionsHelper {
 
     fun addCustomOccasion(context: android.content.Context, title: String, month: Int, day: Int, isHoliday: Boolean) {
         val list = customOccasions.toMutableList()
-        val newOccasion = PersianOccasion(title, isHoliday, isNational = true, customMonth = month, customDay = day)
+        val newOccasion = PersianOccasion(title.trim(), isHoliday, isNational = true, customMonth = month, customDay = day)
         list.add(newOccasion)
-        customOccasions = list
+        customOccasions = list.distinctBy { "${it.title.trim()}_${it.customMonth}_${it.customDay}" }
 
+        saveCustomOccasionsToPrefs(context)
+    }
+
+    fun updateCustomOccasion(
+        context: android.content.Context,
+        oldOccasion: PersianOccasion,
+        newTitle: String,
+        newMonth: Int,
+        newDay: Int,
+        newIsHoliday: Boolean
+    ) {
+        val list = customOccasions.toMutableList()
+        // پیدا کردن رکورد موجود برای جلوگیری از ایجاد تکراری
+        val index = list.indexOfFirst {
+            (it.title == oldOccasion.title &&
+                (oldOccasion.customMonth == -1 || it.customMonth == oldOccasion.customMonth) &&
+                (oldOccasion.customDay == -1 || it.customDay == oldOccasion.customDay)) ||
+            (oldOccasion.originalTitle.isNotBlank() && it.originalTitle == oldOccasion.originalTitle) ||
+            (it.originalTitle.isNotBlank() && it.originalTitle == oldOccasion.title && it.customMonth == newMonth && it.customDay == newDay) ||
+            (it.customMonth == newMonth && it.customDay == newDay && it.title == newTitle.trim())
+        }
+
+        // پنهان کردن عنوان قبلی مناسبت رسمی و عناوین همپوشان
+        hiddenOccasions.add(oldOccasion.title)
+        if (oldOccasion.originalTitle.isNotBlank()) {
+            hiddenOccasions.add(oldOccasion.originalTitle)
+        }
+
+        val origTitle = if (index != -1 && list[index].originalTitle.isNotBlank()) {
+            list[index].originalTitle
+        } else if (oldOccasion.originalTitle.isNotBlank()) {
+            oldOccasion.originalTitle
+        } else {
+            oldOccasion.title
+        }
+
+        val updatedOccasion = PersianOccasion(
+            title = newTitle.trim(),
+            isHoliday = newIsHoliday,
+            isNational = true,
+            customMonth = newMonth,
+            customDay = newDay,
+            originalTitle = origTitle
+        )
+
+        if (index != -1) {
+            list[index] = updatedOccasion
+        } else {
+            list.add(updatedOccasion)
+        }
+
+        customOccasions = list.distinctBy { "${it.title.trim()}_${it.customMonth}_${it.customDay}" }
         saveCustomOccasionsToPrefs(context)
     }
 
     fun removeCustomOccasion(context: android.content.Context, occasion: PersianOccasion) {
         val list = customOccasions.toMutableList()
-        list.remove(occasion)
+        list.removeAll {
+            (it.title == occasion.title && it.customMonth == occasion.customMonth && it.customDay == occasion.customDay) ||
+            (occasion.originalTitle.isNotBlank() && it.originalTitle == occasion.originalTitle) ||
+            (it.originalTitle.isNotBlank() && it.originalTitle == occasion.title)
+        }
+        if (occasion.originalTitle.isNotBlank()) {
+            hiddenOccasions.remove(occasion.originalTitle)
+        } else if (occasion.customMonth == -1) {
+            hiddenOccasions.add(occasion.title)
+        }
         customOccasions = list
         saveCustomOccasionsToPrefs(context)
     }
@@ -351,9 +460,19 @@ object PersianOccasionsHelper {
             obj.put("isHoliday", occ.isHoliday)
             obj.put("month", occ.customMonth)
             obj.put("day", occ.customDay)
+            if (occ.originalTitle.isNotBlank()) {
+                obj.put("originalTitle", occ.originalTitle)
+            }
             arr.put(obj)
         }
+        val hArr = org.json.JSONArray()
+        for (h in hiddenOccasions) {
+            hArr.put(h)
+        }
         context.getSharedPreferences("CustomOccasions", android.content.Context.MODE_PRIVATE)
-            .edit().putString("data", arr.toString()).apply()
+            .edit()
+            .putString("data", arr.toString())
+            .putString("hidden_data", hArr.toString())
+            .apply()
     }
 }

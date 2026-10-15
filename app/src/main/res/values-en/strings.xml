@@ -1,0 +1,9 @@
+﻿<resources>
+    <string name="app_name">Hamgam | همگام</string>
+    <string name="tab_calendar">Calendar</string>
+    <string name="tab_tasks">Tasks</string>
+    <string name="tab_notes">Notes</string>
+    <string name="tab_chat">AI Chat</string>
+    <string name="tab_sync">Sync</string>
+    <string name="tab_settings">Settings</string>
+</resources>

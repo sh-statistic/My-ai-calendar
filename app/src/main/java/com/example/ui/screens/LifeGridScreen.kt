@@ -23,6 +23,8 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.Cake
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.HourglassBottom
 import androidx.compose.material3.AlertDialog
@@ -30,6 +32,7 @@ import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Icon
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -59,6 +62,7 @@ import com.example.calendar.PersianCalendarHelper
 import com.example.memento.LifeProgress
 import com.example.memento.MementoMoriManager
 import com.example.ui.MainViewModel
+import com.example.ui.rememberAppStrings
 
 // Color palette
 private val BgScreen        = Color(0xFFFDF9F3)
@@ -82,6 +86,7 @@ fun LifeGridScreen(
     modifier: Modifier = Modifier
 ) {
     val context  = LocalContext.current
+    val strings  = rememberAppStrings()
     val manager  = remember { MementoMoriManager(context) }
     var progress by remember { mutableStateOf(manager.calculateProgress()) }
 
@@ -99,7 +104,7 @@ fun LifeGridScreen(
     var showNewMonthPrompt by remember { mutableStateOf(false) }
 
     androidx.compose.runtime.LaunchedEffect(progress.currentMonthIndex) {
-        if (manager.checkNewMonthCompleted(progress.currentMonthIndex)) {
+        if (progress.isConfigured && manager.checkNewMonthCompleted(progress.currentMonthIndex)) {
             showNewMonthPrompt = true
         }
     }
@@ -109,8 +114,8 @@ fun LifeGridScreen(
     if (showNewMonthPrompt) {
         AlertDialog(
             onDismissRequest = { showNewMonthPrompt = false },
-            title = { Text("یک ماه دیگر گذشت...", fontWeight = FontWeight.Bold) },
-            text = { Text("ماه جدیدی از عمر شما آغاز شده است و ماه قبلی تکمیل شد! آیا می‌خواهید برای ماه گذشته یادداشتی ثبت کنید؟") },
+            title = { Text(strings.anotherMonthPassedTitle, fontWeight = FontWeight.Bold) },
+            text = { Text(strings.anotherMonthPassedMsg) },
             confirmButton = {
                 Button(
                     onClick = {
@@ -120,10 +125,10 @@ fun LifeGridScreen(
                         showReflectionDialog = true
                     },
                     colors = ButtonDefaults.buttonColors(containerColor = OrangeAccent)
-                ) { Text("بله، یادداشت می‌نویسم") }
+                ) { Text(strings.writeNoteConfirm) }
             },
             dismissButton = {
-                TextButton(onClick = { showNewMonthPrompt = false }) { Text("بعداً") }
+                TextButton(onClick = { showNewMonthPrompt = false }) { Text(strings.later) }
             }
         )
     }
@@ -162,8 +167,6 @@ fun LifeGridScreen(
                     selectedYearIdx = yearIdx,
                     onMonthClick    = { clickedMonthIdx ->
                         justDrilledMonthIdx = clickedMonthIdx
-                        // We do not advance the current month manually anymore.
-                        // The user can only write reflection notes for elapsed months.
                         if (clickedMonthIdx <= progress.currentMonthIndex) {
                             reflectionNoteText = manager.getReflectionNote(clickedMonthIdx) ?: ""
                             selectedYearIdx = null
@@ -173,7 +176,7 @@ fun LifeGridScreen(
                 )
             },
             confirmButton = {
-                TextButton(onClick = { selectedYearIdx = null }) { Text("بستن") }
+                TextButton(onClick = { selectedYearIdx = null }) { Text(strings.close) }
             }
         )
     }
@@ -182,17 +185,17 @@ fun LifeGridScreen(
     if (showReflectionDialog) {
         AlertDialog(
             onDismissRequest = { showReflectionDialog = false },
-            title  = { Text("این ماه چطور گذشت؟", fontWeight = FontWeight.Bold) },
+            title  = { Text(strings.howWasThisMonthTitle, fontWeight = FontWeight.Bold) },
             text   = {
                 Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                     Text(
-                        "یک ماه دیگر از عمر شما سپری و ثبت شد. مهم‌ترین خاطره یا دستاورد این ماه را بنویسید:",
+                        strings.howWasThisMonthMsg,
                         fontSize = 13.sp, color = SubtleGray
                     )
                     OutlinedTextField(
                         value         = reflectionNoteText,
                         onValueChange = { reflectionNoteText = it },
-                        placeholder   = { Text("مثال: پروژه جدید را شروع کردم...") },
+                        placeholder   = { Text(strings.notePlaceholder) },
                         minLines = 3, maxLines = 6,
                         modifier = Modifier.fillMaxWidth()
                     )
@@ -207,48 +210,49 @@ fun LifeGridScreen(
                         showReflectionDialog = false
                     },
                     colors = ButtonDefaults.buttonColors(containerColor = OrangeAccent)
-                ) { Text("ذخیره یادداشت") }
+                ) { Text(strings.saveNote) }
             },
             dismissButton = {
-                TextButton(onClick = { showReflectionDialog = false }) { Text("بعداً") }
+                TextButton(onClick = { showReflectionDialog = false }) { Text(strings.later) }
             }
         )
     }
 
     // Birth Date Dialog
     if (showBirthDialog) {
-        var tempYear     by remember { mutableStateOf(progress.birthYear.toString()) }
+        var tempYear     by remember { mutableStateOf(if (progress.isConfigured) progress.birthYear.toString() else "") }
         var tempMonth    by remember { mutableIntStateOf(progress.birthMonth) }
         var tempLifespan by remember { mutableStateOf((progress.totalMonths / 12).toString()) }
         val currentYear  = PersianCalendarHelper.getCurrentJalaliDate().year
 
         AlertDialog(
             onDismissRequest = { showBirthDialog = false },
-            title   = { Text("تنظیمات عمر من", fontWeight = FontWeight.Bold) },
+            title   = { Text(strings.lifeSettingsTitle, fontWeight = FontWeight.Bold) },
             text    = {
                 Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                    Text("مشخصات خود را برای محاسبه دقیق وارد کنید:", fontSize = 13.sp)
+                    Text(strings.enterDetailsDesc, fontSize = 13.sp)
                     OutlinedTextField(
                         value         = tempYear,
                         onValueChange = { tempYear = it.filter { c -> c.isDigit() } },
-                        label         = { Text("سال تولد (شمسی)") },
+                        label         = { Text(strings.birthYearLabel) },
+                        placeholder   = { Text(strings.birthYearExample) },
                         singleLine    = true,
                         modifier      = Modifier.fillMaxWidth()
                     )
                     OutlinedTextField(
                         value         = tempLifespan,
                         onValueChange = { tempLifespan = it.filter { c -> c.isDigit() } },
-                        label         = { Text("عمر پیش‌بینی‌شده (سال)") },
+                        label         = { Text(strings.expectedLifespan) },
                         singleLine    = true,
                         modifier      = Modifier.fillMaxWidth()
                     )
-                    Text("ماه تولد:", fontSize = 12.sp, fontWeight = FontWeight.SemiBold)
+                    Text(strings.birthMonthLabel, fontSize = 12.sp, fontWeight = FontWeight.SemiBold)
                     FlowRow(
                         modifier              = Modifier.fillMaxWidth(),
                         horizontalArrangement = Arrangement.spacedBy(4.dp),
                         verticalArrangement   = Arrangement.spacedBy(4.dp)
                     ) {
-                        PersianCalendarHelper.PERSIAN_MONTH_NAMES.forEachIndexed { i, name ->
+                        strings.jalaliMonths.forEachIndexed { i, name ->
                             FilterChip(
                                 selected = tempMonth == i + 1,
                                 onClick  = { tempMonth = i + 1 },
@@ -259,20 +263,32 @@ fun LifeGridScreen(
                 }
             },
             confirmButton = {
-                Button(onClick = {
-                    val y  = tempYear.toIntOrNull() ?: progress.birthYear
-                    val ls = tempLifespan.toIntOrNull()?.coerceIn(10, 150) ?: (progress.totalMonths / 12)
-                    manager.setBirthDate(
-                        if (y in 1300..currentYear) y else progress.birthYear,
-                        tempMonth
-                    )
-                    manager.setExpectedLifespan(ls)
-                    progress = manager.calculateProgress()
-                    showBirthDialog = false
-                }) { Text("ذخیره و بروزرسانی") }
+                Button(
+                    enabled = tempYear.isNotBlank() && (tempYear.toIntOrNull() ?: 0) in 1300..currentYear,
+                    onClick = {
+                        val y  = tempYear.toIntOrNull() ?: return@Button
+                        val ls = tempLifespan.toIntOrNull()?.coerceIn(10, 150) ?: (progress.totalMonths / 12)
+                        manager.setBirthDate(y, tempMonth)
+                        manager.setExpectedLifespan(ls)
+                        progress = manager.calculateProgress()
+                        showBirthDialog = false
+                    }
+                ) { Text(strings.saveAndUpdate) }
             },
             dismissButton = {
-                TextButton(onClick = { showBirthDialog = false }) { Text("انصراف") }
+                Row {
+                    if (progress.isConfigured) {
+                        TextButton(
+                            onClick = {
+                                manager.clearBirthDate()
+                                progress = manager.calculateProgress()
+                                showBirthDialog = false
+                            },
+                            colors = ButtonDefaults.textButtonColors(contentColor = MaterialTheme.colorScheme.error)
+                        ) { Text(strings.deleteBirthDate) }
+                    }
+                    TextButton(onClick = { showBirthDialog = false }) { Text(strings.cancel) }
+                }
             }
         )
     }
@@ -281,93 +297,143 @@ fun LifeGridScreen(
 // ─── Summary Card ─────────────────────────────────────────────────────────────
 @Composable
 private fun SummaryCard(progress: LifeProgress, onEditClick: () -> Unit) {
-    val p = PersianCalendarHelper::toPersianDigits
+    val strings = rememberAppStrings()
     Surface(
         color    = CardBg,
         shape    = RoundedCornerShape(16.dp),
         border   = androidx.compose.foundation.BorderStroke(1.dp, CardBorder),
         modifier = Modifier.fillMaxWidth()
     ) {
-        Column(modifier = Modifier.padding(14.dp)) {
-            Row(
-                modifier              = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment     = Alignment.CenterVertically
+        if (!progress.isConfigured) {
+            Column(
+                modifier = Modifier.padding(16.dp),
+                horizontalAlignment = Alignment.CenterHorizontally
             ) {
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Icon(Icons.Default.HourglassBottom, null, tint = OrangeAccent, modifier = Modifier.size(20.dp))
+                Row(
+                    modifier              = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment     = Alignment.CenterVertically
+                ) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Icon(Icons.Default.HourglassBottom, null, tint = OrangeAccent, modifier = Modifier.size(20.dp))
+                        Spacer(modifier = Modifier.width(6.dp))
+                        Text(strings.lifeGridTitle, fontSize = 14.sp, fontWeight = FontWeight.Bold, color = TextMain)
+                    }
+                }
+                Spacer(modifier = Modifier.height(12.dp))
+                Icon(
+                    Icons.Default.Cake,
+                    contentDescription = null,
+                    tint = OrangeAccent,
+                    modifier = Modifier.size(36.dp)
+                )
+                Spacer(modifier = Modifier.height(8.dp))
+                Text(
+                    strings.birthDateNotSet,
+                    fontSize = 13.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = TextMain
+                )
+                Spacer(modifier = Modifier.height(4.dp))
+                Text(
+                    strings.birthDateDesc,
+                    fontSize = 11.sp,
+                    color = SubtleGray,
+                    textAlign = TextAlign.Center
+                )
+                Spacer(modifier = Modifier.height(12.dp))
+                Button(
+                    onClick = onEditClick,
+                    shape = RoundedCornerShape(10.dp),
+                    colors = ButtonDefaults.buttonColors(containerColor = OrangeAccent)
+                ) {
+                    Icon(Icons.Default.Add, contentDescription = null, modifier = Modifier.size(16.dp))
                     Spacer(modifier = Modifier.width(6.dp))
-                    Text("عمر فعلی و پیش‌بینی‌شده", fontSize = 14.sp, fontWeight = FontWeight.Bold, color = TextMain)
+                    Text(strings.editBirthDate, fontSize = 12.sp, fontWeight = FontWeight.Bold)
                 }
-                Surface(
-                    color    = Color(0xFFFEF9EC),
-                    shape    = RoundedCornerShape(20.dp),
-                    border   = androidx.compose.foundation.BorderStroke(1.dp, Color(0xFFFDE68A)),
-                    modifier = Modifier.clickable { onEditClick() }
+            }
+        } else {
+            Column(modifier = Modifier.padding(14.dp)) {
+                Row(
+                    modifier              = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment     = Alignment.CenterVertically
                 ) {
-                    Row(
-                        modifier          = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
-                        verticalAlignment = Alignment.CenterVertically
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Icon(Icons.Default.HourglassBottom, null, tint = OrangeAccent, modifier = Modifier.size(20.dp))
+                        Spacer(modifier = Modifier.width(6.dp))
+                        Text(strings.currentAndExpectedLife, fontSize = 14.sp, fontWeight = FontWeight.Bold, color = TextMain)
+                    }
+                    Surface(
+                        color    = Color(0xFFFEF9EC),
+                        shape    = RoundedCornerShape(20.dp),
+                        border   = androidx.compose.foundation.BorderStroke(1.dp, Color(0xFFFDE68A)),
+                        modifier = Modifier.clickable { onEditClick() }
                     ) {
-                        Icon(Icons.Default.Edit, null, modifier = Modifier.size(11.dp), tint = OrangeAccent)
-                        Spacer(modifier = Modifier.width(4.dp))
-                        Text(
-                            "متولد ${p(progress.birthYear.toString())} · ${p((progress.totalMonths / 12).toString())} سال",
-                            fontSize = 11.sp, color = OrangeAccent, fontWeight = FontWeight.SemiBold
-                        )
+                        Row(
+                            modifier          = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Icon(Icons.Default.Edit, null, modifier = Modifier.size(11.dp), tint = OrangeAccent)
+                            Spacer(modifier = Modifier.width(4.dp))
+                            Text(
+                                strings.bornInfo(progress.birthYear.toString(), (progress.totalMonths / 12).toString()),
+                                fontSize = 11.sp, color = OrangeAccent, fontWeight = FontWeight.SemiBold
+                            )
+                        }
                     }
                 }
-            }
-            Spacer(modifier = Modifier.height(10.dp))
-            Row(
-                modifier              = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(8.dp)
-            ) {
-                Surface(color = ElapsedCardBg, shape = RoundedCornerShape(12.dp), modifier = Modifier.weight(1f)) {
-                    Column(modifier = Modifier.padding(10.dp)) {
-                        Text("سن فعلی", fontSize = 11.sp, color = Color(0xFF92400E))
-                        Spacer(modifier = Modifier.height(4.dp))
-                        Text(
-                            "${p(progress.elapsedYears.toString())} سال و ${p(progress.elapsedRemainingMonths.toString())} ماه",
-                            fontSize = 14.sp, fontWeight = FontWeight.Bold, color = TextMain
-                        )
-                        Text("(${p(progress.elapsedMonths.toString())} ماه)", fontSize = 11.sp, color = SubtleGray)
-                    }
-                }
-                Surface(color = RemainingCardBg, shape = RoundedCornerShape(12.dp), modifier = Modifier.weight(1f)) {
-                    Column(modifier = Modifier.padding(10.dp)) {
-                        Text("باقیمانده", fontSize = 11.sp, color = Color(0xFF1E40AF))
-                        Spacer(modifier = Modifier.height(4.dp))
-                        val remMonths = progress.totalMonths - progress.elapsedMonths
-                        Text(
-                            "${p(progress.remainingYears.toString())} سال و ${p(progress.remainingMonths.toString())} ماه",
-                            fontSize = 14.sp, fontWeight = FontWeight.Bold, color = TextMain
-                        )
-                        Text("(${p(remMonths.toString())} ماه)", fontSize = 11.sp, color = SubtleGray)
-                    }
-                }
-            }
-            Spacer(modifier = Modifier.height(12.dp))
-            val pct     = (progress.percentElapsed / 100f).coerceIn(0f, 1f)
-            val pctText = p("${(progress.percentElapsed + 0.5f).toInt()}") + "٪ از عمر"
-            Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-                Box(
-                    modifier = Modifier
-                        .weight(1f)
-                        .height(7.dp)
-                        .clip(RoundedCornerShape(4.dp))
-                        .background(ProgressTrack)
+                Spacer(modifier = Modifier.height(10.dp))
+                Row(
+                    modifier              = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
+                    Surface(color = ElapsedCardBg, shape = RoundedCornerShape(12.dp), modifier = Modifier.weight(1f)) {
+                        Column(modifier = Modifier.padding(10.dp)) {
+                            Text(strings.currentAge, fontSize = 11.sp, color = Color(0xFF92400E))
+                            Spacer(modifier = Modifier.height(4.dp))
+                            Text(
+                                strings.ageSpan(progress.elapsedYears.toString(), progress.elapsedRemainingMonths.toString()),
+                                fontSize = 14.sp, fontWeight = FontWeight.Bold, color = TextMain
+                            )
+                            Text(strings.monthsCount(progress.elapsedMonths.toString()), fontSize = 11.sp, color = SubtleGray)
+                        }
+                    }
+                    Surface(color = RemainingCardBg, shape = RoundedCornerShape(12.dp), modifier = Modifier.weight(1f)) {
+                        Column(modifier = Modifier.padding(10.dp)) {
+                            Text(strings.remainingLife, fontSize = 11.sp, color = Color(0xFF1E40AF))
+                            Spacer(modifier = Modifier.height(4.dp))
+                            val remMonths = progress.totalMonths - progress.elapsedMonths
+                            Text(
+                                strings.ageSpan(progress.remainingYears.toString(), progress.remainingMonths.toString()),
+                                fontSize = 14.sp, fontWeight = FontWeight.Bold, color = TextMain
+                            )
+                            Text(strings.monthsCount(remMonths.toString()), fontSize = 11.sp, color = SubtleGray)
+                        }
+                    }
+                }
+                Spacer(modifier = Modifier.height(12.dp))
+                val pct     = (progress.percentElapsed / 100f).coerceIn(0f, 1f)
+                val pctText = "${strings.formatDigits((progress.percentElapsed + 0.5f).toInt().toString())}% ${strings.percentOfLife}"
+                Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
                     Box(
                         modifier = Modifier
-                            .fillMaxWidth(pct)
+                            .weight(1f)
                             .height(7.dp)
                             .clip(RoundedCornerShape(4.dp))
-                            .background(NavyElapsed)
-                    )
+                            .background(ProgressTrack)
+                    ) {
+                        Box(
+                            modifier = Modifier
+                                .fillMaxWidth(pct)
+                                .height(7.dp)
+                                .clip(RoundedCornerShape(4.dp))
+                                .background(NavyElapsed)
+                        )
+                    }
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text(pctText, fontSize = 11.sp, color = NavyElapsed, fontWeight = FontWeight.Bold)
                 }
-                Spacer(modifier = Modifier.width(8.dp))
-                Text(pctText, fontSize = 11.sp, color = NavyElapsed, fontWeight = FontWeight.Bold)
             }
         }
     }
@@ -376,14 +442,15 @@ private fun SummaryCard(progress: LifeProgress, onEditClick: () -> Unit) {
 // ─── Legend Row ───────────────────────────────────────────────────────────────
 @Composable
 private fun LegendRow() {
+    val strings = rememberAppStrings()
     Row(
         modifier              = Modifier.fillMaxWidth(),
         horizontalArrangement = Arrangement.spacedBy(12.dp, Alignment.CenterHorizontally),
         verticalAlignment     = Alignment.CenterVertically
     ) {
-        LegendDot(NavyElapsed,  "سپری‌شده")
-        LegendDot(OrangeAccent, "ماه فعلی")
-        LegendDot(FutureBlue,   "آینده")
+        LegendDot(NavyElapsed,  strings.elapsedLegend)
+        LegendDot(OrangeAccent, strings.currentMonthLegend)
+        LegendDot(FutureBlue,   strings.futureLegend)
     }
 }
 
@@ -405,6 +472,7 @@ private fun WholeLifeCard(
     selectedYearIdx: Int?,
     onYearSelected: (Int) -> Unit
 ) {
+    val strings = rememberAppStrings()
     Surface(
         color    = CardBg,
         shape    = RoundedCornerShape(16.dp),
@@ -417,8 +485,8 @@ private fun WholeLifeCard(
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment     = Alignment.CenterVertically
             ) {
-                Text("کل عمر؛ هر بلوک یک سال", fontSize = 14.sp, fontWeight = FontWeight.Bold, color = TextMain)
-                Text("سال را لمس کنید", fontSize = 11.sp, color = GrayText)
+                Text(strings.wholeLifeHeader, fontSize = 14.sp, fontWeight = FontWeight.Bold, color = TextMain)
+                Text(strings.tapYearHint, fontSize = 11.sp, color = GrayText)
             }
             Spacer(modifier = Modifier.height(10.dp))
 
@@ -454,7 +522,7 @@ private fun WholeLifeCard(
                             val displayEnd   = minOf(startAge + 10, totalYears)
 
                             Text(
-                                "${PersianCalendarHelper.toPersianDigits(displayStart.toString())} تا ${PersianCalendarHelper.toPersianDigits(displayEnd.toString())} سالگی",
+                                strings.ageRange(displayStart.toString(), displayEnd.toString()),
                                 fontSize  = 10.sp, color = GrayText,
                                 modifier  = Modifier.fillMaxWidth(),
                                 textAlign = TextAlign.Start
@@ -538,6 +606,7 @@ private fun DrawScope.drawYearBlock(
             val radius = dotSizePx / 2f
 
             when {
+                !progress.isConfigured -> drawCircle(FutureBlue, radius, center)
                 absYear == 0 && monthInYear < (progress.birthMonth - 1) -> {
                     // Draw gray dots for months before birth instead of hiding them
                     drawCircle(Color.Gray.copy(alpha = 0.4f), radius, center)
@@ -556,7 +625,7 @@ private fun DrawScope.drawYearBlock(
 // ─── Selected Year Dialog Components ──────────────────────────────────────────
 @Composable
 private fun SelectedYearDialogHeader(progress: LifeProgress, selectedYearIdx: Int) {
-    val p = PersianCalendarHelper::toPersianDigits
+    val strings = rememberAppStrings()
     val persianCalYear = progress.birthYear + selectedYearIdx
     Row(
         modifier              = Modifier.fillMaxWidth(),
@@ -564,10 +633,12 @@ private fun SelectedYearDialogHeader(progress: LifeProgress, selectedYearIdx: In
         verticalAlignment     = Alignment.CenterVertically
     ) {
         Text(
-            "سن ${p(selectedYearIdx.toString())} تا ${p((selectedYearIdx + 1).toString())} سالگی",
+            strings.ageRange(selectedYearIdx.toString(), (selectedYearIdx + 1).toString()),
             fontSize = 14.sp, fontWeight = FontWeight.Bold, color = TextMain
         )
-        Text("سال ${p(persianCalYear.toString())}", fontSize = 12.sp, color = SubtleGray)
+        if (progress.isConfigured) {
+            Text(strings.yearLabel(persianCalYear.toString()), fontSize = 12.sp, color = SubtleGray)
+        }
     }
 }
 
@@ -577,7 +648,8 @@ private fun SelectedYearDialogContent(
     selectedYearIdx: Int,
     onMonthClick: (Int) -> Unit
 ) {
-    val monthNames      = PersianCalendarHelper.PERSIAN_MONTH_NAMES
+    val strings         = rememberAppStrings()
+    val monthNames      = strings.jalaliMonths
     val startMonthIdx   = selectedYearIdx * 12
     val currentMonthIdx = progress.currentMonthIndex
 
@@ -608,7 +680,7 @@ private fun SelectedYearDialogContent(
                     val isClickable = isElapsed || isCurrent
                     val chipBg    = when { isElapsed -> Color(0xFF1B2A4A); isCurrent -> OrangeAccent; else -> Color(0xFFF0EDE8) }
                     val chipText  = if (isClickable) Color.White else GrayText
-                    val subtitle  = when { isElapsed -> "مشاهده/ثبت"; isCurrent -> "لمس برای ثبت"; else -> "—" }
+                    val subtitle  = when { isElapsed -> strings.viewOrAddNote; isCurrent -> strings.tapToAddNote; else -> "—" }
 
                     Surface(
                         color    = chipBg,

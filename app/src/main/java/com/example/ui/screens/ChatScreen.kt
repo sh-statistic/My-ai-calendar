@@ -35,13 +35,18 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.Send
 import androidx.compose.material.icons.filled.AutoAwesome
 import androidx.compose.material.icons.filled.Bolt
-import androidx.compose.material.icons.filled.ClearAll
+import androidx.compose.material.icons.filled.DeleteOutline
 import androidx.compose.material.icons.filled.ContentCopy
+import android.net.Uri
+import androidx.compose.material.icons.filled.ExpandLess
+import androidx.compose.material.icons.filled.ExpandMore
 import androidx.compose.material.icons.filled.Key
 import androidx.compose.material.icons.filled.KeyOff
+import androidx.compose.material.icons.automirrored.filled.OpenInNew
 import androidx.compose.material.icons.filled.Mic
 import androidx.compose.material.icons.filled.Psychology
 import androidx.compose.material.icons.filled.SmartToy
+import androidx.compose.material.icons.filled.Tune
 import androidx.compose.material.icons.filled.WbSunny
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
@@ -78,6 +83,8 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.calendar.PersianCalendarHelper
+import com.example.chat.AiProvider
+import com.example.chat.ApiKeyManager
 import com.example.chat.ChatMessage
 import com.example.chat.ChatRole
 import com.example.chat.ChatSender
@@ -93,12 +100,14 @@ fun ChatScreen(
 
     val messages by viewModel.chatMessages.collectAsState()
     val isGenerating by viewModel.isGeneratingResponse.collectAsState()
+    val selectedProvider by viewModel.selectedAiProvider.collectAsState()
     val isApiKeyConfigured by viewModel.isApiKeyConfigured.collectAsState()
     val userApiKey by viewModel.userApiKey.collectAsState()
     val selectedRole by viewModel.selectedRole.collectAsState()
 
     var inputText by remember { mutableStateOf("") }
     var showApiKeyDialog by remember { mutableStateOf(false) }
+    var showClearConfirmDialog by remember { mutableStateOf(false) }
 
     val listState = rememberLazyListState()
 
@@ -186,7 +195,7 @@ fun ChatScreen(
                         Surface(
                             shape = CircleShape,
                             color = MaterialTheme.colorScheme.primary.copy(alpha = 0.15f),
-                            modifier = Modifier.size(36.dp)
+                            modifier = Modifier.size(38.dp)
                         ) {
                             Box(contentAlignment = Alignment.Center) {
                                 Icon(
@@ -200,36 +209,59 @@ fun ChatScreen(
 
                         Spacer(modifier = Modifier.width(8.dp))
 
-                        Column {
+                        Column(modifier = Modifier.weight(1f)) {
                             Text(
                                 text = "دستیار هوشمند تقویم",
                                 style = MaterialTheme.typography.titleMedium,
-                                fontWeight = FontWeight.Bold
+                                fontWeight = FontWeight.Bold,
+                                maxLines = 1
                             )
-                            Row(verticalAlignment = Alignment.CenterVertically) {
+                            Spacer(modifier = Modifier.height(2.dp))
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(6.dp)
+                            ) {
                                 Surface(
                                     shape = RoundedCornerShape(4.dp),
-                                    color = MaterialTheme.colorScheme.primary.copy(alpha = 0.15f)
+                                    color = MaterialTheme.colorScheme.primary.copy(alpha = 0.12f)
                                 ) {
                                     Text(
-                                        text = selectedRole.badge,
+                                        text = if (selectedProvider == AiProvider.GEMINI) "Google Gemini" else "OpenAI Compatible",
                                         fontSize = 10.sp,
                                         fontWeight = FontWeight.SemiBold,
                                         color = MaterialTheme.colorScheme.primary,
-                                        modifier = Modifier.padding(horizontal = 4.dp, vertical = 1.dp)
+                                        modifier = Modifier.padding(horizontal = 5.dp, vertical = 2.dp),
+                                        maxLines = 1
                                     )
                                 }
-                                Spacer(modifier = Modifier.width(6.dp))
-                                Text(
-                                    text = if (isApiKeyConfigured) "آماده دریافت دستورات صوتی و متنی" else "نیاز به تنظیم کلید API",
-                                    fontSize = 10.sp,
-                                    color = if (isApiKeyConfigured) Color(0xFF15803D) else MaterialTheme.colorScheme.error
-                                )
+
+                                Row(
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.spacedBy(3.dp)
+                                ) {
+                                    Box(
+                                        modifier = Modifier
+                                            .size(7.dp)
+                                            .clip(CircleShape)
+                                            .background(if (isApiKeyConfigured) Color(0xFF16A34A) else MaterialTheme.colorScheme.error)
+                                    )
+                                    Text(
+                                        text = if (isApiKeyConfigured) "آماده" else "نیاز به کلید",
+                                        fontSize = 10.sp,
+                                        fontWeight = FontWeight.Medium,
+                                        color = if (isApiKeyConfigured) Color(0xFF16A34A) else MaterialTheme.colorScheme.error,
+                                        maxLines = 1,
+                                        softWrap = false
+                                    )
+                                }
                             }
                         }
                     }
 
-                    Row {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(2.dp)
+                    ) {
                         // Voice trigger in header
                         IconButton(
                             onClick = launchVoiceInput,
@@ -254,7 +286,7 @@ fun ChatScreen(
                         ) {
                             Icon(
                                 if (isApiKeyConfigured) Icons.Default.Key else Icons.Default.KeyOff,
-                                contentDescription = "تنظیم کلید API",
+                                contentDescription = "تنظیم سرویس هوش مصنوعی",
                                 tint = if (isApiKeyConfigured) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.error,
                                 modifier = Modifier.size(18.dp)
                             )
@@ -262,14 +294,14 @@ fun ChatScreen(
 
                         // Clear Chat Button
                         IconButton(
-                            onClick = { viewModel.clearChatHistory() },
+                            onClick = { showClearConfirmDialog = true },
                             modifier = Modifier.size(34.dp)
                         ) {
                             Icon(
-                                Icons.Default.ClearAll,
-                                contentDescription = "پاک‌سازی چت",
+                                Icons.Default.DeleteOutline,
+                                contentDescription = "پاک‌سازی سابقه گفتگو",
                                 tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                                modifier = Modifier.size(18.dp)
+                                modifier = Modifier.size(19.dp)
                             )
                         }
                     }
@@ -459,15 +491,65 @@ fun ChatScreen(
         }
     }
 
-    // Configure API Key Dialog
+    // Configure AI Provider & API Key Dialog
     if (showApiKeyDialog) {
-        ApiKeySetupDialog(
-            currentKey = userApiKey,
+        AiProviderSetupDialog(
+            initialProvider = selectedProvider,
             onDismiss = { showApiKeyDialog = false },
-            onSave = { newKey: String ->
-                viewModel.updateApiKey(newKey)
+            onSave = { provider, key, baseUrl, model ->
+                viewModel.updateAiConfiguration(
+                    provider = provider,
+                    apiKey = key,
+                    customBaseUrl = baseUrl,
+                    customModel = model
+                )
                 showApiKeyDialog = false
-                Toast.makeText(context, "کلید API ذخیره شد", Toast.LENGTH_SHORT).show()
+                Toast.makeText(context, "سرویس ${provider.displayName} با موفقیت فعال شد", Toast.LENGTH_SHORT).show()
+            }
+        )
+    }
+
+    // Clear Chat Confirmation Dialog
+    if (showClearConfirmDialog) {
+        AlertDialog(
+            onDismissRequest = { showClearConfirmDialog = false },
+            icon = {
+                Icon(
+                    Icons.Default.DeleteOutline,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.error,
+                    modifier = Modifier.size(28.dp)
+                )
+            },
+            title = {
+                Text(
+                    text = "پاک‌سازی سابقه گفتگو",
+                    fontWeight = FontWeight.Bold
+                )
+            },
+            text = {
+                Text(
+                    text = "آیا از پاک کردن سابقه پیام‌های گفتگو مطمئن هستید؟ تمامی پیام‌های این بخش حذف خواهند شد.",
+                    style = MaterialTheme.typography.bodyMedium
+                )
+            },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        viewModel.clearChatHistory()
+                        showClearConfirmDialog = false
+                    },
+                    colors = androidx.compose.material3.ButtonDefaults.buttonColors(
+                        containerColor = MaterialTheme.colorScheme.error
+                    )
+                ) {
+                    Text("پاک کردن")
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showClearConfirmDialog = false }) {
+                    Text("انصراف")
+                }
             }
         )
     }
@@ -570,39 +652,82 @@ fun ChatBubble(
 }
 
 @Composable
-fun ApiKeySetupDialog(
-    currentKey: String,
+fun AiProviderSetupDialog(
+    initialProvider: AiProvider,
     onDismiss: () -> Unit,
-    onSave: (String) -> Unit
+    onSave: (provider: AiProvider, apiKey: String, customBaseUrl: String?, customModel: String?) -> Unit
 ) {
-    var keyText by remember { mutableStateOf(currentKey) }
+    val context = LocalContext.current
+    var activeProvider by remember { mutableStateOf(initialProvider) }
+    var keyText by remember(activeProvider) { mutableStateOf(ApiKeyManager.getApiKey(context, activeProvider)) }
+    var baseUrlText by remember(activeProvider) { mutableStateOf(ApiKeyManager.getBaseUrl(context, activeProvider)) }
+    var modelText by remember(activeProvider) { mutableStateOf(ApiKeyManager.getModel(context, activeProvider)) }
 
     AlertDialog(
         onDismissRequest = onDismiss,
         icon = {
-            Icon(Icons.Default.Key, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
+            Icon(Icons.Default.Tune, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
         },
         title = {
-            Text("تنظیم کلید Gemini API", fontWeight = FontWeight.Bold, style = MaterialTheme.typography.titleMedium)
+            Text(
+                "تنظیم سرویس هوش مصنوعی",
+                fontWeight = FontWeight.Bold,
+                style = MaterialTheme.typography.titleMedium
+            )
         },
         text = {
             Column(
                 modifier = Modifier
                     .fillMaxWidth()
                     .verticalScroll(rememberScrollState()),
-                verticalArrangement = Arrangement.spacedBy(8.dp)
+                verticalArrangement = Arrangement.spacedBy(10.dp)
             ) {
                 Text(
-                    text = "جهت فعال‌سازی هوش مصنوعی، لطفاً کلید اختصاصی Gemini API خود را وارد کنید (این کادر در ابتدا کاملاً خالی است):",
+                    text = "نوع سرویس‌دهنده هوش مصنوعی را انتخاب نمایید:",
                     style = MaterialTheme.typography.bodySmall,
                     fontSize = 11.sp,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
 
+                // 2 Provider Selection Chips: Google Gemini vs OpenAI Compatible
+                Row(
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    AiProvider.entries.forEach { provider ->
+                        val isSelected = activeProvider == provider
+                        FilterChip(
+                            selected = isSelected,
+                            onClick = {
+                                activeProvider = provider
+                                keyText = ApiKeyManager.getApiKey(context, provider)
+                                baseUrlText = ApiKeyManager.getBaseUrl(context, provider)
+                                modelText = ApiKeyManager.getModel(context, provider)
+                            },
+                            label = {
+                                Text(
+                                    if (provider == AiProvider.GEMINI) "Google Gemini" else "OpenAI Compatible",
+                                    fontSize = 11.sp,
+                                    fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal
+                                )
+                            },
+                            colors = FilterChipDefaults.filterChipColors(
+                                selectedContainerColor = MaterialTheme.colorScheme.primary,
+                                selectedLabelColor = MaterialTheme.colorScheme.onPrimary
+                            ),
+                            modifier = Modifier
+                                .weight(1f)
+                                .testTag("chip_provider_${provider.id}")
+                        )
+                    }
+                }
+
+                // API Key Field
                 OutlinedTextField(
                     value = keyText,
                     onValueChange = { keyText = it },
-                    placeholder = { Text("کلید API خود را اینجا بنویسید (مانند AIzaSy...)", fontSize = 11.sp) },
+                    label = { Text("کلید API (${if (activeProvider == AiProvider.GEMINI) "Google Gemini" else "OpenAI Compatible"})", fontSize = 11.sp) },
+                    placeholder = { Text(activeProvider.keyHint, fontSize = 11.sp) },
                     singleLine = true,
                     modifier = Modifier
                         .fillMaxWidth()
@@ -613,43 +738,128 @@ fun ApiKeySetupDialog(
                     TextButton(
                         onClick = {
                             keyText = ""
-                            onSave("")
                         },
                         modifier = Modifier.align(Alignment.End)
                     ) {
-                        Text("پاک‌سازی و خالی کردن کلید", color = MaterialTheme.colorScheme.error, fontSize = 10.sp)
+                        Text("پاک‌سازی کلید", color = MaterialTheme.colorScheme.error, fontSize = 10.sp)
                     }
                 }
 
+                // Extra settings for OpenAI Compatible (Base URL and Model Name)
+                if (activeProvider == AiProvider.OPENAI_COMPATIBLE) {
+                    Surface(
+                        shape = RoundedCornerShape(8.dp),
+                        color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f),
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Column(
+                            modifier = Modifier.padding(10.dp),
+                            verticalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
+                            Text(
+                                text = "تنظیمات آدرس سرور و مدل:",
+                                style = MaterialTheme.typography.labelMedium,
+                                fontWeight = FontWeight.SemiBold,
+                                color = MaterialTheme.colorScheme.primary
+                            )
+
+                            OutlinedTextField(
+                                value = baseUrlText,
+                                onValueChange = { baseUrlText = it },
+                                label = { Text("آدرس سرور (Base URL)", fontSize = 10.sp) },
+                                singleLine = true,
+                                modifier = Modifier.fillMaxWidth()
+                            )
+
+                            OutlinedTextField(
+                                value = modelText,
+                                onValueChange = { modelText = it },
+                                label = { Text("نام مدل (Model Name)", fontSize = 10.sp) },
+                                singleLine = true,
+                                modifier = Modifier.fillMaxWidth()
+                            )
+
+                            TextButton(
+                                onClick = {
+                                    baseUrlText = activeProvider.defaultBaseUrl
+                                    modelText = activeProvider.defaultModel
+                                },
+                                modifier = Modifier.align(Alignment.End)
+                            ) {
+                                Text("بازنشانی به پیش‌فرض OpenAI", fontSize = 10.sp)
+                            }
+                        }
+                    }
+                }
+
+                // Help Box
                 Card(
                     colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.6f)),
                     shape = RoundedCornerShape(8.dp),
                     modifier = Modifier.fillMaxWidth()
                 ) {
-                    Column(modifier = Modifier.padding(8.dp)) {
+                    Column(
+                        modifier = Modifier.padding(10.dp),
+                        verticalArrangement = Arrangement.spacedBy(4.dp)
+                    ) {
                         Text(
-                            text = "💡 نحوه دریافت کلید رایگان:",
+                            text = "💡 راهنما:",
                             style = MaterialTheme.typography.labelSmall,
                             fontWeight = FontWeight.Bold,
                             color = MaterialTheme.colorScheme.primary
                         )
                         Text(
-                            text = "کلید رایگان خود را از aistudio.google.com تهیه نموده و در این قسمت قرار دهید. کلید فقط در حافظه آفلاین دستگاه ذخیره می‌شود.",
+                            text = if (activeProvider == AiProvider.GEMINI) {
+                                "برای دریافت رایگان کلید Gemini به aistudio.google.com مراجعه کنید."
+                            } else {
+                                "از این گزینه می‌توانید برای اتصال به تمامی سرویس‌های سازگار با OpenAI (مثل OpenAI، DeepSeek، Groq یا مدل‌های محلی Ollama) استفاده کنید."
+                            },
                             style = MaterialTheme.typography.bodySmall,
                             fontSize = 10.sp,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                             lineHeight = 15.sp
                         )
+
+                        if (activeProvider.helpUrl.isNotBlank()) {
+                            TextButton(
+                                onClick = {
+                                    try {
+                                        val intent = Intent(Intent.ACTION_VIEW, Uri.parse(activeProvider.helpUrl))
+                                        context.startActivity(intent)
+                                    } catch (_: Exception) {
+                                        Toast.makeText(context, "عدم امکان باز کردن مرورگر", Toast.LENGTH_SHORT).show()
+                                    }
+                                },
+                                contentPadding = PaddingValues(0.dp)
+                            ) {
+                                Row(verticalAlignment = Alignment.CenterVertically) {
+                                    Icon(
+                                        Icons.AutoMirrored.Filled.OpenInNew,
+                                        contentDescription = null,
+                                        modifier = Modifier.size(14.dp),
+                                        tint = MaterialTheme.colorScheme.primary
+                                    )
+                                    Spacer(modifier = Modifier.width(4.dp))
+                                    Text(
+                                        text = "دریافت کلید از وب‌سایت ارائه‌دهنده",
+                                        fontSize = 11.sp,
+                                        color = MaterialTheme.colorScheme.primary
+                                    )
+                                }
+                            }
+                        }
                     }
                 }
             }
         },
         confirmButton = {
             Button(
-                onClick = { onSave(keyText.trim()) },
+                onClick = {
+                    onSave(activeProvider, keyText.trim(), baseUrlText.trim(), modelText.trim())
+                },
                 modifier = Modifier.testTag("btn_save_api_key")
             ) {
-                Text("ذخیره کلید", fontSize = 12.sp)
+                Text("ذخیره و فعال‌سازی", fontSize = 12.sp)
             }
         },
         dismissButton = {
@@ -659,3 +869,17 @@ fun ApiKeySetupDialog(
         }
     )
 }
+
+@Composable
+fun ApiKeySetupDialog(
+    currentKey: String,
+    onDismiss: () -> Unit,
+    onSave: (String) -> Unit
+) {
+    AiProviderSetupDialog(
+        initialProvider = AiProvider.GEMINI,
+        onDismiss = onDismiss,
+        onSave = { _, key, _, _ -> onSave(key) }
+    )
+}
+

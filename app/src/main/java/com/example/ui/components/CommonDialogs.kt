@@ -20,6 +20,7 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.ArrowDropDown
 import androidx.compose.material.icons.filled.CalendarMonth
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.ContentCopy
@@ -27,10 +28,14 @@ import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.NotificationsActive
 import androidx.compose.material.icons.filled.Schedule
+import androidx.compose.material.icons.filled.Star
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.Checkbox
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Icon
@@ -43,6 +48,7 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TimePicker
 import androidx.compose.material3.rememberTimePickerState
+import com.example.calendar.PersianOccasion
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
@@ -65,6 +71,28 @@ import com.example.calendar.PersianCalendarHelper
 import com.example.data.EventEntity
 import com.example.data.NoteEntity
 import com.example.data.TaskEntity
+import com.example.ui.rememberAppStrings
+
+fun eventCategoryLabel(cat: String, isFa: Boolean): String = if (isFa) cat else when (cat) {
+    "کاری" -> "Work"
+    "شخصی" -> "Personal"
+    "مهم" -> "Important"
+    "جلسه" -> "Meeting"
+    "یادآوری" -> "Reminder"
+    else -> cat
+}
+
+fun reminderOptionLabel(opt: String, isFa: Boolean): String = if (isFa) opt else when (opt) {
+    "بدون زنگ" -> "No Alarm"
+    "همزمان با رویداد" -> "At event time"
+    "۵ دقیقه قبل" -> "5 min before"
+    "۱۰ دقیقه قبل" -> "10 min before"
+    "۱۵ دقیقه قبل" -> "15 min before"
+    "۳۰ دقیقه قبل" -> "30 min before"
+    "۱ ساعت قبل" -> "1 hour before"
+    "۱ روز قبل" -> "1 day before"
+    else -> opt
+}
 
 /**
  * Super Simple & Clean Persian Time Selector.
@@ -76,14 +104,16 @@ fun PersianTimePicker(
     initialHour: Int = 10,
     initialMinute: Int = 0,
     onTimeChange: (hour: Int, minute: Int, formatted: String) -> Unit,
-    label: String = "ساعت برگزاری رویداد"
+    label: String = ""
 ) {
+    val strings = rememberAppStrings()
     var hour by remember { mutableIntStateOf(initialHour) }
     var minute by remember { mutableIntStateOf(initialMinute) }
     var showTimePickerDialog by remember { mutableStateOf(false) }
 
     val formattedTime = String.format("%02d:%02d", hour, minute)
-    val persianDisplay = PersianCalendarHelper.toPersianDigits(formattedTime)
+    val displayDigits = strings.formatDigits(formattedTime)
+    val displayLabel = if (label.isNotBlank()) label else (if (strings.isFa) "ساعت برگزاری رویداد" else "Event Time")
 
     // Main Clickable Time Card
     Surface(
@@ -110,8 +140,13 @@ fun PersianTimePicker(
                 )
                 Spacer(modifier = Modifier.width(10.dp))
                 Column {
-                    Text(label, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                    Text("ساعت $persianDisplay", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
+                    Text(displayLabel, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    Text(
+                        if (strings.isFa) "ساعت $displayDigits" else "Time: $displayDigits",
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.Bold,
+                        color = MaterialTheme.colorScheme.primary
+                    )
                 }
             }
 
@@ -125,7 +160,7 @@ fun PersianTimePicker(
                 ) {
                     Icon(Icons.Default.Edit, contentDescription = null, tint = MaterialTheme.colorScheme.onPrimary, modifier = Modifier.size(14.dp))
                     Spacer(modifier = Modifier.width(4.dp))
-                    Text("تنظیم ساعت", fontSize = 11.sp, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onPrimary)
+                    Text(if (strings.isFa) "تنظیم ساعت" else "Set Time", fontSize = 11.sp, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onPrimary)
                 }
             }
         }
@@ -141,7 +176,7 @@ fun PersianTimePicker(
 
         AlertDialog(
             onDismissRequest = { showTimePickerDialog = false },
-            title = { Text("انتخاب ساعت رویداد", fontWeight = FontWeight.Bold) },
+            title = { Text(if (strings.isFa) "انتخاب ساعت رویداد" else "Select Event Time", fontWeight = FontWeight.Bold) },
             text = {
                 Box(modifier = Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
                     TimePicker(state = timePickerState)
@@ -157,12 +192,12 @@ fun PersianTimePicker(
                         showTimePickerDialog = false
                     }
                 ) {
-                    Text("تأیید ساعت")
+                    Text(if (strings.isFa) "تأیید ساعت" else "Confirm Time")
                 }
             },
             dismissButton = {
                 TextButton(onClick = { showTimePickerDialog = false }) {
-                    Text("انصراف")
+                    Text(strings.cancel)
                 }
             }
         )
@@ -183,6 +218,7 @@ fun AddEventDialog(
         colorHex: String
     ) -> Unit
 ) {
+    val strings = rememberAppStrings()
     var title by remember { mutableStateOf("") }
     var description by remember { mutableStateOf("") }
     var persianDate by remember { mutableStateOf(initialDate.formatted) }
@@ -202,7 +238,7 @@ fun AddEventDialog(
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Icon(Icons.Default.CalendarMonth, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
                 Spacer(modifier = Modifier.width(8.dp))
-                Text("ثبت رویداد جدید", fontWeight = FontWeight.Bold)
+                Text(strings.newEvent, fontWeight = FontWeight.Bold)
             }
         },
         text = {
@@ -215,7 +251,7 @@ fun AddEventDialog(
                 OutlinedTextField(
                     value = title,
                     onValueChange = { title = it },
-                    label = { Text("عنوان رویداد *") },
+                    label = { Text(if (strings.isFa) "عنوان رویداد *" else "Event Title *") },
                     singleLine = true,
                     modifier = Modifier
                         .fillMaxWidth()
@@ -225,7 +261,7 @@ fun AddEventDialog(
                 OutlinedTextField(
                     value = description,
                     onValueChange = { description = it },
-                    label = { Text("توضیحات رویداد (اختیاری)") },
+                    label = { Text(if (strings.isFa) "توضیحات رویداد (اختیاری)" else "Description (optional)") },
                     maxLines = 3,
                     modifier = Modifier.fillMaxWidth()
                 )
@@ -233,7 +269,7 @@ fun AddEventDialog(
                 OutlinedTextField(
                     value = persianDate,
                     onValueChange = { persianDate = it },
-                    label = { Text("تاریخ شمسی (مثال: ۱۴۰۵/۰۱/۱۵)") },
+                    label = { Text(if (strings.isFa) "تاریخ شمسی (مثال: ۱۴۰۵/۰۱/۱۵)" else "Solar Date (e.g. 1405/01/15)") },
                     singleLine = true,
                     modifier = Modifier.fillMaxWidth()
                 )
@@ -247,7 +283,7 @@ fun AddEventDialog(
                     horizontalArrangement = Arrangement.SpaceBetween,
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    Text("رویداد تمام‌روز (بدون ساعت خاص)", fontSize = 12.sp, fontWeight = FontWeight.SemiBold)
+                    Text(if (strings.isFa) "رویداد تمام‌روز (بدون ساعت خاص)" else "All-day event (no specific time)", fontSize = 12.sp, fontWeight = FontWeight.SemiBold)
                     Switch(
                         checked = isAllDay,
                         onCheckedChange = { isAllDay = it }
@@ -260,11 +296,11 @@ fun AddEventDialog(
                         initialHour = 10,
                         initialMinute = 0,
                         onTimeChange = { _, _, formatted -> eventTime = formatted },
-                        label = "ساعت برگزاری رویداد"
+                        label = if (strings.isFa) "ساعت برگزاری رویداد" else "Event Time"
                     )
 
                     // Reminder Alarm Selection
-                    Text("⏰ زنگ و زمان یادآوری هشدار:", style = MaterialTheme.typography.bodySmall, fontWeight = FontWeight.Bold)
+                    Text(if (strings.isFa) "⏰ زنگ و زمان یادآوری هشدار:" else "⏰ Reminder & Alarm:", style = MaterialTheme.typography.bodySmall, fontWeight = FontWeight.Bold)
                     FlowRow(
                         modifier = Modifier.fillMaxWidth(),
                         horizontalArrangement = Arrangement.spacedBy(4.dp),
@@ -274,27 +310,28 @@ fun AddEventDialog(
                             FilterChip(
                                 selected = reminderOption == option,
                                 onClick = { reminderOption = option },
-                                label = { Text(option, fontSize = 10.sp) }
+                                label = { Text(reminderOptionLabel(option, strings.isFa), fontSize = 10.sp) }
                             )
                         }
                     }
                 }
 
-                Text("دسته‌بندی:", style = MaterialTheme.typography.bodySmall, fontWeight = FontWeight.SemiBold)
-                Row(
+                Text(if (strings.isFa) "دسته‌بندی:" else "Category:", style = MaterialTheme.typography.bodySmall, fontWeight = FontWeight.SemiBold)
+                FlowRow(
                     modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(6.dp)
+                    horizontalArrangement = Arrangement.spacedBy(6.dp),
+                    verticalArrangement = Arrangement.spacedBy(4.dp)
                 ) {
                     categories.forEach { cat ->
                         FilterChip(
                             selected = category == cat,
                             onClick = { category = cat },
-                            label = { Text(cat, fontSize = 11.sp) }
+                            label = { Text(eventCategoryLabel(cat, strings.isFa), fontSize = 11.sp) }
                         )
                     }
                 }
 
-                Text("رنگ نشانگر رویداد:", style = MaterialTheme.typography.bodySmall, fontWeight = FontWeight.SemiBold)
+                Text(if (strings.isFa) "رنگ نشانگر رویداد:" else "Event Marker Color:", style = MaterialTheme.typography.bodySmall, fontWeight = FontWeight.SemiBold)
                 Row(
                     horizontalArrangement = Arrangement.spacedBy(12.dp)
                 ) {
@@ -337,11 +374,11 @@ fun AddEventDialog(
                 enabled = title.isNotBlank(),
                 modifier = Modifier.testTag("confirm_add_event")
             ) {
-                Text("ثبت رویداد")
+                Text(if (strings.isFa) "ثبت رویداد" else "Add Event")
             }
         },
         dismissButton = {
-            TextButton(onClick = onDismiss) { Text("انصراف") }
+            TextButton(onClick = onDismiss) { Text(strings.cancel) }
         }
     )
 }
@@ -361,6 +398,7 @@ fun EditEventDialog(
     ) -> Unit,
     onDelete: () -> Unit
 ) {
+    val strings = rememberAppStrings()
     var title by remember { mutableStateOf(initialEvent.title) }
     var description by remember { mutableStateOf(initialEvent.description.replace(Regex("\\[یادآوری:[^\\]]+\\]"), "").trim()) }
     var persianDate by remember { mutableStateOf(initialEvent.persianDate) }
@@ -385,9 +423,9 @@ fun EditEventDialog(
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                Text("ویرایش رویداد", fontWeight = FontWeight.Bold)
+                Text(if (strings.isFa) "ویرایش رویداد" else "Edit Event", fontWeight = FontWeight.Bold)
                 IconButton(onClick = onDelete, modifier = Modifier.size(28.dp)) {
-                    Icon(Icons.Default.Delete, contentDescription = "حذف رویداد", tint = MaterialTheme.colorScheme.error)
+                    Icon(Icons.Default.Delete, contentDescription = if (strings.isFa) "حذف رویداد" else "Delete Event", tint = MaterialTheme.colorScheme.error)
                 }
             }
         },
@@ -401,7 +439,7 @@ fun EditEventDialog(
                 OutlinedTextField(
                     value = title,
                     onValueChange = { title = it },
-                    label = { Text("عنوان رویداد *") },
+                    label = { Text(if (strings.isFa) "عنوان رویداد *" else "Event Title *") },
                     singleLine = true,
                     modifier = Modifier.fillMaxWidth()
                 )
@@ -409,7 +447,7 @@ fun EditEventDialog(
                 OutlinedTextField(
                     value = description,
                     onValueChange = { description = it },
-                    label = { Text("توضیحات رویداد") },
+                    label = { Text(if (strings.isFa) "توضیحات رویداد" else "Description") },
                     maxLines = 3,
                     modifier = Modifier.fillMaxWidth()
                 )
@@ -417,7 +455,7 @@ fun EditEventDialog(
                 OutlinedTextField(
                     value = persianDate,
                     onValueChange = { persianDate = it },
-                    label = { Text("تاریخ شمسی") },
+                    label = { Text(if (strings.isFa) "تاریخ شمسی" else "Solar Date") },
                     singleLine = true,
                     modifier = Modifier.fillMaxWidth()
                 )
@@ -431,7 +469,7 @@ fun EditEventDialog(
                     horizontalArrangement = Arrangement.SpaceBetween,
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    Text("رویداد تمام‌روز (بدون ساعت خاص)", fontSize = 12.sp, fontWeight = FontWeight.SemiBold)
+                    Text(if (strings.isFa) "رویداد تمام‌روز (بدون ساعت خاص)" else "All-day event (no specific time)", fontSize = 12.sp, fontWeight = FontWeight.SemiBold)
                     Switch(checked = isAllDay, onCheckedChange = { isAllDay = it })
                 }
 
@@ -445,11 +483,11 @@ fun EditEventDialog(
                         initialHour = h,
                         initialMinute = m,
                         onTimeChange = { _, _, formatted -> eventTime = formatted },
-                        label = "ساعت برگزاری رویداد"
+                        label = if (strings.isFa) "ساعت برگزاری رویداد" else "Event Time"
                     )
 
                     // Reminder Alarm Selection
-                    Text("⏰ زمان زنگ و یادآوری هشدار:", style = MaterialTheme.typography.bodySmall, fontWeight = FontWeight.Bold)
+                    Text(if (strings.isFa) "⏰ زمان زنگ و یادآوری هشدار:" else "⏰ Reminder & Alarm:", style = MaterialTheme.typography.bodySmall, fontWeight = FontWeight.Bold)
                     FlowRow(
                         modifier = Modifier.fillMaxWidth(),
                         horizontalArrangement = Arrangement.spacedBy(4.dp),
@@ -459,20 +497,24 @@ fun EditEventDialog(
                             FilterChip(
                                 selected = reminderOption == option,
                                 onClick = { reminderOption = option },
-                                label = { Text(option, fontSize = 10.sp) }
+                                label = { Text(reminderOptionLabel(option, strings.isFa), fontSize = 10.sp) }
                             )
                         }
                     }
                 }
 
-                Text("دسته‌بندی:", style = MaterialTheme.typography.bodySmall, fontWeight = FontWeight.SemiBold)
-                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                Text(if (strings.isFa) "دسته‌بندی:" else "Category:", style = MaterialTheme.typography.bodySmall, fontWeight = FontWeight.SemiBold)
+                FlowRow(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(6.dp),
+                    verticalArrangement = Arrangement.spacedBy(4.dp)
+                ) {
                     categories.forEach { cat ->
-                        FilterChip(selected = category == cat, onClick = { category = cat }, label = { Text(cat, fontSize = 11.sp) })
+                        FilterChip(selected = category == cat, onClick = { category = cat }, label = { Text(eventCategoryLabel(cat, strings.isFa), fontSize = 11.sp) })
                     }
                 }
 
-                Text("رنگ نشانگر:", style = MaterialTheme.typography.bodySmall, fontWeight = FontWeight.SemiBold)
+                Text(if (strings.isFa) "رنگ نشانگر:" else "Marker Color:", style = MaterialTheme.typography.bodySmall, fontWeight = FontWeight.SemiBold)
                 Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                     colors.forEach { hex ->
                         val col = parseColor(hex)
@@ -508,11 +550,11 @@ fun EditEventDialog(
                 },
                 enabled = title.isNotBlank()
             ) {
-                Text("ذخیره تغییرات")
+                Text(strings.saveChanges)
             }
         },
         dismissButton = {
-            TextButton(onClick = onDismiss) { Text("انصراف") }
+            TextButton(onClick = onDismiss) { Text(strings.cancel) }
         }
     )
 }
@@ -534,6 +576,7 @@ fun AddToCalendarFromNoteDialog(
         colorHex: String
     ) -> Unit
 ) {
+    val strings = rememberAppStrings()
     val today = PersianCalendarHelper.getCurrentJalaliDate()
     var title by remember { mutableStateOf(note.title) }
     var description by remember { mutableStateOf(note.content) }
@@ -551,7 +594,7 @@ fun AddToCalendarFromNoteDialog(
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Icon(Icons.Default.NotificationsActive, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
                 Spacer(modifier = Modifier.width(8.dp))
-                Text("افزودن یادداشت به تقویم و یادآور", fontWeight = FontWeight.Bold, fontSize = 14.sp)
+                Text(if (strings.isFa) "افزودن یادداشت به تقویم و یادآور" else "Add Note to Calendar & Reminder", fontWeight = FontWeight.Bold, fontSize = 14.sp)
             }
         },
         text = {
@@ -564,7 +607,7 @@ fun AddToCalendarFromNoteDialog(
                 OutlinedTextField(
                     value = title,
                     onValueChange = { title = it },
-                    label = { Text("عنوان رویداد / یادآور") },
+                    label = { Text(if (strings.isFa) "عنوان رویداد / یادآور" else "Event / Reminder Title") },
                     singleLine = true,
                     modifier = Modifier.fillMaxWidth()
                 )
@@ -572,7 +615,7 @@ fun AddToCalendarFromNoteDialog(
                 OutlinedTextField(
                     value = description,
                     onValueChange = { description = it },
-                    label = { Text("متن یادداشت") },
+                    label = { Text(if (strings.isFa) "متن یادداشت" else "Note Content") },
                     maxLines = 3,
                     modifier = Modifier.fillMaxWidth()
                 )
@@ -580,7 +623,7 @@ fun AddToCalendarFromNoteDialog(
                 OutlinedTextField(
                     value = persianDate,
                     onValueChange = { persianDate = it },
-                    label = { Text("تاریخ اجرای رویداد (شمسی)") },
+                    label = { Text(if (strings.isFa) "تاریخ اجرای رویداد (شمسی)" else "Execution Date (Solar)") },
                     singleLine = true,
                     modifier = Modifier.fillMaxWidth()
                 )
@@ -589,11 +632,11 @@ fun AddToCalendarFromNoteDialog(
                     initialHour = 10,
                     initialMinute = 0,
                     onTimeChange = { _, _, formatted -> eventTime = formatted },
-                    label = "ساعت رویداد و یادآور"
+                    label = if (strings.isFa) "ساعت رویداد و یادآور" else "Time & Reminder"
                 )
 
                 // Reminder alarm options
-                Text("⏰ زنگ و هشدار یادآوری:", style = MaterialTheme.typography.bodySmall, fontWeight = FontWeight.Bold)
+                Text(if (strings.isFa) "⏰ زنگ و هشدار یادآوری:" else "⏰ Reminder & Alarm:", style = MaterialTheme.typography.bodySmall, fontWeight = FontWeight.Bold)
                 FlowRow(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.spacedBy(4.dp),
@@ -603,7 +646,7 @@ fun AddToCalendarFromNoteDialog(
                         FilterChip(
                             selected = reminderOption == option,
                             onClick = { reminderOption = option },
-                            label = { Text(option, fontSize = 10.sp) }
+                            label = { Text(reminderOptionLabel(option, strings.isFa), fontSize = 10.sp) }
                         )
                     }
                 }
@@ -622,32 +665,34 @@ fun AddToCalendarFromNoteDialog(
                     }
                 }
             ) {
-                Text("ثبت در تقویم")
+                Text(if (strings.isFa) "ثبت در تقویم" else "Add to Calendar")
             }
         },
         dismissButton = {
-            TextButton(onClick = onDismiss) { Text("انصراف") }
+            TextButton(onClick = onDismiss) { Text(strings.cancel) }
         }
     )
 }
 
+@OptIn(ExperimentalLayoutApi::class)
 @Composable
 fun AddTaskDialog(
     initialDate: JalaliDate,
     onDismiss: () -> Unit,
     onConfirm: (title: String, dueDate: String, priority: String, category: String) -> Unit
 ) {
+    val strings = rememberAppStrings()
     var title by remember { mutableStateOf("") }
     var dueDate by remember { mutableStateOf(initialDate.formatted) }
     var priority by remember { mutableStateOf("متوسط") }
     var category by remember { mutableStateOf("عمومی") }
 
     val priorities = listOf("پایین", "متوسط", "بالا", "فوری")
-    val categories = listOf("عمومی", "کاری", "شخصی", "خرید", "مطالعه")
+    val categories = listOf("عمومی", "کسب و کار", "عبادت", "تفریح", "معاشرت", "خرید", "شخصی")
 
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text("افزودن وظیفه جدید", fontWeight = FontWeight.Bold) },
+        title = { Text(strings.newTask, fontWeight = FontWeight.Bold) },
         text = {
             Column(
                 modifier = Modifier
@@ -658,7 +703,7 @@ fun AddTaskDialog(
                 OutlinedTextField(
                     value = title,
                     onValueChange = { title = it },
-                    label = { Text("عنوان کار یا وظیفه *") },
+                    label = { Text(if (strings.isFa) "عنوان کار یا وظیفه *" else "Task Title *") },
                     singleLine = true,
                     modifier = Modifier
                         .fillMaxWidth()
@@ -668,12 +713,12 @@ fun AddTaskDialog(
                 OutlinedTextField(
                     value = dueDate,
                     onValueChange = { dueDate = it },
-                    label = { Text("تاریخ موعد (شمسی)") },
+                    label = { Text(if (strings.isFa) "تاریخ موعد (شمسی)" else "Due Date (Solar)") },
                     singleLine = true,
                     modifier = Modifier.fillMaxWidth()
                 )
 
-                Text("اولویت:", style = MaterialTheme.typography.bodySmall, fontWeight = FontWeight.SemiBold)
+                Text(if (strings.isFa) "اولویت:" else "Priority:", style = MaterialTheme.typography.bodySmall, fontWeight = FontWeight.SemiBold)
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.spacedBy(6.dp)
@@ -682,21 +727,22 @@ fun AddTaskDialog(
                         FilterChip(
                             selected = priority == prio,
                             onClick = { priority = prio },
-                            label = { Text(prio, fontSize = 12.sp) }
+                            label = { Text(strings.taskPriority(prio), fontSize = 12.sp) }
                         )
                     }
                 }
 
-                Text("دسته‌بندی:", style = MaterialTheme.typography.bodySmall, fontWeight = FontWeight.SemiBold)
-                Row(
+                Text(if (strings.isFa) "دسته‌بندی:" else "Category:", style = MaterialTheme.typography.bodySmall, fontWeight = FontWeight.SemiBold)
+                FlowRow(
                     modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(6.dp)
+                    horizontalArrangement = Arrangement.spacedBy(6.dp),
+                    verticalArrangement = Arrangement.spacedBy(4.dp)
                 ) {
                     categories.forEach { cat ->
                         FilterChip(
                             selected = category == cat,
                             onClick = { category = cat },
-                            label = { Text(cat, fontSize = 12.sp) }
+                            label = { Text(strings.taskTag(cat), fontSize = 11.sp) }
                         )
                     }
                 }
@@ -712,15 +758,16 @@ fun AddTaskDialog(
                 enabled = title.isNotBlank(),
                 modifier = Modifier.testTag("confirm_add_task")
             ) {
-                Text("افزودن وظیفه")
+                Text(strings.newTask)
             }
         },
         dismissButton = {
-            TextButton(onClick = onDismiss) { Text("انصراف") }
+            TextButton(onClick = onDismiss) { Text(strings.cancel) }
         }
     )
 }
 
+@OptIn(ExperimentalLayoutApi::class)
 @Composable
 fun EditTaskDialog(
     task: TaskEntity,
@@ -728,13 +775,14 @@ fun EditTaskDialog(
     onConfirm: (title: String, dueDate: String, priority: String, category: String) -> Unit,
     onDelete: () -> Unit
 ) {
+    val strings = rememberAppStrings()
     var title by remember { mutableStateOf(task.title) }
     var dueDate by remember { mutableStateOf(task.persianDueDate) }
     var priority by remember { mutableStateOf(task.priority) }
     var category by remember { mutableStateOf(task.category) }
 
     val priorities = listOf("پایین", "متوسط", "بالا", "فوری")
-    val categories = listOf("عمومی", "کاری", "شخصی", "خرید", "مطالعه")
+    val categories = listOf("عمومی", "کسب و کار", "عبادت", "تفریح", "معاشرت", "خرید", "شخصی")
 
     AlertDialog(
         onDismissRequest = onDismiss,
@@ -744,9 +792,9 @@ fun EditTaskDialog(
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                Text("ویرایش وظیفه", fontWeight = FontWeight.Bold)
+                Text(strings.editTask, fontWeight = FontWeight.Bold)
                 IconButton(onClick = onDelete, modifier = Modifier.size(28.dp)) {
-                    Icon(Icons.Default.Delete, contentDescription = "حذف وظیفه", tint = MaterialTheme.colorScheme.error)
+                    Icon(Icons.Default.Delete, contentDescription = strings.deleteTask, tint = MaterialTheme.colorScheme.error)
                 }
             }
         },
@@ -760,7 +808,7 @@ fun EditTaskDialog(
                 OutlinedTextField(
                     value = title,
                     onValueChange = { title = it },
-                    label = { Text("عنوان کار یا وظیفه *") },
+                    label = { Text(if (strings.isFa) "عنوان کار یا وظیفه *" else "Task Title *") },
                     singleLine = true,
                     modifier = Modifier.fillMaxWidth()
                 )
@@ -768,12 +816,12 @@ fun EditTaskDialog(
                 OutlinedTextField(
                     value = dueDate,
                     onValueChange = { dueDate = it },
-                    label = { Text("تاریخ موعد (شمسی)") },
+                    label = { Text(if (strings.isFa) "تاریخ موعد (شمسی)" else "Due Date (Solar)") },
                     singleLine = true,
                     modifier = Modifier.fillMaxWidth()
                 )
 
-                Text("اولویت:", style = MaterialTheme.typography.bodySmall, fontWeight = FontWeight.SemiBold)
+                Text(if (strings.isFa) "اولویت:" else "Priority:", style = MaterialTheme.typography.bodySmall, fontWeight = FontWeight.SemiBold)
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.spacedBy(6.dp)
@@ -782,21 +830,22 @@ fun EditTaskDialog(
                         FilterChip(
                             selected = priority == prio,
                             onClick = { priority = prio },
-                            label = { Text(prio, fontSize = 12.sp) }
+                            label = { Text(strings.taskPriority(prio), fontSize = 12.sp) }
                         )
                     }
                 }
 
-                Text("دسته‌بندی:", style = MaterialTheme.typography.bodySmall, fontWeight = FontWeight.SemiBold)
-                Row(
+                Text(if (strings.isFa) "دسته‌بندی:" else "Category:", style = MaterialTheme.typography.bodySmall, fontWeight = FontWeight.SemiBold)
+                FlowRow(
                     modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(6.dp)
+                    horizontalArrangement = Arrangement.spacedBy(6.dp),
+                    verticalArrangement = Arrangement.spacedBy(4.dp)
                 ) {
                     categories.forEach { cat ->
                         FilterChip(
                             selected = category == cat,
                             onClick = { category = cat },
-                            label = { Text(cat, fontSize = 12.sp) }
+                            label = { Text(strings.taskTag(cat), fontSize = 11.sp) }
                         )
                     }
                 }
@@ -811,11 +860,11 @@ fun EditTaskDialog(
                 },
                 enabled = title.isNotBlank()
             ) {
-                Text("ذخیره تغییرات")
+                Text(strings.saveChanges)
             }
         },
         dismissButton = {
-            TextButton(onClick = onDismiss) { Text("انصراف") }
+            TextButton(onClick = onDismiss) { Text(strings.cancel) }
         }
     )
 }
@@ -825,6 +874,7 @@ fun AddNoteDialog(
     onDismiss: () -> Unit,
     onConfirm: (title: String, content: String, colorHex: String) -> Unit
 ) {
+    val strings = rememberAppStrings()
     var title by remember { mutableStateOf("") }
     var content by remember { mutableStateOf("") }
     var selectedColor by remember { mutableStateOf("#FEF3C7") }
@@ -833,7 +883,7 @@ fun AddNoteDialog(
 
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text("یادداشت جدید", fontWeight = FontWeight.Bold) },
+        title = { Text(strings.addNote, fontWeight = FontWeight.Bold) },
         text = {
             Column(
                 modifier = Modifier
@@ -844,7 +894,7 @@ fun AddNoteDialog(
                 OutlinedTextField(
                     value = title,
                     onValueChange = { title = it },
-                    label = { Text("عنوان یادداشت") },
+                    label = { Text(strings.noteTitleLabel) },
                     singleLine = true,
                     modifier = Modifier
                         .fillMaxWidth()
@@ -854,7 +904,7 @@ fun AddNoteDialog(
                 OutlinedTextField(
                     value = content,
                     onValueChange = { content = it },
-                    label = { Text("متن یادداشت *") },
+                    label = { Text(if (strings.isFa) "متن یادداشت *" else "Note Content *") },
                     minLines = 4,
                     maxLines = 8,
                     modifier = Modifier
@@ -862,7 +912,7 @@ fun AddNoteDialog(
                         .testTag("note_content_input")
                 )
 
-                Text("رنگ یادداشت:", style = MaterialTheme.typography.bodySmall, fontWeight = FontWeight.SemiBold)
+                Text(if (strings.isFa) "رنگ یادداشت:" else "Note Color:", style = MaterialTheme.typography.bodySmall, fontWeight = FontWeight.SemiBold)
                 Row(
                     horizontalArrangement = Arrangement.spacedBy(10.dp)
                 ) {
@@ -899,11 +949,11 @@ fun AddNoteDialog(
                 enabled = content.isNotBlank(),
                 modifier = Modifier.testTag("confirm_add_note")
             ) {
-                Text("ذخیره یادداشت")
+                Text(if (strings.isFa) "ذخیره یادداشت" else "Save Note")
             }
         },
         dismissButton = {
-            TextButton(onClick = onDismiss) { Text("انصراف") }
+            TextButton(onClick = onDismiss) { Text(strings.cancel) }
         }
     )
 }
@@ -914,6 +964,7 @@ fun EditNoteDialog(
     onDismiss: () -> Unit,
     onConfirm: (title: String, content: String, colorHex: String, isPinned: Boolean) -> Unit
 ) {
+    val strings = rememberAppStrings()
     var title by remember { mutableStateOf(initialNote.title) }
     var content by remember { mutableStateOf(initialNote.content) }
     var selectedColor by remember { mutableStateOf(initialNote.colorHex) }
@@ -923,7 +974,7 @@ fun EditNoteDialog(
 
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text("ویرایش یادداشت", fontWeight = FontWeight.Bold) },
+        title = { Text(strings.editNote, fontWeight = FontWeight.Bold) },
         text = {
             Column(
                 modifier = Modifier
@@ -934,7 +985,7 @@ fun EditNoteDialog(
                 OutlinedTextField(
                     value = title,
                     onValueChange = { title = it },
-                    label = { Text("عنوان یادداشت") },
+                    label = { Text(strings.noteTitleLabel) },
                     singleLine = true,
                     modifier = Modifier.fillMaxWidth()
                 )
@@ -942,7 +993,7 @@ fun EditNoteDialog(
                 OutlinedTextField(
                     value = content,
                     onValueChange = { content = it },
-                    label = { Text("متن یادداشت *") },
+                    label = { Text(if (strings.isFa) "متن یادداشت *" else "Note Content *") },
                     minLines = 4,
                     maxLines = 8,
                     modifier = Modifier.fillMaxWidth()
@@ -953,11 +1004,11 @@ fun EditNoteDialog(
                     horizontalArrangement = Arrangement.SpaceBetween,
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    Text("سنجاق به بالا", style = MaterialTheme.typography.bodySmall, fontWeight = FontWeight.SemiBold)
+                    Text(if (strings.isFa) "سنجاق به بالا" else "Pin to top", style = MaterialTheme.typography.bodySmall, fontWeight = FontWeight.SemiBold)
                     Switch(checked = isPinned, onCheckedChange = { isPinned = it })
                 }
 
-                Text("رنگ یادداشت:", style = MaterialTheme.typography.bodySmall, fontWeight = FontWeight.SemiBold)
+                Text(if (strings.isFa) "رنگ یادداشت:" else "Note Color:", style = MaterialTheme.typography.bodySmall, fontWeight = FontWeight.SemiBold)
                 Row(
                     horizontalArrangement = Arrangement.spacedBy(10.dp)
                 ) {
@@ -993,11 +1044,11 @@ fun EditNoteDialog(
                 },
                 enabled = content.isNotBlank()
             ) {
-                Text("ذخیره تغییرات")
+                Text(strings.saveChanges)
             }
         },
         dismissButton = {
-            TextButton(onClick = onDismiss) { Text("انصراف") }
+            TextButton(onClick = onDismiss) { Text(strings.cancel) }
         }
     )
 }
@@ -1008,6 +1059,7 @@ fun PairingInfoDialog(
     port: Int,
     onDismiss: () -> Unit
 ) {
+    val strings = rememberAppStrings()
     val clipboardManager: ClipboardManager = LocalClipboardManager.current
     val url = "http://$ip:$port"
 
@@ -1017,7 +1069,7 @@ fun PairingInfoDialog(
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Icon(Icons.Default.Schedule, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
                 Spacer(modifier = Modifier.width(8.dp))
-                Text("اتصال به افزونه مرورگر کروم", fontWeight = FontWeight.Bold)
+                Text(if (strings.isFa) "اتصال به افزونه مرورگر کروم" else "Connect to Chrome Extension", fontWeight = FontWeight.Bold)
             }
         },
         text = {
@@ -1028,15 +1080,15 @@ fun PairingInfoDialog(
                 verticalArrangement = Arrangement.spacedBy(10.dp)
             ) {
                 Text(
-                    "برای همگام‌سازی مستقیم و بدون نیاز به اینترنت:",
+                    if (strings.isFa) "برای همگام‌سازی مستقیم و بدون نیاز به اینترنت:" else "For direct offline local sync:",
                     style = MaterialTheme.typography.bodyMedium
                 )
                 Text(
-                    "۱. گوشی و رایانه را به یک شبکه Wi-Fi متصل کنید، یا هات‌اسپات (نقطه اتصال) یکی از دستگاه‌ها را روشن کنید.",
+                    if (strings.isFa) "۱. گوشی و رایانه را به یک شبکه Wi-Fi متصل کنید، یا هات‌اسپات (نقطه اتصال) یکی از دستگاه‌ها را روشن کنید." else "1. Connect phone and PC to the same Wi-Fi network, or enable hotspot on one device.",
                     style = MaterialTheme.typography.bodySmall
                 )
                 Text(
-                    "۲. آدرس زیر را در مرورگر لپ‌تاپ باز کنید یا در افزونه کروم وارد نمایید:",
+                    if (strings.isFa) "۲. آدرس زیر را در مرورگر لپ‌تاپ باز کنید یا در افزونه کروم وارد نمایید:" else "2. Open the URL below in your PC browser or enter it in the Chrome extension:",
                     style = MaterialTheme.typography.bodySmall
                 )
 
@@ -1058,20 +1110,20 @@ fun PairingInfoDialog(
                             color = MaterialTheme.colorScheme.primary
                         )
                         IconButton(onClick = { clipboardManager.setText(AnnotatedString(url)) }) {
-                            Icon(Icons.Default.ContentCopy, contentDescription = "کپی آدرس")
+                            Icon(Icons.Default.ContentCopy, contentDescription = if (strings.isFa) "کپی آدرس" else "Copy URL")
                         }
                     }
                 }
 
                 Text(
-                    "۳. بارکد QR اتصال به صورت خودکار روی صفحه مانیتور لپ‌تاپ نمایش داده می‌شود و می‌توانید با دوربین گوشی آن را اسکن کنید.",
+                    if (strings.isFa) "۳. با فشردن دکمه همگام‌سازی در افزونه کروم، اطلاعات رویدادها، وظایف و یادداشت‌ها به صورت خودکار در شبکه محلی تبادل می‌شوند." else "3. By clicking sync in the Chrome extension, events, tasks, and notes are exchanged automatically over the local network.",
                     style = MaterialTheme.typography.bodySmall,
                     fontSize = 11.sp
                 )
             }
         },
         confirmButton = {
-            Button(onClick = onDismiss) { Text("متوجه شدم") }
+            Button(onClick = onDismiss) { Text(strings.understood) }
         }
     )
 }
@@ -1082,6 +1134,7 @@ fun JsonBackupDialog(
     onDismiss: () -> Unit,
     onImport: (String) -> Unit
 ) {
+    val strings = rememberAppStrings()
     var importText by remember { mutableStateOf("") }
     var activeTab by remember { mutableStateOf(0) }
     val clipboardManager: ClipboardManager = LocalClipboardManager.current
@@ -1089,7 +1142,7 @@ fun JsonBackupDialog(
 
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text("پشتیبان‌گیری و بازیابی آفلاین JSON", fontWeight = FontWeight.Bold) },
+        title = { Text(if (strings.isFa) "پشتیبان‌گیری و بازیابی آفلاین JSON" else "Offline JSON Backup & Restore", fontWeight = FontWeight.Bold) },
         text = {
             Column(
                 modifier = Modifier
@@ -1104,17 +1157,17 @@ fun JsonBackupDialog(
                     FilterChip(
                         selected = activeTab == 0,
                         onClick = { activeTab = 0 },
-                        label = { Text("خروجی پشتیبان (Export)") }
+                        label = { Text(if (strings.isFa) "خروجی پشتیبان (Export)" else "Export Backup") }
                     )
                     FilterChip(
                         selected = activeTab == 1,
                         onClick = { activeTab = 1 },
-                        label = { Text("ورود اطلاعات (Import)") }
+                        label = { Text(if (strings.isFa) "ورود اطلاعات (Import)" else "Import Data") }
                     )
                 }
 
                 if (activeTab == 0) {
-                    Text("کد JSON کلیه رویدادها، وظایف و یادداشت‌های شما:", style = MaterialTheme.typography.bodySmall)
+                    Text(if (strings.isFa) "کد JSON کلیه رویدادها، وظایف و یادداشت‌های شما:" else "JSON code of all events, tasks, and notes:", style = MaterialTheme.typography.bodySmall)
                     OutlinedTextField(
                         value = jsonString,
                         onValueChange = {},
@@ -1131,10 +1184,10 @@ fun JsonBackupDialog(
                     ) {
                         Icon(Icons.Default.ContentCopy, contentDescription = null)
                         Spacer(modifier = Modifier.width(6.dp))
-                        Text(if (copiedMessage) "کپی شد!" else "کپی کد پشتیبان در حافظه")
+                        Text(if (copiedMessage) (if (strings.isFa) "کپی شد!" else "Copied!") else (if (strings.isFa) "کپی کد پشتیبان در حافظه" else "Copy backup code"))
                     }
                 } else {
-                    Text("کد پشتیبان JSON را در کادر زیر جای‌گذاری (Paste) کنید:", style = MaterialTheme.typography.bodySmall)
+                    Text(if (strings.isFa) "کد پشتیبان JSON را در کادر زیر جای‌گذاری (Paste) کنید:" else "Paste backup JSON code below:", style = MaterialTheme.typography.bodySmall)
                     OutlinedTextField(
                         value = importText,
                         onValueChange = { importText = it },
@@ -1152,13 +1205,329 @@ fun JsonBackupDialog(
                         enabled = importText.isNotBlank(),
                         modifier = Modifier.fillMaxWidth()
                     ) {
-                        Text("بازیابی و ادغام اطلاعات")
+                        Text(if (strings.isFa) "بازیابی و ادغام اطلاعات" else "Restore & Merge Data")
                     }
                 }
             }
         },
         confirmButton = {
-            TextButton(onClick = onDismiss) { Text("بستن") }
+            TextButton(onClick = onDismiss) { Text(strings.close) }
+        }
+    )
+}
+
+/**
+ * Dialog to edit an Occasion (custom or official calendar occasion).
+ * Allows changing the title, holiday status, month, and day.
+ */
+@Composable
+fun EditOccasionDialog(
+    occasion: PersianOccasion,
+    currentDate: JalaliDate,
+    onDismiss: () -> Unit,
+    onConfirm: (newTitle: String, month: Int, day: Int, isHoliday: Boolean) -> Unit,
+    onDelete: (() -> Unit)? = null
+) {
+    val strings = rememberAppStrings()
+    val initialMonth = if (occasion.customMonth != -1) occasion.customMonth else currentDate.month
+    val initialDay = if (occasion.customDay != -1) occasion.customDay else currentDate.day
+
+    var title by remember { mutableStateOf(occasion.title) }
+    var isHoliday by remember { mutableStateOf(occasion.isHoliday) }
+    var selectedMonth by remember { mutableIntStateOf(initialMonth) }
+    var selectedDay by remember { mutableIntStateOf(initialDay) }
+
+    var monthMenuExpanded by remember { mutableStateOf(false) }
+    var dayMenuExpanded by remember { mutableStateOf(false) }
+
+    val daysInSelectedMonth = when (selectedMonth) {
+        in 1..6 -> 31
+        in 7..11 -> 30
+        else -> 29
+    }
+    if (selectedDay > daysInSelectedMonth) {
+        selectedDay = daysInSelectedMonth
+    }
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Icon(
+                    Icons.Default.Edit,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.primary,
+                    modifier = Modifier.size(20.dp)
+                )
+                Spacer(modifier = Modifier.width(8.dp))
+                Text(
+                    text = if (strings.isFa) "ویرایش مناسبت" else "Edit Occasion",
+                    fontWeight = FontWeight.Bold,
+                    fontSize = 16.sp
+                )
+            }
+        },
+        text = {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .verticalScroll(rememberScrollState()),
+                verticalArrangement = Arrangement.spacedBy(12.dp)
+            ) {
+                // Occasion Title Field
+                OutlinedTextField(
+                    value = title,
+                    onValueChange = { title = it },
+                    label = { Text(if (strings.isFa) "عنوان مناسبت" else "Occasion Title") },
+                    placeholder = { Text(if (strings.isFa) "مثلاً: سالگرد، تولد، رویداد..." else "e.g. Anniversary, Birthday, Event...") },
+                    modifier = Modifier.fillMaxWidth(),
+                    singleLine = true
+                )
+
+                // Date Picker (Month and Day selectors)
+                Surface(
+                    color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
+                    shape = RoundedCornerShape(10.dp),
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Column(modifier = Modifier.padding(10.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                        Text(
+                            text = if (strings.isFa) "تاریخ مناسبت (تکرار سالانه):" else "Occasion Date (Yearly):",
+                            fontSize = 11.sp,
+                            fontWeight = FontWeight.SemiBold,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.spacedBy(8.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            // Month selector
+                            Box(modifier = Modifier.weight(1.2f)) {
+                                Surface(
+                                    color = MaterialTheme.colorScheme.surface,
+                                    shape = RoundedCornerShape(8.dp),
+                                    border = androidx.compose.foundation.BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.3f)),
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .clickable { monthMenuExpanded = true }
+                                ) {
+                                    Row(
+                                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 6.dp),
+                                        horizontalArrangement = Arrangement.SpaceBetween,
+                                        verticalAlignment = Alignment.CenterVertically
+                                    ) {
+                                        Text(
+                                            text = strings.jalaliMonths.getOrElse(selectedMonth - 1) { "" },
+                                            fontSize = 12.sp,
+                                            fontWeight = FontWeight.SemiBold
+                                        )
+                                        Icon(Icons.Default.ArrowDropDown, contentDescription = null, modifier = Modifier.size(16.dp))
+                                    }
+                                }
+                                DropdownMenu(
+                                    expanded = monthMenuExpanded,
+                                    onDismissRequest = { monthMenuExpanded = false }
+                                ) {
+                                    strings.jalaliMonths.forEachIndexed { index, mName ->
+                                        DropdownMenuItem(
+                                            text = { Text(mName, fontSize = 12.sp) },
+                                            onClick = {
+                                                selectedMonth = index + 1
+                                                monthMenuExpanded = false
+                                            }
+                                        )
+                                    }
+                                }
+                            }
+
+                            // Day selector
+                            Box(modifier = Modifier.weight(1f)) {
+                                Surface(
+                                    color = MaterialTheme.colorScheme.surface,
+                                    shape = RoundedCornerShape(8.dp),
+                                    border = androidx.compose.foundation.BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.3f)),
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .clickable { dayMenuExpanded = true }
+                                ) {
+                                    Row(
+                                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 6.dp),
+                                        horizontalArrangement = Arrangement.SpaceBetween,
+                                        verticalAlignment = Alignment.CenterVertically
+                                    ) {
+                                        Text(
+                                            text = if (strings.isFa) "${strings.formatDigits(selectedDay.toString())} ام" else "Day ${strings.formatDigits(selectedDay.toString())}",
+                                            fontSize = 12.sp,
+                                            fontWeight = FontWeight.SemiBold
+                                        )
+                                        Icon(Icons.Default.ArrowDropDown, contentDescription = null, modifier = Modifier.size(16.dp))
+                                    }
+                                }
+                                DropdownMenu(
+                                    expanded = dayMenuExpanded,
+                                    onDismissRequest = { dayMenuExpanded = false }
+                                ) {
+                                    for (d in 1..daysInSelectedMonth) {
+                                        DropdownMenuItem(
+                                            text = { Text(if (strings.isFa) "${strings.formatDigits(d.toString())} ام" else "Day ${strings.formatDigits(d.toString())}", fontSize = 12.sp) },
+                                            onClick = {
+                                                selectedDay = d
+                                                dayMenuExpanded = false
+                                            }
+                                        )
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+
+                // Holiday Checkbox
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clickable { isHoliday = !isHoliday }
+                        .padding(vertical = 4.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Checkbox(
+                        checked = isHoliday,
+                        onCheckedChange = { isHoliday = it }
+                    )
+                    Spacer(modifier = Modifier.width(6.dp))
+                    Column {
+                        Text(if (strings.isFa) "روز تعطیل رسمی" else "Official Holiday", fontSize = 12.sp, fontWeight = FontWeight.SemiBold)
+                        Text(
+                            if (strings.isFa) "در صورت انتخاب، این روز در تقویم با رنگ قرمز تعطیل نشان داده خواهد شد" else "If selected, this day will be marked as a red holiday on the calendar",
+                            fontSize = 10.sp,
+                            color = Color.Gray
+                        )
+                    }
+                }
+
+                // If editing an official calendar occasion
+                if (occasion.customMonth == -1) {
+                    Text(
+                        text = if (strings.isFa) "💡 این مناسبت از تقویم رسمی است. با ویرایش، تغییرات شما جایگزین خواهد شد و هر زمان بخواهید می‌توانید آن را به حالت اولیه برگردانید." else "💡 This is an official calendar occasion. Editing will override it, and you can reset it anytime.",
+                        fontSize = 10.sp,
+                        color = MaterialTheme.colorScheme.primary,
+                        lineHeight = 15.sp
+                    )
+                }
+            }
+        },
+        confirmButton = {
+            Button(
+                onClick = {
+                    if (title.isNotBlank()) {
+                        onConfirm(title.trim(), selectedMonth, selectedDay, isHoliday)
+                    }
+                },
+                enabled = title.isNotBlank()
+            ) {
+                Text(strings.saveChanges)
+            }
+        },
+        dismissButton = {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                if (onDelete != null) {
+                    TextButton(
+                        onClick = onDelete,
+                        colors = androidx.compose.material3.ButtonDefaults.textButtonColors(
+                            contentColor = MaterialTheme.colorScheme.error
+                        )
+                    ) {
+                        Text(if (occasion.customMonth == -1) (if (strings.isFa) "بازگردانی به پیش‌فرض" else "Reset to default") else (if (strings.isFa) "حذف مناسبت" else "Delete Occasion"))
+                    }
+                    Spacer(modifier = Modifier.width(4.dp))
+                }
+                TextButton(onClick = onDismiss) {
+                    Text(strings.cancel)
+                }
+            }
+        }
+    )
+}
+
+/**
+ * Dialog to pick which occasion to edit when a day has multiple occasions.
+ */
+@Composable
+fun SelectOccasionToEditDialog(
+    occasions: List<PersianOccasion>,
+    onSelect: (PersianOccasion) -> Unit,
+    onDismiss: () -> Unit
+) {
+    val strings = rememberAppStrings()
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Icon(
+                    Icons.Default.Edit,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.primary,
+                    modifier = Modifier.size(20.dp)
+                )
+                Spacer(modifier = Modifier.width(8.dp))
+                Text(
+                    text = if (strings.isFa) "انتخاب مناسبت برای ویرایش" else "Select Occasion to Edit",
+                    fontWeight = FontWeight.Bold,
+                    fontSize = 15.sp
+                )
+            }
+        },
+        text = {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .verticalScroll(rememberScrollState()),
+                verticalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                Text(
+                    text = if (strings.isFa) "مناسبت مورد نظر برای تغییر یا اصلاح را انتخاب کنید:" else "Select the occasion to edit or modify:",
+                    fontSize = 11.sp,
+                    color = Color.Gray
+                )
+                occasions.forEach { occ ->
+                    Surface(
+                        color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f),
+                        shape = RoundedCornerShape(10.dp),
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clickable { onSelect(occ) }
+                    ) {
+                        Row(
+                            modifier = Modifier.padding(12.dp),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Column(modifier = Modifier.weight(1f)) {
+                                Text(
+                                    text = occ.title,
+                                    fontSize = 12.sp,
+                                    fontWeight = FontWeight.SemiBold,
+                                    color = if (occ.isHoliday) Color(0xFFB91C1C) else MaterialTheme.colorScheme.onSurface
+                                )
+                                if (occ.isHoliday) {
+                                    Text(if (strings.isFa) "تعطیل رسمی" else "Official Holiday", fontSize = 9.sp, color = Color(0xFFDC2626), fontWeight = FontWeight.Bold)
+                                }
+                            }
+                            Icon(
+                                Icons.Default.Edit,
+                                contentDescription = null,
+                                tint = MaterialTheme.colorScheme.primary,
+                                modifier = Modifier.size(16.dp)
+                            )
+                        }
+                    }
+                }
+            }
+        },
+        confirmButton = {
+            TextButton(onClick = onDismiss) { Text(strings.close) }
         }
     )
 }

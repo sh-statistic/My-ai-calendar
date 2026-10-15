@@ -821,7 +821,7 @@ body.desktop-body {
 
 /* ─── Gadget 3: Tasks ──────────────────────────────────────────────────── */
 #gadgetTasks {
-  width: 250px;
+  width: 275px;
 }
 
 .w7-task-badge {
@@ -832,8 +832,92 @@ body.desktop-body {
   border-radius: 8px;
 }
 
+/* Tasks Date Navigation & Filters (Matching Mobile App) */
+.w7-task-date-nav {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 6px;
+  background: rgba(241, 245, 249, 0.7);
+  padding: 3px 6px;
+  border-radius: 6px;
+}
+.w7-task-nav-btn {
+  background: transparent;
+  border: 1px solid #cbd5e1;
+  border-radius: 4px;
+  font-size: 9px;
+  padding: 1px 5px;
+  cursor: pointer;
+  color: #475569;
+}
+.w7-task-nav-btn:hover {
+  background: #e2e8f0;
+}
+.w7-task-date-text {
+  font-size: 10.5px;
+  font-weight: 700;
+  color: var(--primary-dark);
+}
+.w7-task-today-btn {
+  background: var(--primary);
+  color: #fff;
+  border: none;
+  border-radius: 4px;
+  font-size: 9px;
+  padding: 1px 6px;
+  cursor: pointer;
+}
+
+.w7-filter-chips {
+  display: flex;
+  gap: 3px;
+  margin-bottom: 6px;
+  flex-wrap: wrap;
+}
+.w7-filter-chip {
+  font-size: 9.5px;
+  padding: 2px 6px;
+  border-radius: 10px;
+  background: #f1f5f9;
+  color: #475569;
+  border: 1px solid #e2e8f0;
+  cursor: pointer;
+  transition: all 0.15s;
+  user-select: none;
+}
+.w7-filter-chip.active {
+  background: var(--primary);
+  color: #fff;
+  border-color: var(--primary);
+  font-weight: 700;
+}
+
+.w7-progress-box {
+  margin-bottom: 6px;
+}
+.w7-progress-label {
+  display: flex;
+  justify-content: space-between;
+  font-size: 9.5px;
+  color: #64748b;
+  margin-bottom: 2px;
+}
+.w7-progress-track {
+  height: 4px;
+  background: #e2e8f0;
+  border-radius: 2px;
+  overflow: hidden;
+}
+.w7-progress-fill {
+  height: 100%;
+  background: #16a34a;
+  border-radius: 2px;
+  transition: width 0.3s;
+}
+
 .w7-task-list {
-  max-height: 140px;
+  max-height: 150px;
   overflow-y: auto;
   display: flex;
   flex-direction: column;
@@ -844,15 +928,35 @@ body.desktop-body {
 .w7-task-item {
   display: flex;
   align-items: center;
-  gap: 6px;
-  font-size: 11px;
-  background: rgba(248, 250, 252, 0.7);
+  justify-content: space-between;
   padding: 4px 6px;
   border-radius: 6px;
+  background: rgba(248, 250, 252, 0.85);
+  border: 1px solid #e2e8f0;
+  border-right-width: 3.5px;
+  font-size: 11px;
+}
+.w7-task-item.priority-high {
+  border-right-color: #ef4444;
+}
+.w7-task-item.priority-medium {
+  border-right-color: #f59e0b;
+}
+.w7-task-item.priority-low {
+  border-right-color: #10b981;
+}
+.w7-task-item.completed {
+  opacity: 0.65;
+  background: #f8fafc;
 }
 .w7-task-item.completed span {
   text-decoration: line-through;
   color: var(--text-muted);
+}
+.w7-task-due-date {
+  font-size: 8.5px;
+  color: #94a3b8;
+  display: block;
 }
 
 .w7-input-row {
@@ -1376,7 +1480,60 @@ body.desktop-body {
   background: #dc2626;
 }
 
+/* Calendar Tasks of Selected Day */
+.cal-section-subtitle {
+  font-size: 9.5px;
+  font-weight: 700;
+  color: #64748b;
+  margin-top: 4px;
+  margin-bottom: 2px;
+  display: flex;
+  align-items: center;
+  gap: 3px;
+}
+.cal-task-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  background: #ffffff;
+  border: 1px solid #e2e8f0;
+  border-right-width: 3px;
+  border-radius: 6px;
+  padding: 3px 6px;
+  margin-top: 3px;
+  font-size: 10px;
+}
+.cal-task-row.completed span {
+  text-decoration: line-through;
+  color: #94a3b8;
+}
+.cal-task-row-left {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  flex: 1;
+  overflow: hidden;
+}
+
 /* Sticky Note Gadget - Multi-Notes List */
+.w7-notes-search-box {
+  margin-bottom: 6px;
+}
+.w7-notes-search-input {
+  width: 100%;
+  border: 1px solid #facc15;
+  border-radius: 6px;
+  padding: 3px 8px;
+  font-size: 10.5px;
+  outline: none;
+  background: rgba(255, 255, 255, 0.8);
+  font-family: inherit;
+}
+.w7-notes-search-input:focus {
+  background: #fff;
+  border-color: #eab308;
+}
+
 .w7-notes-list {
   display: flex;
   flex-direction: column;
@@ -1403,6 +1560,12 @@ body.desktop-body {
   box-shadow: 0 1px 3px rgba(0,0,0,0.04);
   transition: transform 0.1s, box-shadow 0.1s;
 }
+.w7-note-card.pinned {
+  border-color: #eab308;
+  border-right-width: 4.5px;
+  background: #fef08a;
+  box-shadow: 0 2px 5px rgba(202, 138, 4, 0.18);
+}
 .w7-note-card:hover {
   transform: translateY(-1px);
   box-shadow: 0 2px 6px rgba(0,0,0,0.08);
@@ -1417,6 +1580,27 @@ body.desktop-body {
   font-weight: 700;
   font-size: 11px;
   color: #713f12;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+.w7-note-pin-btn {
+  background: transparent;
+  border: none;
+  font-size: 11px;
+  cursor: pointer;
+  padding: 1px 3px;
+  border-radius: 4px;
+  line-height: 1;
+  opacity: 0.6;
+}
+.w7-note-pin-btn.pinned {
+  opacity: 1;
+  color: #b45309;
+}
+.w7-note-pin-btn:hover {
+  opacity: 1;
+  background: rgba(254, 240, 138, 0.8);
 }
 .w7-note-card-date {
   font-size: 9px;

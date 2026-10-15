@@ -99,6 +99,18 @@ class GoogleCalendarSyncManager(private val context: Context) {
             .apply()
     }
 
+    fun ensureCalendarSelected(): Boolean {
+        if (getSelectedCalendarId() != -1L) return true
+        val calendars = getAvailableCalendars()
+        val target = calendars.firstOrNull { it.isGoogle } ?: calendars.firstOrNull()
+        return if (target != null) {
+            selectCalendar(target.id, target.displayName)
+            true
+        } else {
+            false
+        }
+    }
+
     // ──────────────────────────────────────────────────────────────────────────
     // Event Sync
     // ──────────────────────────────────────────────────────────────────────────
@@ -200,8 +212,11 @@ class GoogleCalendarSyncManager(private val context: Context) {
     }
 
     fun syncNotesToGoogle(notes: List<NoteEntity>): SyncResult {
+        if (getSelectedCalendarId() == -1L) {
+            ensureCalendarSelected()
+        }
         val calId = getSelectedCalendarId()
-        if (calId == -1L) return SyncResult(message = "تقویمی انتخاب نشده است")
+        if (calId == -1L) return SyncResult(message = "تقویمی انتخاب نشده است یا مجوز تقویم داده نشده است")
 
         var added = 0
         var errors = 0
@@ -276,73 +291,233 @@ class GoogleCalendarSyncManager(private val context: Context) {
 
     /**
      * Import events from Google Calendar into the app (pull).
-     * Returns list of EventEntity objects parsed from Google Calendar.
+     * Retrieves events from the past (up to pastDays) and future (up to futureDays),
+     * supporting both standard and recurring events via CalendarContract.Instances with
+     * fallback to CalendarContract.Events.
      */
-    fun importEventsFromGoogle(daysRange: Int = 90): List<EventEntity> {
-        val calId = getSelectedCalendarId()
-        if (calId == -1L) return emptyList()
+    fun importEventsFromGoogle(pastDays: Int = 1095, futureDays: Int = 1095): List<EventEntity> {
+        if (getSelectedCalendarId() == -1L) {
+            ensureCalendarSelected()
+        }
 
-        val imported = mutableListOf<EventEntity>()
-        val now = Calendar.getInstance()
-        val startMillis = now.timeInMillis
-        now.add(Calendar.DAY_OF_YEAR, daysRange)
-        val endMillis = now.timeInMillis
+        val available = getAvailableCalendars()
+        val selectedId = getSelectedCalendarId()
 
-        val projection = arrayOf(
-            CalendarContract.Events._ID,
-            CalendarContract.Events.TITLE,
-            CalendarContract.Events.DESCRIPTION,
-            CalendarContract.Events.DTSTART,
-            CalendarContract.Events.DTEND,
-            CalendarContract.Events.ALL_DAY
-        )
-
-        val selection = "${CalendarContract.Events.CALENDAR_ID} = ? AND " +
-                "${CalendarContract.Events.DTSTART} >= ? AND " +
-                "${CalendarContract.Events.DTSTART} <= ?"
-        val selArgs = arrayOf(calId.toString(), startMillis.toString(), endMillis.toString())
-
-        val cursor: Cursor? = try {
-            context.contentResolver.query(
-                CalendarContract.Events.CONTENT_URI,
-                projection, selection, selArgs,
-                "${CalendarContract.Events.DTSTART} ASC"
-            )
-        } catch (e: SecurityException) { null }
-
-        cursor?.use {
-            while (it.moveToNext()) {
-                val title = it.getString(1) ?: continue
-                // Skip our own synced items
-                if (title.startsWith(APP_TAG) || title.startsWith(TASK_PREFIX) || title.startsWith(NOTE_PREFIX)) continue
-
-                val desc = it.getString(2) ?: ""
-                val dtStart = it.getLong(3)
-
-                val cal = Calendar.getInstance().apply { timeInMillis = dtStart }
-                val gYear = cal.get(Calendar.YEAR)
-                val gMonth = cal.get(Calendar.MONTH) + 1
-                val gDay = cal.get(Calendar.DAY_OF_MONTH)
-                val hour = cal.get(Calendar.HOUR_OF_DAY)
-                val minute = cal.get(Calendar.MINUTE)
-
-                val jalali = PersianCalendarHelper.gregorianToJalali(gYear, gMonth, gDay)
-                val timeStr = "%02d:%02d".format(hour, minute)
-                val persianTime = PersianCalendarHelper.toPersianDigits(timeStr)
-
-                imported.add(
-                    EventEntity(
-                        title = title,
-                        description = desc,
-                        persianDate = jalali.formatted,
-                        gregorianDate = "%04d-%02d-%02d".format(gYear, gMonth, gDay),
-                        startTime = persianTime,
-                        category = "تقویم گوگل",
-                        colorHex = "#4285F4"
-                    )
-                )
+        // Find candidate calendar IDs: selected calendar + any other Google calendar accounts
+        val targetCalendarIds = mutableListOf<Long>()
+        if (selectedId != -1L) {
+            targetCalendarIds.add(selectedId)
+        }
+        val googleCalIds = available.filter { it.isGoogle }.map { it.id }
+        for (gId in googleCalIds) {
+            if (!targetCalendarIds.contains(gId)) {
+                targetCalendarIds.add(gId)
             }
         }
+        if (targetCalendarIds.isEmpty()) {
+            targetCalendarIds.addAll(available.map { it.id })
+        }
+
+        if (targetCalendarIds.isEmpty()) return emptyList()
+
+        val imported = mutableListOf<EventEntity>()
+        val seenKeys = mutableSetOf<String>()
+
+        val startCal = Calendar.getInstance().apply {
+            add(Calendar.DAY_OF_YEAR, -pastDays)
+            set(Calendar.HOUR_OF_DAY, 0)
+            set(Calendar.MINUTE, 0)
+            set(Calendar.SECOND, 0)
+            set(Calendar.MILLISECOND, 0)
+        }
+        val endCal = Calendar.getInstance().apply {
+            add(Calendar.DAY_OF_YEAR, futureDays)
+            set(Calendar.HOUR_OF_DAY, 23)
+            set(Calendar.MINUTE, 59)
+            set(Calendar.SECOND, 59)
+            set(Calendar.MILLISECOND, 999)
+        }
+        val startMillis = startCal.timeInMillis
+        val endMillis = endCal.timeInMillis
+
+        // 1. Try querying CalendarContract.Instances first (expands recurring events and covers past/future instances)
+        try {
+            val builder = CalendarContract.Instances.CONTENT_URI.buildUpon()
+            ContentUris.appendId(builder, startMillis)
+            ContentUris.appendId(builder, endMillis)
+            val instancesUri = builder.build()
+
+            val instanceProjection = arrayOf(
+                CalendarContract.Instances.EVENT_ID,
+                CalendarContract.Instances.TITLE,
+                CalendarContract.Instances.DESCRIPTION,
+                CalendarContract.Instances.BEGIN,
+                CalendarContract.Instances.END,
+                CalendarContract.Instances.ALL_DAY,
+                CalendarContract.Instances.CALENDAR_ID
+            )
+
+            val calPlaceholders = targetCalendarIds.joinToString(",") { "?" }
+            val selection = "${CalendarContract.Instances.CALENDAR_ID} IN ($calPlaceholders)"
+            val selArgs = targetCalendarIds.map { it.toString() }.toTypedArray()
+
+            val cursor = context.contentResolver.query(
+                instancesUri,
+                instanceProjection,
+                selection,
+                selArgs,
+                "${CalendarContract.Instances.BEGIN} ASC"
+            )
+
+            cursor?.use {
+                while (it.moveToNext()) {
+                    val title = it.getString(1) ?: continue
+                    if (title.startsWith(APP_TAG) || title.startsWith(TASK_PREFIX) || title.startsWith(NOTE_PREFIX)) continue
+
+                    val desc = it.getString(2) ?: ""
+                    if (desc.contains("app_id:")) continue
+
+                    val dtStart = it.getLong(3)
+                    val dtEnd = it.getLong(4)
+                    val isAllDay = it.getInt(5) == 1
+
+                    val cal = if (isAllDay) {
+                        Calendar.getInstance(TimeZone.getTimeZone("UTC")).apply { timeInMillis = dtStart }
+                    } else {
+                        Calendar.getInstance().apply { timeInMillis = dtStart }
+                    }
+
+                    val gYear = cal.get(Calendar.YEAR)
+                    val gMonth = cal.get(Calendar.MONTH) + 1
+                    val gDay = cal.get(Calendar.DAY_OF_MONTH)
+
+                    val jalali = PersianCalendarHelper.gregorianToJalali(gYear, gMonth, gDay)
+                    val gregorianDate = "%04d-%02d-%02d".format(gYear, gMonth, gDay)
+
+                    val startTime = if (isAllDay) {
+                        ""
+                    } else {
+                        val hour = cal.get(Calendar.HOUR_OF_DAY)
+                        val minute = cal.get(Calendar.MINUTE)
+                        PersianCalendarHelper.toPersianDigits("%02d:%02d".format(hour, minute))
+                    }
+
+                    val endTime = if (isAllDay || dtEnd <= dtStart) {
+                        ""
+                    } else {
+                        val endCalLocal = Calendar.getInstance().apply { timeInMillis = dtEnd }
+                        val hour = endCalLocal.get(Calendar.HOUR_OF_DAY)
+                        val minute = endCalLocal.get(Calendar.MINUTE)
+                        PersianCalendarHelper.toPersianDigits("%02d:%02d".format(hour, minute))
+                    }
+
+                    val dedupKey = "$title|$gregorianDate|$startTime"
+                    if (seenKeys.add(dedupKey)) {
+                        imported.add(
+                            EventEntity(
+                                title = title,
+                                description = desc,
+                                persianDate = jalali.formatted,
+                                gregorianDate = gregorianDate,
+                                startTime = startTime,
+                                endTime = endTime,
+                                category = "تقویم گوگل",
+                                colorHex = "#4285F4"
+                            )
+                        )
+                    }
+                }
+            }
+        } catch (_: Exception) {}
+
+        // 2. Fallback or supplement with CalendarContract.Events if needed
+        if (imported.isEmpty()) {
+            try {
+                val eventsProjection = arrayOf(
+                    CalendarContract.Events._ID,
+                    CalendarContract.Events.TITLE,
+                    CalendarContract.Events.DESCRIPTION,
+                    CalendarContract.Events.DTSTART,
+                    CalendarContract.Events.DTEND,
+                    CalendarContract.Events.ALL_DAY,
+                    CalendarContract.Events.CALENDAR_ID
+                )
+
+                val calPlaceholders = targetCalendarIds.joinToString(",") { "?" }
+                val selection = "${CalendarContract.Events.CALENDAR_ID} IN ($calPlaceholders) AND " +
+                        "${CalendarContract.Events.DTSTART} >= ? AND ${CalendarContract.Events.DTSTART} <= ?"
+                val selArgs = (targetCalendarIds.map { it.toString() } + listOf(startMillis.toString(), endMillis.toString())).toTypedArray()
+
+                val cursor = context.contentResolver.query(
+                    CalendarContract.Events.CONTENT_URI,
+                    eventsProjection,
+                    selection,
+                    selArgs,
+                    "${CalendarContract.Events.DTSTART} ASC"
+                )
+
+                cursor?.use {
+                    while (it.moveToNext()) {
+                        val title = it.getString(1) ?: continue
+                        if (title.startsWith(APP_TAG) || title.startsWith(TASK_PREFIX) || title.startsWith(NOTE_PREFIX)) continue
+
+                        val desc = it.getString(2) ?: ""
+                        if (desc.contains("app_id:")) continue
+
+                        val dtStart = it.getLong(3)
+                        val dtEnd = it.getLong(4)
+                        val isAllDay = it.getInt(5) == 1
+
+                        val cal = if (isAllDay) {
+                            Calendar.getInstance(TimeZone.getTimeZone("UTC")).apply { timeInMillis = dtStart }
+                        } else {
+                            Calendar.getInstance().apply { timeInMillis = dtStart }
+                        }
+
+                        val gYear = cal.get(Calendar.YEAR)
+                        val gMonth = cal.get(Calendar.MONTH) + 1
+                        val gDay = cal.get(Calendar.DAY_OF_MONTH)
+
+                        val jalali = PersianCalendarHelper.gregorianToJalali(gYear, gMonth, gDay)
+                        val gregorianDate = "%04d-%02d-%02d".format(gYear, gMonth, gDay)
+
+                        val startTime = if (isAllDay) {
+                            ""
+                        } else {
+                            val hour = cal.get(Calendar.HOUR_OF_DAY)
+                            val minute = cal.get(Calendar.MINUTE)
+                            PersianCalendarHelper.toPersianDigits("%02d:%02d".format(hour, minute))
+                        }
+
+                        val endTime = if (isAllDay || dtEnd <= dtStart) {
+                            ""
+                        } else {
+                            val endCalLocal = Calendar.getInstance().apply { timeInMillis = dtEnd }
+                            val hour = endCalLocal.get(Calendar.HOUR_OF_DAY)
+                            val minute = endCalLocal.get(Calendar.MINUTE)
+                            PersianCalendarHelper.toPersianDigits("%02d:%02d".format(hour, minute))
+                        }
+
+                        val dedupKey = "$title|$gregorianDate|$startTime"
+                        if (seenKeys.add(dedupKey)) {
+                            imported.add(
+                                EventEntity(
+                                    title = title,
+                                    description = desc,
+                                    persianDate = jalali.formatted,
+                                    gregorianDate = gregorianDate,
+                                    startTime = startTime,
+                                    endTime = endTime,
+                                    category = "تقویم گوگل",
+                                    colorHex = "#4285F4"
+                                )
+                            )
+                        }
+                    }
+                }
+            } catch (_: Exception) {}
+        }
+
         return imported
     }
 

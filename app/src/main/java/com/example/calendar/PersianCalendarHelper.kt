@@ -48,6 +48,35 @@ object PersianCalendarHelper {
         return sb.toString()
     }
 
+    fun toEnglishDigits(text: String): String {
+        val persianDigits = "۰۱۲۳۴۵۶۷۸۹"
+        val arabicDigits = "٠١٢٣٤٥٦٧٨٩"
+        val sb = java.lang.StringBuilder()
+        for (ch in text) {
+            val pIdx = persianDigits.indexOf(ch)
+            if (pIdx >= 0) {
+                sb.append(pIdx)
+            } else {
+                val aIdx = arabicDigits.indexOf(ch)
+                if (aIdx >= 0) {
+                    sb.append(aIdx)
+                } else {
+                    sb.append(ch)
+                }
+            }
+        }
+        return sb.toString()
+    }
+
+    fun normalizePersianDate(pDate: String): String {
+        val eng = toEnglishDigits(pDate.trim())
+        val parts = eng.split("/").mapNotNull { it.trim().toIntOrNull() }
+        if (parts.size == 3) {
+            return "%04d/%02d/%02d".format(parts[0], parts[1], parts[2])
+        }
+        return eng
+    }
+
     fun gregorianToJalali(gYear: Int, gMonth: Int, gDay: Int): JalaliDate {
         val gDaysInMonth = intArrayOf(31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31)
         val jDaysInMonth = intArrayOf(31, 31, 31, 31, 31, 31, 30, 30, 30, 30, 30, 29)

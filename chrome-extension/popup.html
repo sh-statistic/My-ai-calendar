@@ -75,21 +75,6 @@
     .date-gregorian { font-size: 11px; color: var(--text-muted); }
     .occasion-badge { display: inline-block; font-size: 10px; background: #FEE2E2; color: #991B1B; padding: 2px 6px; border-radius: 6px; margin-top: 4px; font-weight: bold; }
 
-    /* QR Code Display on Laptop Screen */
-    .qr-card {
-      background: var(--surface);
-      border: 1px solid var(--primary-light);
-      border-radius: 12px;
-      padding: 10px;
-      text-align: center;
-      margin-bottom: 8px;
-      box-shadow: 0 1px 4px rgba(0,0,0,0.03);
-    }
-    .qr-title { font-size: 11px; font-weight: bold; color: var(--primary-dark); margin-bottom: 4px; }
-    .qr-box { display: flex; justify-content: center; align-items: center; margin: 6px 0; }
-    .qr-img { width: 130px; height: 130px; border-radius: 6px; border: 1px solid var(--surface-border); }
-    .qr-tip { font-size: 10px; color: var(--text-muted); line-height: 15px; }
-
     /* Prayer Times Widget */
     .prayer-card {
       background: var(--surface);
@@ -105,9 +90,16 @@
     .prayer-name { font-size: 8px; color: var(--text-muted); }
     .prayer-time { font-size: 9px; font-weight: bold; color: var(--text); }
 
-    .section-title { font-size: 11px; font-weight: bold; color: var(--text-muted); margin: 6px 0 4px; display: flex; justify-content: space-between; }
-    .items-list { display: flex; flex-direction: column; gap: 4px; max-height: 80px; overflow-y: auto; margin-bottom: 6px; }
+    .section-title { font-size: 11px; font-weight: bold; color: var(--text-muted); margin: 6px 0 4px; display: flex; justify-content: space-between; align-items: center; }
+    .items-list { display: flex; flex-direction: column; gap: 4px; max-height: 95px; overflow-y: auto; margin-bottom: 6px; }
     .item-card { background: var(--surface); border-radius: 6px; padding: 5px 8px; display: flex; justify-content: space-between; align-items: center; border: 1px solid var(--surface-border); border-right: 3px solid var(--primary); font-size: 11px; }
+    .item-card.completed span { text-decoration: line-through; color: var(--text-muted); }
+    .item-card.priority-high { border-right-color: #ef4444 !important; }
+    .item-card.priority-medium { border-right-color: #f59e0b !important; }
+    .item-card.priority-low { border-right-color: #10b981 !important; }
+    .filter-tabs { display: flex; gap: 4px; font-size: 10px; }
+    .filter-tab { cursor: pointer; padding: 1px 6px; border-radius: 4px; background: #E2E8F0; color: #475569; }
+    .filter-tab.active { background: var(--primary); color: white; font-weight: bold; }
     .empty-state { text-align: center; color: var(--text-muted); font-size: 10px; padding: 6px; background: var(--surface); border-radius: 6px; border: 1px dashed var(--surface-border); }
 
     .quick-note textarea { width: 100%; height: 36px; border: 1px solid var(--surface-border); border-radius: 6px; padding: 4px 6px; font-size: 11px; resize: none; margin-bottom: 4px; }
@@ -132,15 +124,6 @@
     <div class="date-solar" id="solarDateText">امروز</div>
     <div class="date-gregorian" id="gregorianDateText">میلادی</div>
     <div id="occasionBadge" class="occasion-badge" style="display: none;"></div>
-  </div>
-
-  <!-- QR Code Pairing Card Displayed on Laptop Screen -->
-  <div class="qr-card">
-    <div class="qr-title">📱 اسکن بارکد با دوربین گوشی جهت اتصال فوری</div>
-    <div class="qr-box">
-      <img id="qrImg" class="qr-img" alt="کد QR اتصال">
-    </div>
-    <div class="qr-tip" id="serverInfoText">در حال دریافت آدرس سرور گوشی...</div>
   </div>
 
   <!-- Offline Prayer Times -->
@@ -168,14 +151,25 @@
   </div>
 
   <div class="section-title">
-    <span>وظایف و کارها</span>
+    <div style="display: flex; align-items: center; gap: 6px;">
+      <span>وظایف و کارها</span>
+      <div class="filter-tabs">
+        <span class="filter-tab active" id="tabTodayTasks">امروز</span>
+        <span class="filter-tab" id="tabAllTasks">همه زمان‌ها</span>
+      </div>
+    </div>
     <span id="tasksCount">۰</span>
   </div>
   <div class="items-list" id="tasksList">
     <div class="empty-state">وظیفه‌ای ثبت نشده است.</div>
   </div>
   <div style="display: flex; gap: 4px; margin-bottom: 8px;">
-    <input type="text" id="popupTaskInput" placeholder="کار جدید..." style="flex: 1; padding: 4px 6px; border: 1px solid var(--surface-border); border-radius: 6px; font-size: 11px;">
+    <input type="text" id="popupTaskInput" placeholder="کار جدید برای امروز..." style="flex: 1; padding: 4px 6px; border: 1px solid var(--surface-border); border-radius: 6px; font-size: 11px;">
+    <select id="popupTaskPriority" style="padding: 4px 2px; border: 1px solid var(--surface-border); border-radius: 6px; font-size: 10px; background: white;">
+      <option value="متوسط">متوسط</option>
+      <option value="بالا">فوری/بالا</option>
+      <option value="پایین">پایین</option>
+    </select>
     <button id="btnPopupAddTask" class="btn" style="padding: 4px 8px;">+ افزودن</button>
   </div>
 

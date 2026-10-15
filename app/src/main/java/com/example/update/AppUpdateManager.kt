@@ -29,7 +29,7 @@ object AppUpdateManager {
     private const val KEY_SAFETY_BACKUP_TIME = "safety_backup_timestamp"
     
     // Check interval: 7 days in milliseconds
-    const val CHECK_INTERVAL_MILLIS = 7L * 24 * 60 * 60 * 1000
+    const val CHECK_INTERVAL_MILLIS = 30L * 24 * 60 * 60 * 1000
 
     /**
      * Checks GitHub for the latest release.

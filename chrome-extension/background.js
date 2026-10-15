@@ -15,9 +15,9 @@ chrome.alarms.onAlarm.addListener(async (alarm) => {
   if (alarm.name === "hamgam-periodic-sync") {
     try {
       const serverUrl = await SyncClient.getServerUrl();
-      const status = await SyncClient.pingServer(serverUrl);
-      if (status) {
-        await SyncClient.syncWithAndroid(serverUrl);
+      const status = await SyncClient.directPingServer(serverUrl);
+      if (status && status.status === "online") {
+        await SyncClient.directSyncWithAndroid(serverUrl);
         updateBadge();
       }
     } catch (_) {}
@@ -26,7 +26,7 @@ chrome.alarms.onAlarm.addListener(async (alarm) => {
 
 chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
   if (request.action === "sync_now") {
-    SyncClient.syncWithAndroid(request.serverUrl)
+    SyncClient.directSyncWithAndroid(request.serverUrl)
       .then((res) => {
         updateBadge();
         sendResponse(res);
@@ -35,8 +35,15 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
     return true; // Keep message channel open for async response
   }
 
-  if (request.action === "get_status") {
-    SyncClient.pingServer(request.serverUrl)
+  if (request.action === "ping_server" || request.action === "get_status") {
+    SyncClient.directPingServer(request.serverUrl, request.timeoutMs || 3500)
+      .then((res) => sendResponse(res))
+      .catch(() => sendResponse(null));
+    return true;
+  }
+
+  if (request.action === "detect_tabs") {
+    SyncClient.detectServerUrlFromOpenTabs()
       .then((res) => sendResponse(res))
       .catch(() => sendResponse(null));
     return true;

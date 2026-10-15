@@ -59,6 +59,7 @@ import androidx.compose.ui.unit.sp
 import com.example.calendar.PersianCalendarHelper
 import com.example.prayer.PrayerTimesCalculator
 import com.example.ui.MainViewModel
+import com.example.ui.rememberAppStrings
 
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
@@ -69,7 +70,7 @@ fun PrayerTimesCard(
     val prayerTimes by viewModel.prayerTimes.collectAsState()
     val nextPrayer by viewModel.nextPrayerInfo.collectAsState()
     val selectedCity by viewModel.selectedCity.collectAsState()
-    var showCityDropdown by remember { mutableStateOf(false) }
+    val strings = rememberAppStrings()
 
     Card(
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
@@ -80,63 +81,34 @@ fun PrayerTimesCard(
             .testTag("prayer_times_card")
     ) {
         Column(modifier = Modifier.padding(10.dp)) {
-            // Header: City Display + Next Prayer Badge
+            // Header: Fixed City Display (Changes only in Settings) + Next Prayer Badge
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                // City Display (Moved selection to Settings)
+                // City Display - Fixed text badge, not clickable
                 Surface(
                     color = MaterialTheme.colorScheme.surfaceVariant,
                     shape = RoundedCornerShape(8.dp)
                 ) {
-                    Box {
-                        Row(
-                            modifier = Modifier
-                                .padding(horizontal = 8.dp, vertical = 4.dp)
-                                .clickable { showCityDropdown = true },
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            Icon(
-                                Icons.Default.LocationOn,
-                                contentDescription = null,
-                                tint = MaterialTheme.colorScheme.primary,
-                                modifier = Modifier.size(14.dp)
-                            )
-                            Spacer(modifier = Modifier.width(3.dp))
-                            Text(
-                                text = selectedCity.nameFa,
-                                style = MaterialTheme.typography.labelSmall,
-                                fontWeight = FontWeight.Bold,
-                                color = MaterialTheme.colorScheme.onSurface
-                            )
-                        }
-                        
-                        DropdownMenu(
-                            expanded = showCityDropdown,
-                            onDismissRequest = { showCityDropdown = false }
-                        ) {
-                            PrayerTimesCalculator.CITIES.forEach { city ->
-                                DropdownMenuItem(
-                                    text = {
-                                        Row(
-                                            modifier = Modifier.fillMaxWidth(),
-                                            horizontalArrangement = Arrangement.SpaceBetween
-                                        ) {
-                                            Text(city.nameFa, fontWeight = if (city.nameFa == selectedCity.nameFa) FontWeight.Bold else FontWeight.Normal)
-                                            if (city.nameFa == selectedCity.nameFa) {
-                                                Icon(Icons.Default.Check, contentDescription = null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(14.dp))
-                                            }
-                                        }
-                                    },
-                                    onClick = {
-                                        viewModel.selectCity(city)
-                                        showCityDropdown = false
-                                    }
-                                )
-                            }
-                        }
+                    Row(
+                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Icon(
+                            Icons.Default.LocationOn,
+                            contentDescription = null,
+                            tint = MaterialTheme.colorScheme.primary,
+                            modifier = Modifier.size(14.dp)
+                        )
+                        Spacer(modifier = Modifier.width(3.dp))
+                        Text(
+                            text = strings.cityName(selectedCity),
+                            style = MaterialTheme.typography.labelSmall,
+                            fontWeight = FontWeight.Bold,
+                            color = MaterialTheme.colorScheme.onSurface
+                        )
                     }
                 }
 
@@ -159,12 +131,8 @@ fun PrayerTimesCard(
                         Spacer(modifier = Modifier.width(4.dp))
                         val hours = nextPrayer.remainingMinutes / 60
                         val mins = nextPrayer.remainingMinutes % 60
-                        val remainingStr = when {
-                            hours > 0 -> "${hours} ساعت و ${mins} دقیقه"
-                            else -> "${mins} دقیقه"
-                        }
                         Text(
-                            text = "${nextPrayer.name}: ${PersianCalendarHelper.toPersianDigits(nextPrayer.time)} (${PersianCalendarHelper.toPersianDigits(remainingStr)})",
+                            text = strings.nextPrayerRemaining(nextPrayer.name, nextPrayer.time, hours, mins),
                             fontSize = 10.sp,
                             fontWeight = FontWeight.SemiBold,
                             color = MaterialTheme.colorScheme.primary,
@@ -182,19 +150,19 @@ fun PrayerTimesCard(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.spacedBy(3.dp)
             ) {
-                PrayerItem(title = "اذان صبح", time = prayerTimes.fajr, icon = Icons.Default.NightsStay, isNext = nextPrayer.name.contains("صبح"))
-                PrayerItem(title = "طلوع", time = prayerTimes.sunrise, icon = Icons.Default.WbSunny, isNext = nextPrayer.name.contains("طلوع"))
-                PrayerItem(title = "اذان ظهر", time = prayerTimes.dhuhr, icon = Icons.Default.WbSunny, isNext = nextPrayer.name.contains("ظهر"))
-                PrayerItem(title = "غروب", time = prayerTimes.sunset, icon = Icons.Default.WbTwilight, isNext = nextPrayer.name.contains("غروب"))
-                PrayerItem(title = "اذان مغرب", time = prayerTimes.maghrib, icon = Icons.Default.WbTwilight, isNext = nextPrayer.name.contains("مغرب"))
-                PrayerItem(title = "نیمه‌شب", time = prayerTimes.midnight, icon = Icons.Default.NightsStay, isNext = nextPrayer.name.contains("نیمه‌شب"))
+                PrayerItem(title = strings.fajr, time = strings.formatDigits(prayerTimes.fajr), icon = Icons.Default.NightsStay, isNext = nextPrayer.name.contains("صبح") || nextPrayer.name.contains("Fajr"))
+                PrayerItem(title = strings.sunrise, time = strings.formatDigits(prayerTimes.sunrise), icon = Icons.Default.WbSunny, isNext = nextPrayer.name.contains("طلوع") || nextPrayer.name.contains("Sunrise"))
+                PrayerItem(title = strings.dhuhr, time = strings.formatDigits(prayerTimes.dhuhr), icon = Icons.Default.WbSunny, isNext = nextPrayer.name.contains("ظهر") || nextPrayer.name.contains("Dhuhr"))
+                PrayerItem(title = strings.sunset, time = strings.formatDigits(prayerTimes.sunset), icon = Icons.Default.WbTwilight, isNext = nextPrayer.name.contains("غروب") || nextPrayer.name.contains("Sunset"))
+                PrayerItem(title = strings.maghrib, time = strings.formatDigits(prayerTimes.maghrib), icon = Icons.Default.WbTwilight, isNext = nextPrayer.name.contains("مغرب") || nextPrayer.name.contains("Maghrib"))
+                PrayerItem(title = strings.midnight, time = strings.formatDigits(prayerTimes.midnight), icon = Icons.Default.NightsStay, isNext = nextPrayer.name.contains("نیمه‌شب") || nextPrayer.name.contains("Midnight"))
             }
 
             Spacer(modifier = Modifier.height(8.dp))
 
             // Accuracy Disclaimer / Caution Note
             Text(
-                text = "⚠️ احتیاط: اوقات شرعی با فرمول ژئوفیزیک محاسبه شده و ممکن است با افق دقیق محلی چند دقیقه تفاوت داشته باشد؛ لطفاً برای ادای فرایض دقایقی احتیاط فرمایید.",
+                text = strings.prayerTimesAccuracyNote,
                 fontSize = 9.sp,
                 color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.8f),
                 lineHeight = 13.sp,
@@ -239,7 +207,7 @@ private fun RowScope.PrayerItem(
         )
         Spacer(modifier = Modifier.height(1.dp))
         Text(
-            text = PersianCalendarHelper.toPersianDigits(time),
+            text = time,
             fontSize = 10.sp,
             fontWeight = FontWeight.Bold,
             color = if (isNext) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface

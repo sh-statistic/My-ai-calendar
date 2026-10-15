@@ -153,7 +153,7 @@ class LocalHttpSyncServer(
                         val statusJson = JSONObject().apply {
                             put("status", "online")
                             put("app", "همگام")
-                            put("version", "1.0")
+                            put("version", "0.6.0")
                             put("eventsCount", eventsCount)
                             put("tasksCount", tasksCount)
                             put("notesCount", notesCount)
@@ -249,7 +249,9 @@ class LocalHttpSyncServer(
             .append("Content-Length: ${bytes.size}\r\n")
             .append("Access-Control-Allow-Origin: *\r\n")
             .append("Access-Control-Allow-Methods: GET, POST, OPTIONS, PUT, DELETE\r\n")
-            .append("Access-Control-Allow-Headers: Content-Type, Authorization, X-Requested-With\r\n")
+            .append("Access-Control-Allow-Headers: *\r\n")
+            .append("Access-Control-Allow-Private-Network: true\r\n")
+            .append("Access-Control-Max-Age: 86400\r\n")
             .append("Connection: close\r\n")
             .append("\r\n")
 

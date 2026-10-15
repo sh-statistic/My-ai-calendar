@@ -677,6 +677,13 @@ document.addEventListener("DOMContentLoaded", async () => {
   let currentMonth = todayJalali.month;
   let selectedDate = { ...todayJalali };
 
+  // Task filters & state (Matching Mobile App)
+  let taskScopeFilter = "day"; // "day" | "all"
+  let taskStatusFilter = "all"; // "all" | "pending" | "done"
+
+  // Notes state
+  let noteSearchQuery = "";
+
   let localEvents = [];
   let localTasks = [];
   let localNotes = [];
@@ -733,8 +740,12 @@ document.addEventListener("DOMContentLoaded", async () => {
 
       cell.addEventListener("click", () => {
         selectedDate = { ...cellJalali };
+        // همگام با اپلیکیشن: بازه وظایف روی روز انتخابی تنظیم می‌شود
+        taskScopeFilter = "day";
+        updateTaskFilterChipsUI();
         renderCalendar();
         renderSelectedDayInfo();
+        renderTasks();
       });
 
       calendarGrid.appendChild(cell);
@@ -775,6 +786,7 @@ document.addEventListener("DOMContentLoaded", async () => {
 
     const occasions = typeof PersianOccasions !== "undefined" ? PersianOccasions.getOccasions(selectedDate.month, selectedDate.day, selectedDate.year) : [];
     const dayEvents = localEvents.filter((e) => !e.isDeleted && PersianDateUtil.normalizePersianDate(e.persianDate) === formatted);
+    const dayTasks = localTasks.filter((t) => !t.isDeleted && PersianDateUtil.normalizePersianDate(t.persianDueDate) === formatted);
     const dayNotes = localNotes.filter((n) => !n.isDeleted && PersianDateUtil.normalizePersianDate(n.persianDate) === formatted);
 
     let html = "";
@@ -787,6 +799,7 @@ document.addEventListener("DOMContentLoaded", async () => {
         .join("");
     }
     if (dayEvents.length > 0) {
+      html += `<div class="cal-section-subtitle">📅 رویدادها (${PersianDateUtil.toPersianDigits(dayEvents.length)}):</div>`;
       html += dayEvents
         .map(
           (e) => `
@@ -801,13 +814,35 @@ document.addEventListener("DOMContentLoaded", async () => {
         )
         .join("");
     }
+    if (dayTasks.length > 0) {
+      const pendingCount = dayTasks.filter(t => !t.isCompleted).length;
+      html += `<div class="cal-section-subtitle">✓ وظایف (${PersianDateUtil.toPersianDigits(dayTasks.length)} - در انتظار: ${PersianDateUtil.toPersianDigits(pendingCount)}):</div>`;
+      html += dayTasks
+        .map(
+          (t) => {
+            const pClass = t.priority === "بالا" ? "priority-high" : (t.priority === "پایین" ? "priority-low" : "priority-medium");
+            const borderColor = t.priority === "بالا" ? "#ef4444" : (t.priority === "پایین" ? "#10b981" : "#f59e0b");
+            return `
+            <div class="cal-task-row ${t.isCompleted ? 'completed' : ''}" style="border-right-color: ${borderColor}">
+              <div class="cal-task-row-left">
+                <input type="checkbox" ${t.isCompleted ? 'checked' : ''} data-task-id="${t.id}" class="cal-task-checkbox">
+                <span>${t.title}</span>
+              </div>
+              <button class="cal-event-delete-btn" data-cal-task-id="${t.id}" title="حذف وظیفه">✕</button>
+            </div>
+            `;
+          }
+        )
+        .join("");
+    }
     if (dayNotes.length > 0) {
+      html += `<div class="cal-section-subtitle">📝 یادداشت‌ها:</div>`;
       html += dayNotes
         .map(
           (n) => `
         <div class="cal-event-row" style="border-right-color: #eab308; background: #fefce8;">
           <div class="cal-event-content">
-            <span class="cal-event-title" style="color: #854d0e;">📝 ${n.title ? n.title + ': ' : ''}${n.content}</span>
+            <span class="cal-event-title" style="color: #854d0e;">${n.title ? n.title + ': ' : ''}${n.content}</span>
           </div>
         </div>
       `
@@ -815,14 +850,14 @@ document.addEventListener("DOMContentLoaded", async () => {
         .join("");
     }
     if (!html) {
-      html = `<span style="color: var(--text-muted); font-size: 10px;">رویدادی برای این روز ثبت نشده است.</span>`;
+      html = `<span style="color: var(--text-muted); font-size: 10px;">رویداد یا وظیفه‌ای برای این روز ثبت نشده است.</span>`;
     }
 
     if (dayEventsList) {
       dayEventsList.innerHTML = html;
 
       // Bind delete buttons for calendar events
-      dayEventsList.querySelectorAll(".cal-event-delete-btn").forEach((btn) => {
+      dayEventsList.querySelectorAll(".cal-event-delete-btn[data-event-id]").forEach((btn) => {
         btn.addEventListener("click", async (ev) => {
           ev.stopPropagation();
           const evId = btn.getAttribute("data-event-id");
@@ -832,7 +867,41 @@ document.addEventListener("DOMContentLoaded", async () => {
             evItem.updatedAt = Date.now();
             await SyncClient.saveLocalData(localEvents, localTasks, localNotes);
             renderSelectedDayInfo();
+            renderCalendar();
             showToast("رویداد با موفقیت حذف شد", "info");
+          }
+        });
+      });
+
+      // Bind checkboxes for tasks directly in calendar info
+      dayEventsList.querySelectorAll(".cal-task-checkbox").forEach((cb) => {
+        cb.addEventListener("change", async (ev) => {
+          const taskId = ev.target.getAttribute("data-task-id");
+          const task = localTasks.find((x) => x.id === taskId);
+          if (task) {
+            task.isCompleted = ev.target.checked;
+            task.updatedAt = Date.now();
+            await SyncClient.saveLocalData(localEvents, localTasks, localNotes);
+            renderSelectedDayInfo();
+            renderTasks();
+          }
+        });
+      });
+
+      // Bind delete buttons for tasks inside calendar info
+      dayEventsList.querySelectorAll(".cal-event-delete-btn[data-cal-task-id]").forEach((btn) => {
+        btn.addEventListener("click", async (ev) => {
+          ev.stopPropagation();
+          const taskId = btn.getAttribute("data-cal-task-id");
+          const task = localTasks.find((x) => x.id === taskId);
+          if (task) {
+            task.isDeleted = true;
+            task.updatedAt = Date.now();
+            await SyncClient.saveLocalData(localEvents, localTasks, localNotes);
+            renderSelectedDayInfo();
+            renderCalendar();
+            renderTasks();
+            showToast("وظیفه با موفقیت حذف شد", "info");
           }
         });
       });
@@ -944,8 +1013,11 @@ document.addEventListener("DOMContentLoaded", async () => {
       currentYear = todayJalali.year;
       currentMonth = todayJalali.month;
       selectedDate = { ...todayJalali };
+      taskScopeFilter = "day";
+      updateTaskFilterChipsUI();
       renderCalendar();
       renderSelectedDayInfo();
+      renderTasks();
     });
   }
 
@@ -998,6 +1070,7 @@ document.addEventListener("DOMContentLoaded", async () => {
     }
 
     updatePrayerTimes();
+    setInterval(updatePrayerTimes, 60000);
     dashCitySelect.addEventListener("change", async () => {
       updatePrayerTimes();
       if (typeof chrome !== "undefined" && chrome.storage && chrome.storage.local) {
@@ -1007,42 +1080,198 @@ document.addEventListener("DOMContentLoaded", async () => {
   }
 
   // =========================================================================
-  // 6. TASKS GADGET (چک‌لیست وظایف با زمان و حذف)
+  // 6. TASKS GADGET (چک‌لیست وظایف، فیلتر تاریخ/وضعیت و اولویت‌ها مشابه اپ)
   // =========================================================================
   const newtabTaskList = document.getElementById("newtabTaskList");
   const newTaskInput = document.getElementById("newTaskInput");
+  const newTaskPriority = document.getElementById("newTaskPriority");
   const newTaskTimeInput = document.getElementById("newTaskTimeInput");
   const btnAddTask = document.getElementById("btnAddTask");
   const pendingCountBadge = document.getElementById("pendingCountBadge");
+  const taskDateLabel = document.getElementById("taskDateLabel");
+  const btnTaskPrevDay = document.getElementById("btnTaskPrevDay");
+  const btnTaskNextDay = document.getElementById("btnTaskNextDay");
+  const btnTaskToday = document.getElementById("btnTaskToday");
+
+  // Chips
+  const chipScopeDay = document.getElementById("chipScopeDay");
+  const chipScopeAll = document.getElementById("chipScopeAll");
+  const chipStatusAll = document.getElementById("chipStatusAll");
+  const chipStatusPending = document.getElementById("chipStatusPending");
+  const chipStatusDone = document.getElementById("chipStatusDone");
+
+  // Progress Bar
+  const taskProgressRatio = document.getElementById("taskProgressRatio");
+  const taskProgressPercent = document.getElementById("taskProgressPercent");
+  const taskProgressFill = document.getElementById("taskProgressFill");
+
+  function changeSelectedDate(offsetDays) {
+    const g = PersianDateUtil.jalaliToGregorian(selectedDate.year, selectedDate.month, selectedDate.day);
+    const d = new Date(g.year, g.month - 1, g.day);
+    d.setDate(d.getDate() + offsetDays);
+    const newJ = PersianDateUtil.gregorianToJalali(d.getFullYear(), d.getMonth() + 1, d.getDate());
+    selectedDate = newJ;
+    currentYear = newJ.year;
+    currentMonth = newJ.month;
+    taskScopeFilter = "day";
+    updateTaskFilterChipsUI();
+    renderCalendar();
+    renderSelectedDayInfo();
+    renderTasks();
+  }
+
+  if (btnTaskPrevDay) btnTaskPrevDay.addEventListener("click", () => changeSelectedDate(-1));
+  if (btnTaskNextDay) btnTaskNextDay.addEventListener("click", () => changeSelectedDate(1));
+  if (btnTaskToday) {
+    btnTaskToday.addEventListener("click", () => {
+      selectedDate = { ...todayJalali };
+      currentYear = todayJalali.year;
+      currentMonth = todayJalali.month;
+      taskScopeFilter = "day";
+      updateTaskFilterChipsUI();
+      renderCalendar();
+      renderSelectedDayInfo();
+      renderTasks();
+    });
+  }
+
+  function updateTaskFilterChipsUI() {
+    [chipScopeDay, chipScopeAll].forEach(c => c && c.classList.remove("active"));
+    if (taskScopeFilter === "day" && chipScopeDay) chipScopeDay.classList.add("active");
+    if (taskScopeFilter === "all" && chipScopeAll) chipScopeAll.classList.add("active");
+
+    [chipStatusAll, chipStatusPending, chipStatusDone].forEach(c => c && c.classList.remove("active"));
+    if (taskStatusFilter === "all" && chipStatusAll) chipStatusAll.classList.add("active");
+    if (taskStatusFilter === "pending" && chipStatusPending) chipStatusPending.classList.add("active");
+    if (taskStatusFilter === "done" && chipStatusDone) chipStatusDone.classList.add("active");
+  }
+
+  if (chipScopeDay) {
+    chipScopeDay.addEventListener("click", () => {
+      taskScopeFilter = "day";
+      updateTaskFilterChipsUI();
+      renderTasks();
+    });
+  }
+  if (chipScopeAll) {
+    chipScopeAll.addEventListener("click", () => {
+      taskScopeFilter = "all";
+      updateTaskFilterChipsUI();
+      renderTasks();
+    });
+  }
+  if (chipStatusAll) {
+    chipStatusAll.addEventListener("click", () => {
+      taskStatusFilter = "all";
+      updateTaskFilterChipsUI();
+      renderTasks();
+    });
+  }
+  if (chipStatusPending) {
+    chipStatusPending.addEventListener("click", () => {
+      taskStatusFilter = "pending";
+      updateTaskFilterChipsUI();
+      renderTasks();
+    });
+  }
+  if (chipStatusDone) {
+    chipStatusDone.addEventListener("click", () => {
+      taskStatusFilter = "done";
+      updateTaskFilterChipsUI();
+      renderTasks();
+    });
+  }
 
   function renderTasks() {
     if (!newtabTaskList) return;
-    const activeTasks = localTasks.filter((t) => !t.isDeleted);
-    const pending = activeTasks.filter((t) => !t.isCompleted).length;
-    if (pendingCountBadge) pendingCountBadge.textContent = PersianDateUtil.toPersianDigits(pending);
 
-    if (activeTasks.length === 0) {
-      newtabTaskList.innerHTML = `<p style="font-size: 11px; color: var(--text-muted); text-align: center; padding: 6px;">کاری برای انجام نیست.</p>`;
+    const formattedSelected = PersianDateUtil.formatJalali(selectedDate);
+    const formattedToday = PersianDateUtil.formatJalali(todayJalali);
+    const isViewingToday = formattedSelected === formattedToday;
+
+    // به‌روزرسانی برچسب تاریخ در بالای ویجت وظایف
+    if (taskDateLabel) {
+      if (taskScopeFilter === "day") {
+        const dow = PersianDateUtil.getPersianDayOfWeek(selectedDate.year, selectedDate.month, selectedDate.day);
+        const dayName = PersianDateUtil.WEEKDAYS[dow];
+        taskDateLabel.textContent = isViewingToday
+          ? `امروز (${PersianDateUtil.toPersianDigits(selectedDate.day)} ${PersianDateUtil.PERSIAN_MONTHS[selectedDate.month - 1]})`
+          : `${dayName}، ${PersianDateUtil.toPersianDigits(selectedDate.day)} ${PersianDateUtil.PERSIAN_MONTHS[selectedDate.month - 1]}`;
+      } else {
+        taskDateLabel.textContent = "همه زمان‌ها (کل کارها)";
+      }
+    }
+
+    const allActiveTasks = localTasks.filter((t) => !t.isDeleted);
+
+    // ۱. فیلتر بازه زمانی (روز انتخابی تقویم یا همه)
+    let filteredTasks = allActiveTasks;
+    if (taskScopeFilter === "day") {
+      filteredTasks = filteredTasks.filter(
+        (t) => PersianDateUtil.normalizePersianDate(t.persianDueDate) === formattedSelected
+      );
+    }
+
+    // آمار کارهای بازه انتخابی برای نشانگر و پروگرس بار
+    const totalInScope = filteredTasks.length;
+    const completedInScope = filteredTasks.filter((t) => t.isCompleted).length;
+    const pendingInScope = totalInScope - completedInScope;
+
+    if (pendingCountBadge) {
+      pendingCountBadge.textContent = PersianDateUtil.toPersianDigits(pendingInScope);
+    }
+
+    // به‌روزرسانی نوار پیشرفت (مشابه اپلیکیشن اندروید)
+    if (taskProgressRatio && taskProgressPercent && taskProgressFill) {
+      const percent = totalInScope > 0 ? Math.round((completedInScope / totalInScope) * 100) : 0;
+      taskProgressRatio.textContent = `${PersianDateUtil.toPersianDigits(completedInScope)} از ${PersianDateUtil.toPersianDigits(totalInScope)} کار`;
+      taskProgressPercent.textContent = `${PersianDateUtil.toPersianDigits(percent)}٪`;
+      taskProgressFill.style.width = `${percent}%`;
+    }
+
+    // ۲. فیلتر وضعیت (همه، در انتظار، انجام‌شده)
+    if (taskStatusFilter === "pending") {
+      filteredTasks = filteredTasks.filter((t) => !t.isCompleted);
+    } else if (taskStatusFilter === "done") {
+      filteredTasks = filteredTasks.filter((t) => t.isCompleted);
+    }
+
+    if (filteredTasks.length === 0) {
+      const msg = taskScopeFilter === "day"
+        ? (isViewingToday ? "کاری برای امروز ثبت نشده است." : "کاری برای این تاریخ ثبت نشده است.")
+        : "هیچ کاری در فهرست وجود ندارد.";
+      newtabTaskList.innerHTML = `<p style="font-size: 11px; color: var(--text-muted); text-align: center; padding: 12px;">${msg}</p>`;
       return;
     }
 
-    newtabTaskList.innerHTML = activeTasks
+    newtabTaskList.innerHTML = filteredTasks
       .map(
-        (t) => `
-      <div class="w7-task-item ${t.isCompleted ? "completed" : ""}">
-        <div class="w7-task-item-left">
-          <input type="checkbox" ${t.isCompleted ? "checked" : ""} data-id="${t.id}" class="task-check-w7">
-          <span>${t.title}</span>
-          ${t.priority && t.priority !== "متوسط" ? `<span class="w7-task-time-badge">${t.priority}</span>` : ""}
-        </div>
-        <button class="w7-task-delete-btn" data-task-id="${t.id}" title="حذف وظیفه">✕</button>
-      </div>
-    `
+        (t) => {
+          const priority = t.priority || "متوسط";
+          const pClass = priority === "بالا" ? "priority-high" : (priority === "پایین" ? "priority-low" : "priority-medium");
+          const pColor = priority === "بالا" ? "#ef4444" : (priority === "پایین" ? "#10b981" : "#f59e0b");
+
+          const showDueDate = taskScopeFilter === "all" && t.persianDueDate;
+
+          return `
+          <div class="w7-task-item ${t.isCompleted ? "completed" : ""} ${pClass}">
+            <div class="w7-task-item-left">
+              <input type="checkbox" ${t.isCompleted ? "checked" : ""} data-id="${t.id}" class="task-check-w7">
+              <div style="overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">
+                <span>${t.title}</span>
+                ${showDueDate ? `<span class="w7-task-due-date">📅 سررسید: ${PersianDateUtil.toPersianDigits(t.persianDueDate)}</span>` : ""}
+              </div>
+              <span class="w7-task-time-badge" style="color: ${pColor}; font-weight: bold;">${priority}</span>
+            </div>
+            <button class="w7-task-delete-btn" data-task-id="${t.id}" title="حذف وظیفه">✕</button>
+          </div>
+        `;
+        }
       )
       .join("");
 
     // Checkbox toggling
-    document.querySelectorAll(".task-check-w7").forEach((cb) => {
+    newtabTaskList.querySelectorAll(".task-check-w7").forEach((cb) => {
       cb.addEventListener("change", async (ev) => {
         const id = ev.target.getAttribute("data-id");
         const item = localTasks.find((x) => x.id === id);
@@ -1051,12 +1280,13 @@ document.addEventListener("DOMContentLoaded", async () => {
           item.updatedAt = Date.now();
           await SyncClient.saveLocalData(localEvents, localTasks, localNotes);
           renderTasks();
+          renderSelectedDayInfo();
         }
       });
     });
 
     // Delete buttons
-    document.querySelectorAll(".w7-task-delete-btn").forEach((btn) => {
+    newtabTaskList.querySelectorAll(".w7-task-delete-btn").forEach((btn) => {
       btn.addEventListener("click", async (ev) => {
         ev.stopPropagation();
         const id = btn.getAttribute("data-task-id");
@@ -1066,7 +1296,9 @@ document.addEventListener("DOMContentLoaded", async () => {
           item.updatedAt = Date.now();
           await SyncClient.saveLocalData(localEvents, localTasks, localNotes);
           renderTasks();
-          showToast("وظیفه حذف شد", "info");
+          renderCalendar();
+          renderSelectedDayInfo();
+          showToast("وظیفه با موفقیت حذف شد", "info");
         }
       });
     });
@@ -1077,13 +1309,17 @@ document.addEventListener("DOMContentLoaded", async () => {
       const text = newTaskInput.value.trim();
       if (!text) return;
       const timeVal = (newTaskTimeInput?.value || "").trim();
+      const priorityVal = newTaskPriority?.value || "متوسط";
+
+      // تاریخ سررسید دقیقاً همان تاریخی است که کاربر روی تقویم انتخاب کرده است
+      const taskDueDate = PersianDateUtil.formatJalali(selectedDate);
 
       const newTask = {
         id: "task_" + Date.now() + "_" + Math.random().toString(36).substring(2, 7),
         title: timeVal ? `${text} (ساعت ${PersianDateUtil.toPersianDigits(timeVal)})` : text,
         isCompleted: false,
-        persianDueDate: PersianDateUtil.formatJalali(todayJalali),
-        priority: "متوسط",
+        persianDueDate: taskDueDate,
+        priority: priorityVal,
         category: "عمومی",
         updatedAt: Date.now(),
         isDeleted: false
@@ -1093,36 +1329,67 @@ document.addEventListener("DOMContentLoaded", async () => {
       newTaskInput.value = "";
       if (newTaskTimeInput) newTaskTimeInput.value = "";
       renderTasks();
-      showToast("کار جدید ذخیره شد ✓", "success");
+      renderCalendar();
+      renderSelectedDayInfo();
+      showToast(`کار جدید برای ${PersianDateUtil.toPersianDigits(taskDueDate)} ذخیره شد ✓`, "success");
     });
   }
 
   // =========================================================================
-  // 7. NOTES GADGET (لیست کامل یادداشت‌های همگام‌شده با گوشی اندروید)
+  // 7. NOTES GADGET (لیست یادداشت‌ها، پین کردن و جستجو مشابه اپلیکیشن اندروید)
   // =========================================================================
   const newtabNotesList = document.getElementById("newtabNotesList");
   const notesCountBadge = document.getElementById("notesCountBadge");
+  const noteSearchInput = document.getElementById("noteSearchInput");
   const newNoteTitleInput = document.getElementById("newNoteTitleInput");
   const newNoteContentInput = document.getElementById("newNoteContentInput");
   const btnAddNote = document.getElementById("btnAddNote");
   const w7StickyStatus = document.getElementById("w7StickyStatus");
 
+  if (noteSearchInput) {
+    noteSearchInput.addEventListener("input", (e) => {
+      noteSearchQuery = (e.target.value || "").trim().toLowerCase();
+      renderNotes();
+    });
+  }
+
   function renderNotes() {
     if (!newtabNotesList) return;
-    const activeNotes = localNotes.filter((n) => !n.isDeleted);
+    let activeNotes = localNotes.filter((n) => !n.isDeleted);
     if (notesCountBadge) notesCountBadge.textContent = PersianDateUtil.toPersianDigits(activeNotes.length);
 
+    // فیلتر جستجو مشابه صفحه NotesScreen اپ
+    if (noteSearchQuery) {
+      activeNotes = activeNotes.filter((n) =>
+        (n.title && n.title.toLowerCase().includes(noteSearchQuery)) ||
+        (n.content && n.content.toLowerCase().includes(noteSearchQuery))
+      );
+    }
+
+    // مرتب‌سازی: یادداشت‌های پین‌شده در ابتدا + سپس بر اساس آخرین به‌روزرسانی
+    activeNotes.sort((a, b) => {
+      if (a.isPinned && !b.isPinned) return -1;
+      if (!a.isPinned && b.isPinned) return 1;
+      return (b.updatedAt || 0) - (a.updatedAt || 0);
+    });
+
     if (activeNotes.length === 0) {
-      newtabNotesList.innerHTML = `<p style="font-size: 11px; color: var(--text-muted); text-align: center; padding: 10px;">یادداشتی ذخیره نشده است.</p>`;
+      const emptyMsg = noteSearchQuery ? "یادداشتی مطابق با جستجو پیدا نشد." : "یادداشتی ذخیره نشده است.";
+      newtabNotesList.innerHTML = `<p style="font-size: 11px; color: var(--text-muted); text-align: center; padding: 10px;">${emptyMsg}</p>`;
       return;
     }
 
     newtabNotesList.innerHTML = activeNotes
       .map(
         (n) => `
-      <div class="w7-note-card" style="background: ${n.colorHex || '#fef9c3'}">
+      <div class="w7-note-card ${n.isPinned ? 'pinned' : ''}" style="background: ${n.colorHex || '#fef9c3'}">
         <div class="w7-note-card-header">
-          <span class="w7-note-card-title">${n.title || "بدون عنوان"}</span>
+          <span class="w7-note-card-title">
+            <button class="w7-note-pin-btn ${n.isPinned ? 'pinned' : ''}" data-pin-id="${n.id}" title="${n.isPinned ? 'برداشتن سنجاق' : 'سنجاق کردن به بالا'}">
+              ${n.isPinned ? '📌' : '📍'}
+            </button>
+            <span>${n.title || "بدون عنوان"}</span>
+          </span>
           <div style="display: flex; align-items: center; gap: 4px;">
             ${n.persianDate ? `<span class="w7-note-card-date">${PersianDateUtil.toPersianDigits(n.persianDate)}</span>` : ""}
             <button class="w7-note-delete-btn" data-note-id="${n.id}" title="حذف یادداشت">✕</button>
@@ -1133,6 +1400,22 @@ document.addEventListener("DOMContentLoaded", async () => {
     `
       )
       .join("");
+
+    // دکمه‌های پین کردن
+    newtabNotesList.querySelectorAll(".w7-note-pin-btn").forEach((btn) => {
+      btn.addEventListener("click", async (ev) => {
+        ev.stopPropagation();
+        const nId = btn.getAttribute("data-pin-id");
+        const item = localNotes.find((x) => x.id === nId);
+        if (item) {
+          item.isPinned = !item.isPinned;
+          item.updatedAt = Date.now();
+          await SyncClient.saveLocalData(localEvents, localTasks, localNotes);
+          renderNotes();
+          showToast(item.isPinned ? "یادداشت سنجاق شد 📌" : "سنجاق یادداشت برداشته شد", "info");
+        }
+      });
+    });
 
     // دکمه‌های حذف یادداشت
     newtabNotesList.querySelectorAll(".w7-note-delete-btn").forEach((btn) => {
@@ -1170,7 +1453,7 @@ document.addEventListener("DOMContentLoaded", async () => {
         id: "note_" + Date.now() + "_" + Math.random().toString(36).substring(2, 7),
         title: title || "یادداشت لپ‌تاپ",
         content: content,
-        persianDate: PersianDateUtil.formatJalali(todayJalali),
+        persianDate: PersianDateUtil.formatJalali(selectedDate),
         colorHex: "#FEF3C7",
         isPinned: false,
         updatedAt: Date.now(),
@@ -1217,9 +1500,10 @@ document.addEventListener("DOMContentLoaded", async () => {
             savedUrl || "http://192.168.43.1:8080"
           );
           if (manualUrl && manualUrl.trim()) {
+            const cleanManual = SyncClient.cleanServerUrl(manualUrl);
             if (headerSyncText) headerSyncText.textContent = "درحال اتصال...";
-            await SyncClient.setServerUrl(manualUrl.trim());
-            result = await SyncClient.syncWithAndroid(manualUrl.trim());
+            await SyncClient.setServerUrl(cleanManual);
+            result = await SyncClient.syncWithAndroid(cleanManual);
           }
         }
 

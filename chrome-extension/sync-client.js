@@ -7,6 +7,23 @@
 const SyncClient = {
   DEFAULT_SERVER_URL: "http://192.168.43.1:8080",
 
+  /**
+   * تمیزکاری و استانداردسازی آدرس سرور (پروتکل، هاست و پورت)
+   */
+  cleanServerUrl(url) {
+    if (!url) return "";
+    let clean = url.trim();
+    if (!clean.startsWith("http://") && !clean.startsWith("https://")) {
+      clean = "http://" + clean;
+    }
+    try {
+      const u = new URL(clean);
+      return `${u.protocol}//${u.host}`;
+    } catch {
+      return clean.replace(/\/+$/, "");
+    }
+  },
+
   async getStorage(keys) {
     if (typeof chrome !== "undefined" && chrome.storage && chrome.storage.local) {
       return new Promise((resolve) => chrome.storage.local.get(keys, resolve));
@@ -34,54 +51,86 @@ const SyncClient = {
 
   async getServerUrl() {
     const data = await this.getStorage(["serverUrl"]);
-    return data.serverUrl || this.DEFAULT_SERVER_URL;
+    return this.cleanServerUrl(data.serverUrl || this.DEFAULT_SERVER_URL);
   },
 
   async setServerUrl(url) {
-    let clean = url.trim().replace(/\/+$/, "");
-    if (!clean.startsWith("http://") && !clean.startsWith("https://")) {
-      clean = "http://" + clean;
+    const clean = this.cleanServerUrl(url);
+    if (clean) {
+      await this.setStorage({ serverUrl: clean });
     }
-    await this.setStorage({ serverUrl: clean });
     return clean;
   },
 
   /**
-   * Smart auto-discovery of Android server across Hotspot and Wi-Fi subnets
+   * شناسایی خودکار آدرس سرور گوشی از روی تب‌های باز در مرورگر کروم
+   * (اگر کاربر آدرس سرور گوشی را در نوار آدرس یکی از تب‌ها باز کرده باشد)
+   */
+  async detectServerUrlFromOpenTabs() {
+    if (typeof chrome !== "undefined" && chrome.tabs && chrome.tabs.query) {
+      try {
+        const tabs = await new Promise((resolve) => chrome.tabs.query({}, resolve));
+        for (const tab of tabs || []) {
+          if (tab.url) {
+            const match = tab.url.match(/^(https?:\/\/(?:192\.168\.\d+\.\d+|10\.\d+\.\d+\.\d+|172\.(?:1[6-9]|2\d|3[0-1])\.\d+\.\d+|localhost):8080)/i);
+            if (match) {
+              const detected = this.cleanServerUrl(match[1]);
+              await this.setServerUrl(detected);
+              return detected;
+            }
+          }
+        }
+      } catch (_) {}
+    }
+    return null;
+  },
+
+  /**
+   * Smart auto-discovery of Android server across open tabs, Hotspot and Wi-Fi subnets
    */
   async findActiveServerUrl() {
+    // ۰. بررسی تب‌های باز شده در مرورگر
+    const tabUrl = await this.detectServerUrlFromOpenTabs();
+    if (tabUrl) {
+      const ping = await this.pingServer(tabUrl, 1500);
+      if (ping && ping.status === "online") return tabUrl;
+    }
+
     const saved = await this.getServerUrl();
     if (saved) {
-      const ping = await this.pingServer(saved, 1000);
+      const ping = await this.pingServer(saved, 1500);
       if (ping && ping.status === "online") return saved;
     }
 
-    // 1. تست هات‌اسپات پیش‌فرض اندروید (192.168.43.1)
+    // ۱. تست هات‌اسپات پیش‌فرض اندروید (192.168.43.1)
     const hotspotUrl = "http://192.168.43.1:8080";
     if (saved !== hotspotUrl) {
-      const pingHotspot = await this.pingServer(hotspotUrl, 1000);
+      const pingHotspot = await this.pingServer(hotspotUrl, 1500);
       if (pingHotspot && pingHotspot.status === "online") {
         await this.setServerUrl(hotspotUrl);
         return hotspotUrl;
       }
     }
 
-    // 2. اسکن موازی سایر آدرس‌های متداول در شبکه
+    // ۲. اسکن موازی سایر آدرس‌های متداول در شبکه
     const candidateIps = [
       "http://192.168.1.100:8080",
       "http://192.168.1.101:8080",
       "http://192.168.1.102:8080",
+      "http://192.168.1.103:8080",
+      "http://192.168.1.104:8080",
       "http://192.168.1.105:8080",
       "http://192.168.0.100:8080",
       "http://192.168.0.101:8080",
       "http://192.168.0.102:8080",
+      "http://192.168.0.105:8080",
       "http://192.168.43.1:8080"
     ];
 
     let found = null;
     const checks = candidateIps.map(async (u) => {
       if (found) return;
-      const res = await this.pingServer(u, 1200);
+      const res = await this.pingServer(u, 1500);
       if (res && res.status === "online") {
         found = u;
       }
@@ -111,12 +160,38 @@ const SyncClient = {
     await this.setStorage({ events, tasks, notes, lastLocalUpdate: Date.now() });
   },
 
+  /**
+   * Ping server: ارجاع به Background Service Worker در صفحات رابط کاربری
+   * جهت عبور تضمینی از موانع CORS و Private Network Access مرورگر کروم
+   */
   async pingServer(serverUrl, timeoutMs = 3500) {
-    let url = serverUrl || (await this.getServerUrl());
-    url = (url || "").trim().replace(/\/+$/, "");
-    if (!url.startsWith("http://") && !url.startsWith("https://")) {
-      url = "http://" + url;
+    const clean = this.cleanServerUrl(serverUrl || (await this.getServerUrl()));
+
+    if (typeof window !== "undefined" && typeof chrome !== "undefined" && chrome.runtime && chrome.runtime.sendMessage) {
+      try {
+        const bgRes = await new Promise((resolve) => {
+          chrome.runtime.sendMessage(
+            { action: "ping_server", serverUrl: clean, timeoutMs },
+            (resp) => {
+              if (chrome.runtime.lastError || !resp) {
+                resolve(null);
+              } else {
+                resolve(resp);
+              }
+            }
+          );
+        });
+        if (bgRes && bgRes.status === "online") return bgRes;
+      } catch (_) {}
     }
+
+    return this.directPingServer(clean, timeoutMs);
+  },
+
+  async directPingServer(serverUrl, timeoutMs = 3500) {
+    const url = this.cleanServerUrl(serverUrl || (await this.getServerUrl()));
+    if (!url) return null;
+
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
 
@@ -141,22 +216,54 @@ const SyncClient = {
    * Primary Wi-Fi / Hotspot Local Sync with timeout and live step callbacks
    */
   async syncWithAndroid(customUrl = null, onProgress = () => {}) {
-    onProgress(`شناسایی خودکار سرور گوشی...`);
-    let serverUrl = customUrl;
+    onProgress(`آماده‌سازی برای همگام‌سازی...`);
+    let serverUrl = customUrl ? this.cleanServerUrl(customUrl) : await this.findActiveServerUrl();
     if (!serverUrl) {
-      serverUrl = await this.findActiveServerUrl();
+      serverUrl = await this.getServerUrl();
     }
-    serverUrl = (serverUrl || "").trim().replace(/\/+$/, "");
-    if (!serverUrl.startsWith("http://") && !serverUrl.startsWith("https://")) {
-      serverUrl = "http://" + serverUrl;
+    serverUrl = this.cleanServerUrl(serverUrl);
+    await this.setServerUrl(serverUrl);
+
+    // اگر در پنجره صفحه وب هستیم، برای عبور از موانع امنیتی CORS / PNA، عملیات را از طریق Background Service Worker اجرا می‌کنیم
+    if (typeof window !== "undefined" && typeof chrome !== "undefined" && chrome.runtime && chrome.runtime.sendMessage) {
+      onProgress(`ارسال درخواست همگام‌سازی به سرویس پس‌زمینه افزونه (${serverUrl})...`);
+      try {
+        const bgResult = await new Promise((resolve) => {
+          chrome.runtime.sendMessage(
+            { action: "sync_now", serverUrl: serverUrl },
+            (response) => {
+              if (chrome.runtime.lastError) {
+                resolve({ success: false, error: chrome.runtime.lastError.message });
+              } else {
+                resolve(response || { success: false, error: "پاسخی از سرویس پس‌زمینه دریافت نشد" });
+              }
+            }
+          );
+        });
+
+        if (bgResult && bgResult.success) {
+          onProgress(`همگام‌سازی با موفقیت انجام شد ✓`);
+          return bgResult;
+        } else if (bgResult && bgResult.error) {
+          onProgress(`تلاش با اتصال مستقیم...`);
+        }
+      } catch (err) {
+        onProgress(`خطای ارتباط با Background: ${err.message}`);
+      }
     }
+
+    // Direct sync fallback
+    return this.directSyncWithAndroid(serverUrl, onProgress);
+  },
+
+  async directSyncWithAndroid(serverUrl, onProgress = () => {}) {
     onProgress(`آماده‌سازی داده‌های محلی افزونه...`);
     const localData = await this.getLocalData();
 
     onProgress(`ارسال داده‌ها به گوشی (${serverUrl}/api/sync)...`);
 
     const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 6000);
+    const timeoutId = setTimeout(() => controller.abort(), 8000);
 
     try {
       const response = await fetch(`${serverUrl}/api/sync`, {
@@ -184,7 +291,8 @@ const SyncClient = {
         tasks: mergedData.tasks || [],
         notes: mergedData.notes || [],
         lastSyncTimestamp: Date.now(),
-        lastSyncStatus: "success"
+        lastSyncStatus: "success",
+        serverUrl: serverUrl
       });
 
       onProgress(`ذخیره در حافظه افزونه تکمیل شد ✓`);
@@ -200,9 +308,9 @@ const SyncClient = {
       clearTimeout(timeoutId);
       let errMsg = error.message;
       if (error.name === "AbortError") {
-        errMsg = "تایم‌اوت (پاسخی دریافت نشد). گوشی در دسترس نیست یا آی‌پی وارد شده نادرست است.";
+        errMsg = "تایم‌اوت (پاسخی دریافت نشد). آیا گوشی و لپ‌تاپ به یک شبکه Wi-Fi متصل هستند؟";
       } else if (errMsg.includes("Failed to fetch") || errMsg.includes("NetworkError")) {
-        errMsg = "عدم امکان اتصال به گوشی (اتصال شبکه برقرار نشد). آیا برنامه در گوشی باز است؟ اگر فیلترشکن لپ‌تاپ روشن است، گزینه Allow LAN Traffic را فعال کنید.";
+        errMsg = `عدم امکان اتصال به گوشی در ${serverUrl}. لطفاً مطمئن شوید سرور در گوشی روشن است یا اگر فیلترشکن لپ‌تاپ روشن است، گزینه Allow LAN Traffic را فعال کنید.`;
       }
 
       await this.setStorage({
@@ -210,6 +318,9 @@ const SyncClient = {
         lastSyncError: errMsg
       });
 
+      return {
+        success: false,
+        error: errMsg
       };
     }
   }

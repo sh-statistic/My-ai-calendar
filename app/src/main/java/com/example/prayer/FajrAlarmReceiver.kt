@@ -34,15 +34,23 @@ class FajrAlarmReceiver : BroadcastReceiver() {
             val cityName = intent.getStringExtra("cityName") ?: "شهر شما"
             val offsetMinutes = intent.getIntExtra("offsetMinutes", 5)
 
-            // Wake up device screen and CPU so user is guaranteed to wake up
-            val powerManager = context.getSystemService(Context.POWER_SERVICE) as? PowerManager
-            val wakeLock = powerManager?.newWakeLock(
-                PowerManager.FULL_WAKE_LOCK or PowerManager.ACQUIRE_CAUSES_WAKEUP or PowerManager.ON_AFTER_RELEASE,
-                "Hamgam:FajrWakeLock"
-            )
-            wakeLock?.acquire(60000L) // 1 minute wake lock
+            // Start foreground continuous alarm service with looping ringtone
+            val serviceIntent = Intent(context, FajrAlarmService::class.java).apply {
+                this.action = FajrAlarmService.ACTION_START_ALARM
+                putExtra("cityName", cityName)
+                putExtra("offsetMinutes", offsetMinutes)
+            }
 
-            showAlarmNotification(context, cityName, offsetMinutes)
+            try {
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                    context.startForegroundService(serviceIntent)
+                } else {
+                    context.startService(serviceIntent)
+                }
+            } catch (_: Exception) {
+                // Fallback to simple notification if background service start fails
+                showAlarmNotification(context, cityName, offsetMinutes)
+            }
 
             // Automatically reschedule tomorrow's alarm dynamically
             FajrAlarmManager.scheduleFajrAlarm(context)

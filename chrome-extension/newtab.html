@@ -280,12 +280,12 @@
       </div>
     </div>
 
-    <!-- GADGET 3: TASKS (چک‌لیست وظایف) -->
+    <!-- GADGET 3: TASKS (چک‌لیست وظایف با اتصال به تقویم و فیلترها) -->
     <div class="w7-gadget" id="gadgetTasks" data-gadget-id="tasks" style="top: 480px; right: 24px;">
       <div class="w7-gadget-header">
         <div class="w7-gadget-title">
           <span>✓</span>
-          <span>کارهای امروز</span>
+          <span>وظایف و کارها</span>
           <span id="pendingCountBadge" class="w7-task-badge">۰</span>
         </div>
         <div class="w7-gadget-controls">
@@ -294,10 +294,46 @@
         </div>
       </div>
       <div class="w7-gadget-body">
+        <!-- ردیف ناوبری تاریخ وظایف مشابه اپلیکیشن -->
+        <div class="w7-task-date-nav">
+          <button id="btnTaskPrevDay" class="w7-task-nav-btn" title="روز قبل">◀</button>
+          <span id="taskDateLabel" class="w7-task-date-text">امروز</span>
+          <button id="btnTaskNextDay" class="w7-task-nav-btn" title="روز بعد">▶</button>
+          <button id="btnTaskToday" class="w7-task-today-btn">امروز</button>
+        </div>
+
+        <!-- فیلترهای وضعیت و بازه مشابه اپ -->
+        <div class="w7-filter-chips">
+          <span class="w7-filter-chip active" id="chipScopeDay" data-scope="day">روز انتخابی</span>
+          <span class="w7-filter-chip" id="chipScopeAll" data-scope="all">همه زمان‌ها</span>
+          <span style="border-left: 1px solid #cbd5e1; margin: 0 1px;"></span>
+          <span class="w7-filter-chip active" id="chipStatusAll" data-status="all">همه</span>
+          <span class="w7-filter-chip" id="chipStatusPending" data-status="pending">در انتظار</span>
+          <span class="w7-filter-chip" id="chipStatusDone" data-status="done">انجام‌شده</span>
+        </div>
+
+        <!-- نوار پیشرفت درصد تکمیل -->
+        <div class="w7-progress-box" id="taskProgressBox">
+          <div class="w7-progress-label">
+            <span id="taskProgressRatio">۰ از ۰ کار</span>
+            <span id="taskProgressPercent">۰٪</span>
+          </div>
+          <div class="w7-progress-track">
+            <div class="w7-progress-fill" id="taskProgressFill" style="width: 0%;"></div>
+          </div>
+        </div>
+
         <div class="w7-task-list" id="newtabTaskList"></div>
-        <div class="w7-input-row" style="gap: 4px;">
+
+        <!-- فرم افزودن کار با انتخاب اولویت -->
+        <div class="w7-input-row" style="gap: 4px; align-items: center;">
           <input type="text" id="newTaskInput" placeholder="کار جدید..." class="w7-text-input" style="flex: 1;">
-          <input type="text" id="newTaskTimeInput" placeholder="ساعت (14:00)" class="w7-text-input" style="width: 76px; font-size: 10px; text-align: center; direction: ltr;">
+          <select id="newTaskPriority" style="border: 1px solid #cbd5e1; border-radius: 6px; padding: 4px 2px; font-size: 10px; outline: none; background: #fff;">
+            <option value="متوسط">متوسط</option>
+            <option value="بالا">فوری/بالا</option>
+            <option value="پایین">پایین</option>
+          </select>
+          <input type="text" id="newTaskTimeInput" placeholder="ساعت" class="w7-text-input" style="width: 50px; font-size: 10px; text-align: center; direction: ltr;">
           <button id="btnAddTask" class="w7-action-btn" title="افزودن کار">+</button>
         </div>
       </div>
@@ -317,6 +353,11 @@
         </div>
       </div>
       <div class="w7-gadget-body sticky-body">
+        <!-- جستجوی زنده در یادداشت‌ها -->
+        <div class="w7-notes-search-box">
+          <input type="text" id="noteSearchInput" placeholder="🔍 جستجو در یادداشت‌ها..." class="w7-notes-search-input">
+        </div>
+
         <!-- لیست کلیه یادداشت‌های همگام‌شده با گوشی -->
         <div class="w7-notes-list" id="newtabNotesList"></div>
 

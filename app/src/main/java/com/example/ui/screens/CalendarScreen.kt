@@ -70,8 +70,10 @@ import com.example.ui.components.AddEventDialog
 import com.example.ui.components.AddTaskDialog
 import com.example.ui.components.EditEventDialog
 import com.example.ui.components.EditTaskDialog
+import com.example.ui.components.EditOccasionDialog
 import com.example.ui.components.PrayerTimesCard
 import com.example.ui.components.parseColor
+import com.example.ui.rememberAppStrings
 
 @Composable
 fun CalendarScreen(
@@ -84,6 +86,7 @@ fun CalendarScreen(
     val events by viewModel.activeEvents.collectAsState()
     val tasks by viewModel.activeTasks.collectAsState()
     val notes by viewModel.activeNotes.collectAsState()
+    val strings = rememberAppStrings()
 
     var showAddEventDialog by remember { mutableStateOf(false) }
     var showAddTaskDialog by remember { mutableStateOf(false) }
@@ -95,12 +98,17 @@ fun CalendarScreen(
     val firstDayOfWeek = PersianCalendarHelper.getPersianDayOfWeek(viewYear, viewMonth, 1)
 
     val selectedDayOfWeekIdx = PersianCalendarHelper.getPersianDayOfWeek(selectedDate.year, selectedDate.month, selectedDate.day)
-    val selectedDayOfWeekName = PersianCalendarHelper.WEEKDAY_NAMES_PERSIAN.getOrElse(selectedDayOfWeekIdx) { "" }
+    val selectedDayOfWeekName = strings.weekdayNames.getOrElse(selectedDayOfWeekIdx) { "" }
 
     val selectedDayEvents = events.filter { it.persianDate == selectedDate.formatted }
     val selectedDayTasks = tasks.filter { it.persianDueDate == selectedDate.formatted }
-    val selectedDayOccasions = PersianOccasionsHelper.getOccasionsForDate(selectedDate.month, selectedDate.day, selectedDate.year)
-    val isSelectedDayHoliday = PersianOccasionsHelper.isHoliday(selectedDate.month, selectedDate.day, selectedDate.year)
+    val occasionsVersion by viewModel.occasionsVersion.collectAsState()
+    val selectedDayOccasions = remember(selectedDate, occasionsVersion) {
+        PersianOccasionsHelper.getOccasionsForDate(selectedDate.month, selectedDate.day, selectedDate.year)
+    }
+    val isSelectedDayHoliday = remember(selectedDate, occasionsVersion) {
+        PersianOccasionsHelper.isHoliday(selectedDate.month, selectedDate.day, selectedDate.year)
+    }
 
     Box(modifier = modifier.fillMaxSize()) {
         // Single unified scrollable container so all details are visible on smaller Android 6 screens
@@ -141,12 +149,12 @@ fun CalendarScreen(
                             )
                         }
 
-                        // Weekday Titles (ش, ی, د, س, چ, پ, ج)
+                        // Weekday Titles (ش, ی, د, س, چ, پ, ج / Sa, Su, ...)
                         Row(
                             modifier = Modifier.fillMaxWidth(),
                             horizontalArrangement = Arrangement.SpaceAround
                         ) {
-                            PersianCalendarHelper.WEEKDAY_ABBR.forEachIndexed { idx, name ->
+                            strings.weekdayAbbr.forEachIndexed { idx, name ->
                                 Text(
                                     text = name,
                                     modifier = Modifier.weight(1f),
@@ -182,8 +190,12 @@ fun CalendarScreen(
                                         val isSelected = cellJalali.formatted == selectedDate.formatted
                                         val isToday = cellJalali.formatted == today.formatted
                                         val isFriday = col == 6
-                                        val isHoliday = isFriday || PersianOccasionsHelper.isHoliday(viewMonth, dayNum, viewYear)
-                                        val cellOccasions = PersianOccasionsHelper.getOccasionsForDate(viewMonth, dayNum, viewYear)
+                                        val isHoliday = isFriday || remember(viewMonth, dayNum, viewYear, occasionsVersion) {
+                                            PersianOccasionsHelper.isHoliday(viewMonth, dayNum, viewYear)
+                                        }
+                                        val cellOccasions = remember(viewMonth, dayNum, viewYear, occasionsVersion) {
+                                            PersianOccasionsHelper.getOccasionsForDate(viewMonth, dayNum, viewYear)
+                                        }
 
                                         val hasEvents = events.any { it.persianDate == cellJalali.formatted }
                                         val hasTasks = tasks.any { it.persianDueDate == cellJalali.formatted }
@@ -243,7 +255,7 @@ fun CalendarScreen(
                                                     contentAlignment = Alignment.Center
                                                 ) {
                                                     Text(
-                                                        text = PersianCalendarHelper.toPersianDigits(dayNum.toString()),
+                                                        text = strings.formatDigits(dayNum.toString()),
                                                         fontSize = 12.sp,
                                                         fontWeight = if (isSelected || isToday || isHoliday) FontWeight.Bold else FontWeight.Normal,
                                                         color = when {
@@ -260,7 +272,7 @@ fun CalendarScreen(
                                                     verticalAlignment = Alignment.CenterVertically
                                                 ) {
                                                     Text(
-                                                        text = PersianCalendarHelper.toPersianDigits(cellHijri.day.toString()),
+                                                        text = strings.formatDigits(cellHijri.day.toString()),
                                                         fontSize = 9.sp,
                                                         lineHeight = 11.sp,
                                                         maxLines = 1,
@@ -292,6 +304,7 @@ fun CalendarScreen(
             item {
                 val context = androidx.compose.ui.platform.LocalContext.current
                 var showAddOccasionDialog by remember { mutableStateOf(false) }
+                var occasionToEdit by remember { mutableStateOf<com.example.calendar.PersianOccasion?>(null) }
                 val customOccasionsForDay = selectedDayOccasions.filter { it.customMonth != -1 }
 
                 Card(
@@ -323,7 +336,7 @@ fun CalendarScreen(
                                 )
                                 Spacer(modifier = Modifier.width(6.dp))
                                 Text(
-                                    text = "مناسبت‌های این روز:",
+                                    text = strings.occasionsOfDayTitle,
                                     fontSize = 11.sp,
                                     fontWeight = FontWeight.Bold,
                                     color = if (isSelectedDayHoliday) Color(0xFF991B1B) else Color(0xFF166534)
@@ -337,7 +350,7 @@ fun CalendarScreen(
                                         shape = RoundedCornerShape(12.dp)
                                     ) {
                                         Text(
-                                            text = "تعطیل رسمی",
+                                            text = strings.officialHoliday,
                                             fontSize = 9.sp,
                                             fontWeight = FontWeight.Bold,
                                             color = Color.White,
@@ -357,7 +370,7 @@ fun CalendarScreen(
                                     ) {
                                         Icon(Icons.Default.Add, contentDescription = null, tint = Color(0xFF16A34A), modifier = Modifier.size(12.dp))
                                         Spacer(modifier = Modifier.width(2.dp))
-                                        Text("ثبت مناسبت", fontSize = 9.sp, fontWeight = FontWeight.SemiBold, color = Color(0xFF16A34A))
+                                        Text(strings.addOccasion, fontSize = 9.sp, fontWeight = FontWeight.SemiBold, color = Color(0xFF16A34A))
                                     }
                                 }
                             }
@@ -369,7 +382,9 @@ fun CalendarScreen(
                             selectedDayOccasions.forEach { occ ->
                                 val isCustom = occ.customMonth != -1
                                 Row(
-                                    modifier = Modifier.fillMaxWidth(),
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .padding(vertical = 2.dp),
                                     horizontalArrangement = Arrangement.SpaceBetween,
                                     verticalAlignment = Alignment.CenterVertically
                                 ) {
@@ -381,21 +396,35 @@ fun CalendarScreen(
                                         lineHeight = 16.sp,
                                         modifier = Modifier.weight(1f)
                                     )
-                                    if (isCustom) {
+                                    Row(verticalAlignment = Alignment.CenterVertically) {
                                         IconButton(
-                                            onClick = {
-                                                PersianOccasionsHelper.removeCustomOccasion(context, occ)
-                                                // Force recomposition by re-selecting the date
-                                                viewModel.setSelectedDate(selectedDate)
-                                            },
-                                            modifier = Modifier.size(20.dp)
+                                            onClick = { occasionToEdit = occ },
+                                            modifier = Modifier.size(24.dp)
                                         ) {
                                             Icon(
-                                                Icons.Default.Delete,
-                                                contentDescription = "حذف مناسبت",
-                                                tint = MaterialTheme.colorScheme.error.copy(alpha = 0.7f),
-                                                modifier = Modifier.size(13.dp)
+                                                Icons.Default.Edit,
+                                                contentDescription = strings.edit,
+                                                tint = MaterialTheme.colorScheme.primary,
+                                                modifier = Modifier.size(14.dp)
                                             )
+                                        }
+
+                                        if (isCustom) {
+                                            IconButton(
+                                                onClick = {
+                                                    PersianOccasionsHelper.removeCustomOccasion(context, occ)
+                                                    viewModel.refreshOccasions()
+                                                    viewModel.setSelectedDate(selectedDate)
+                                                },
+                                                modifier = Modifier.size(24.dp)
+                                            ) {
+                                                Icon(
+                                                    Icons.Default.Delete,
+                                                    contentDescription = strings.delete,
+                                                    tint = MaterialTheme.colorScheme.error.copy(alpha = 0.7f),
+                                                    modifier = Modifier.size(14.dp)
+                                                )
+                                            }
                                         }
                                     }
                                 }
@@ -403,12 +432,35 @@ fun CalendarScreen(
                         } else {
                             Spacer(modifier = Modifier.height(4.dp))
                             Text(
-                                text = "مناسبت ثبت‌شده‌ای برای این روز وجود ندارد.",
+                                text = strings.noOccasions,
                                 fontSize = 10.sp,
                                 color = Color.Gray
                             )
                         }
                     }
+                }
+
+                // Edit Occasion Dialog
+                occasionToEdit?.let { occ ->
+                    EditOccasionDialog(
+                        occasion = occ,
+                        currentDate = selectedDate,
+                        onDismiss = { occasionToEdit = null },
+                        onConfirm = { newTitle, month, day, isHoliday ->
+                            PersianOccasionsHelper.updateCustomOccasion(
+                                context, occ, newTitle, month, day, isHoliday
+                            )
+                            viewModel.refreshOccasions()
+                            viewModel.setSelectedDate(selectedDate)
+                            occasionToEdit = null
+                        },
+                        onDelete = {
+                            PersianOccasionsHelper.removeCustomOccasion(context, occ)
+                            viewModel.refreshOccasions()
+                            viewModel.setSelectedDate(selectedDate)
+                            occasionToEdit = null
+                        }
+                    )
                 }
 
                 // Add Custom Occasion Dialog
@@ -476,7 +528,7 @@ fun CalendarScreen(
                                             isHolidayCheck
                                         )
                                         showAddOccasionDialog = false
-                                        // Force recomposition
+                                        viewModel.refreshOccasions()
                                         viewModel.setSelectedDate(selectedDate)
                                     }
                                 }
@@ -511,20 +563,20 @@ fun CalendarScreen(
                 ) {
                     Column {
                         Text(
-                            text = "$selectedDayOfWeekName ${PersianCalendarHelper.toPersianDigits(selectedDate.day.toString())} ${selectedDate.monthName} ${PersianCalendarHelper.toPersianDigits(selectedDate.year.toString())}",
+                            text = "$selectedDayOfWeekName ${strings.formatDigits(selectedDate.day.toString())} ${strings.jalaliMonths[selectedDate.month - 1]} ${strings.formatDigits(selectedDate.year.toString())}",
                             style = MaterialTheme.typography.titleSmall,
                             fontWeight = FontWeight.Bold,
                             color = MaterialTheme.colorScheme.primary
                         )
                         Text(
-                            text = "معادل میلادی: ${selGDate.formatted} (${selGDate.day} ${selGDate.monthName} ${selGDate.year} - $selectedDayOfWeekName)",
+                            text = "${strings.gregorianEquivalent} ${selGDate.formatted} (${selGDate.day} ${selGDate.monthName} ${selGDate.year} - $selectedDayOfWeekName)",
                             style = MaterialTheme.typography.bodySmall,
                             fontSize = 10.sp,
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
                     }
                     Text(
-                        text = "${PersianCalendarHelper.toPersianDigits((selectedDayEvents.size + selectedDayTasks.size).toString())} برنامه",
+                        text = strings.plansCount(selectedDayEvents.size + selectedDayTasks.size),
                         style = MaterialTheme.typography.bodySmall,
                         fontSize = 11.sp,
                         fontWeight = FontWeight.Bold,
@@ -550,7 +602,7 @@ fun CalendarScreen(
                             horizontalAlignment = Alignment.CenterHorizontally
                         ) {
                             Text(
-                                text = "هیچ برنامه یا وظیفه‌ای برای این روز ثبت نشده است.",
+                                text = strings.noPlansForDay,
                                 style = MaterialTheme.typography.bodySmall,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant
                             )
@@ -559,12 +611,12 @@ fun CalendarScreen(
                                 OutlinedButton(onClick = { showAddEventDialog = true }) {
                                     Icon(Icons.Default.Add, contentDescription = null, modifier = Modifier.size(14.dp))
                                     Spacer(modifier = Modifier.width(4.dp))
-                                    Text("افزودن رویداد", fontSize = 11.sp)
+                                    Text(strings.addEvent, fontSize = 11.sp)
                                 }
                                 OutlinedButton(onClick = { showAddTaskDialog = true }) {
                                     Icon(Icons.Default.Add, contentDescription = null, modifier = Modifier.size(14.dp))
                                     Spacer(modifier = Modifier.width(4.dp))
-                                    Text("افزودن وظیفه", fontSize = 11.sp)
+                                    Text(strings.addTask, fontSize = 11.sp)
                                 }
                             }
                         }
@@ -587,7 +639,7 @@ fun CalendarScreen(
                 if (selectedDayTasks.isNotEmpty()) {
                     item {
                         Text(
-                            text = "وظایف و کارهای این روز:",
+                            text = strings.tasksOfDayTitle,
                             style = MaterialTheme.typography.labelMedium,
                             fontWeight = FontWeight.Bold,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
@@ -618,7 +670,7 @@ fun CalendarScreen(
                 .padding(16.dp)
                 .testTag("fab_add_event")
         ) {
-            Icon(Icons.Default.Add, contentDescription = "افزودن رویداد جدید")
+            Icon(Icons.Default.Add, contentDescription = strings.addEvent)
         }
     }
 
@@ -701,6 +753,7 @@ fun EventItemCard(
     onEdit: () -> Unit,
     onDelete: () -> Unit
 ) {
+    val strings = rememberAppStrings()
     val reminderMatch = remember(event.description) {
         Regex("\\[یادآوری:([^\\]]+)\\]").find(event.description)?.groupValues?.getOrNull(1)?.trim()
     }
@@ -763,7 +816,7 @@ fun EventItemCard(
                             )
                             Spacer(modifier = Modifier.width(3.dp))
                             Text(
-                                text = PersianCalendarHelper.toPersianDigits(event.startTime),
+                                text = strings.formatDigits(event.startTime),
                                 fontSize = 10.sp,
                                 fontWeight = FontWeight.Bold,
                                 color = MaterialTheme.colorScheme.primary
@@ -795,7 +848,7 @@ fun EventItemCard(
                         shape = RoundedCornerShape(4.dp)
                     ) {
                         Text(
-                            text = event.category,
+                            text = strings.taskTag(event.category),
                             fontSize = 9.sp,
                             fontWeight = FontWeight.SemiBold,
                             color = parseColor(event.colorHex),
@@ -809,7 +862,7 @@ fun EventItemCard(
                 IconButton(onClick = onEdit, modifier = Modifier.size(28.dp)) {
                     Icon(
                         Icons.Default.Edit,
-                        contentDescription = "ویرایش رویداد",
+                        contentDescription = strings.edit,
                         tint = MaterialTheme.colorScheme.onSurfaceVariant,
                         modifier = Modifier.size(15.dp)
                     )
@@ -818,7 +871,7 @@ fun EventItemCard(
                 IconButton(onClick = onDelete, modifier = Modifier.size(28.dp)) {
                     Icon(
                         Icons.Default.Delete,
-                        contentDescription = "حذف رویداد",
+                        contentDescription = strings.delete,
                         tint = MaterialTheme.colorScheme.error.copy(alpha = 0.7f),
                         modifier = Modifier.size(15.dp)
                     )

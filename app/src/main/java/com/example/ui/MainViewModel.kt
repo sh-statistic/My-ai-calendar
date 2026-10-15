@@ -14,6 +14,7 @@ import com.example.data.NoteEntity
 import com.example.data.SyncData
 import com.example.data.SyncLogEntity
 import com.example.data.TaskEntity
+import com.example.chat.AiProvider
 import com.example.chat.ApiKeyManager
 import com.example.chat.ChatMessage
 import com.example.chat.ChatRole
@@ -31,6 +32,7 @@ import com.example.prayer.PrayerTimesCalculator
 import com.example.update.AppUpdateManager
 import com.example.update.UpdateInfo
 import com.example.alarm.EventAlarmScheduler
+import com.example.settings.AppPreferences
 import java.util.Calendar
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
@@ -40,6 +42,8 @@ import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.isActive
 import java.util.UUID
 
 class MainViewModel(application: Application) : AndroidViewModel(application) {
@@ -63,6 +67,15 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     val syncLogs: StateFlow<List<SyncLogEntity>> = repository.recentSyncLogs
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
+    // Language State
+    private val _appLanguage = MutableStateFlow(AppPreferences.getAppLanguage(application))
+    val appLanguage: StateFlow<String> = _appLanguage.asStateFlow()
+
+    fun setAppLanguage(lang: String) {
+        AppPreferences.setAppLanguage(getApplication(), lang)
+        _appLanguage.value = lang
+    }
+
     // Calendar State
     private val todayJalali = PersianCalendarHelper.getCurrentJalaliDate()
     private val _selectedDate = MutableStateFlow(todayJalali)
@@ -73,6 +86,13 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
 
     private val _currentViewMonth = MutableStateFlow(todayJalali.month)
     val currentViewMonth: StateFlow<Int> = _currentViewMonth.asStateFlow()
+
+    private val _occasionsVersion = MutableStateFlow(0)
+    val occasionsVersion: StateFlow<Int> = _occasionsVersion.asStateFlow()
+
+    fun refreshOccasions() {
+        _occasionsVersion.value += 1
+    }
 
     // Sync Server State
     private val _isServerRunning = MutableStateFlow(false)
@@ -305,10 +325,13 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     private val _isGeneratingResponse = MutableStateFlow(false)
     val isGeneratingResponse: StateFlow<Boolean> = _isGeneratingResponse.asStateFlow()
 
-    private val _userApiKey = MutableStateFlow(ApiKeyManager.getApiKey(application))
+    private val _selectedAiProvider = MutableStateFlow(ApiKeyManager.getSelectedProvider(application))
+    val selectedAiProvider: StateFlow<AiProvider> = _selectedAiProvider.asStateFlow()
+
+    private val _userApiKey = MutableStateFlow(ApiKeyManager.getApiKey(application, _selectedAiProvider.value))
     val userApiKey: StateFlow<String> = _userApiKey.asStateFlow()
 
-    private val _isApiKeyConfigured = MutableStateFlow(ApiKeyManager.isKeyConfigured(application))
+    private val _isApiKeyConfigured = MutableStateFlow(ApiKeyManager.isKeyConfigured(application, _selectedAiProvider.value))
     val isApiKeyConfigured: StateFlow<Boolean> = _isApiKeyConfigured.asStateFlow()
 
     fun selectRole(role: ChatRole) {
@@ -325,11 +348,63 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         logMessage("نقش هوش مصنوعی به ${role.title} تغییر یافت.")
     }
 
-    fun updateApiKey(newKey: String) {
-        ApiKeyManager.saveApiKey(getApplication(), newKey)
-        _userApiKey.value = newKey.trim()
-        _isApiKeyConfigured.value = newKey.trim().isNotBlank()
-        logMessage("کلید Gemini API با موفقیت به‌روزرسانی شد.")
+    fun selectAiProvider(provider: AiProvider) {
+        _selectedAiProvider.value = provider
+        ApiKeyManager.saveSelectedProvider(getApplication(), provider)
+        val key = ApiKeyManager.getApiKey(getApplication(), provider)
+        _userApiKey.value = key
+        _isApiKeyConfigured.value = ApiKeyManager.isKeyConfigured(getApplication(), provider)
+
+        val currentList = _chatMessages.value.toMutableList()
+        currentList.add(
+            ChatMessage(
+                sender = ChatSender.GEMINI,
+                text = "سرویس‌دهنده هوش مصنوعی به «${provider.displayName}» تغییر یافت.",
+                modelBadge = provider.displayName.substringBefore(' ')
+            )
+        )
+        _chatMessages.value = currentList
+        logMessage("سرویس‌دهنده هوش مصنوعی به ${provider.displayName} تغییر یافت.")
+    }
+
+    fun updateApiKey(newKey: String, provider: AiProvider = _selectedAiProvider.value) {
+        ApiKeyManager.saveApiKey(getApplication(), newKey, provider)
+        if (provider == _selectedAiProvider.value) {
+            _userApiKey.value = newKey.trim()
+            _isApiKeyConfigured.value = ApiKeyManager.isKeyConfigured(getApplication(), provider)
+        }
+        logMessage("کلید API برای ${provider.displayName} با موفقیت به‌روزرسانی شد.")
+    }
+
+    fun updateAiConfiguration(
+        provider: AiProvider,
+        apiKey: String,
+        customBaseUrl: String?,
+        customModel: String?
+    ) {
+        _selectedAiProvider.value = provider
+        ApiKeyManager.saveSelectedProvider(getApplication(), provider)
+        ApiKeyManager.saveApiKey(getApplication(), apiKey, provider)
+        if (!customBaseUrl.isNullOrBlank()) {
+            ApiKeyManager.saveBaseUrl(getApplication(), customBaseUrl, provider)
+        }
+        if (!customModel.isNullOrBlank()) {
+            ApiKeyManager.saveModel(getApplication(), customModel, provider)
+        }
+
+        _userApiKey.value = apiKey.trim()
+        _isApiKeyConfigured.value = ApiKeyManager.isKeyConfigured(getApplication(), provider)
+
+        val currentList = _chatMessages.value.toMutableList()
+        currentList.add(
+            ChatMessage(
+                sender = ChatSender.GEMINI,
+                text = "تنظیمات هوش مصنوعی برای «${provider.displayName}» ذخیره و فعال شد.",
+                modelBadge = provider.displayName.substringBefore(' ')
+            )
+        )
+        _chatMessages.value = currentList
+        logMessage("تنظیمات هوش مصنوعی ${provider.displayName} به‌روزرسانی شد.")
     }
 
     fun sendChatMessage(text: String) {
@@ -387,13 +462,14 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             return
         }
 
-        // 2. Fallback to Online Engine (Gemini)
-        val key = _userApiKey.value
-        if (key.isBlank()) {
+        // 2. Fallback to Online Engine (Multi-Provider Support)
+        val currentProvider = _selectedAiProvider.value
+        val key = ApiKeyManager.getApiKey(getApplication(), currentProvider)
+        if (currentProvider.isGoogleFormat && key.isBlank()) {
             currentList.add(
                 ChatMessage(
                     sender = ChatSender.GEMINI,
-                    text = "من متوجه این دستور نشدم. لطفاً برای صحبت کردن یا ارسال درخواست پیچیده‌تر، کلید اختصاصی Gemini API خود را وارد نمایید.",
+                    text = "من متوجه این دستور نشدم. لطفاً برای استفاده از هوش مصنوعی آنلاین، کلید اختصاصی Google Gemini را در بخش تنظیمات هوش مصنوعی وارد نمایید.",
                     isError = true
                 )
             )
@@ -402,6 +478,13 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         }
 
         val currentRole = _selectedRole.value
+        val effectiveModel = if (currentProvider.isGoogleFormat) {
+            currentRole.modelName
+        } else {
+            ApiKeyManager.getModel(getApplication(), currentProvider)
+        }
+        val effectiveBaseUrl = ApiKeyManager.getBaseUrl(getApplication(), currentProvider)
+        val activeBadge = "${currentProvider.displayName.substringBefore(' ')} • ${currentRole.badge}"
 
         viewModelScope.launch {
             _isGeneratingResponse.value = true
@@ -432,10 +515,12 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             val fullSystemInstruction = currentRole.systemInstruction + "\n" + dynamicContext
 
             val result = GeminiChatService.sendMessage(
+                provider = currentProvider,
                 apiKey = key,
                 history = currentList,
                 userMessage = trimmed,
-                modelName = currentRole.modelName,
+                baseUrl = effectiveBaseUrl,
+                modelName = effectiveModel,
                 systemInstruction = fullSystemInstruction
             )
             _isGeneratingResponse.value = false
@@ -457,7 +542,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                                 category = "هوش مصنوعی"
                             )
                             repository.insertTask(task)
-                            updated.add(ChatMessage(sender = ChatSender.GEMINI, text = "وظیفه جدید با موفقیت اضافه شد: $title", modelBadge = currentRole.badge))
+                            updated.add(ChatMessage(sender = ChatSender.GEMINI, text = "وظیفه جدید با موفقیت اضافه شد: $title", modelBadge = activeBadge))
                             _chatMessages.value = updated
                             return@launch
                         } else if (action == "ADD_NOTE") {
@@ -471,7 +556,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                                 colorHex = "#FEF3C7"
                             )
                             repository.insertNote(note)
-                            updated.add(ChatMessage(sender = ChatSender.GEMINI, text = "یادداشت جدید با موفقیت ثبت شد: $title", modelBadge = currentRole.badge))
+                            updated.add(ChatMessage(sender = ChatSender.GEMINI, text = "یادداشت جدید با موفقیت ثبت شد: $title", modelBadge = activeBadge))
                             _chatMessages.value = updated
                             return@launch
                         }
@@ -484,7 +569,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                     ChatMessage(
                         sender = ChatSender.GEMINI,
                         text = reply,
-                        modelBadge = currentRole.badge
+                        modelBadge = activeBadge
                     )
                 )
             }.onFailure { err ->
@@ -493,7 +578,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                         sender = ChatSender.GEMINI,
                         text = err.message ?: "خطا در برقراری ارتباط با مدل هوش مصنوعی",
                         isError = true,
-                        modelBadge = currentRole.badge
+                        modelBadge = activeBadge
                     )
                 )
             }
@@ -519,6 +604,24 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         refreshNetworkInfo()
         initServer()
         checkForAppUpdate(isManual = false)
+        startPrayerCountdownTicker()
+    }
+
+    private fun startPrayerCountdownTicker() {
+        viewModelScope.launch(Dispatchers.Default) {
+            var lastRecordedDay = Calendar.getInstance().get(Calendar.DAY_OF_YEAR)
+            while (isActive) {
+                // هماهنگ‌سازی دقیق با شروع هر دقیقه ساعت سیستم
+                val millisToNextMinute = 60_000L - (System.currentTimeMillis() % 60_000L)
+                delay(maxOf(1_000L, millisToNextMinute))
+                val currentDay = Calendar.getInstance().get(Calendar.DAY_OF_YEAR)
+                if (currentDay != lastRecordedDay) {
+                    lastRecordedDay = currentDay
+                    _prayerTimes.value = calculateCurrentPrayerTimes()
+                }
+                _nextPrayerInfo.value = calculateNextPrayerInfo()
+            }
+        }
     }
 
     private fun logMessage(msg: String) {
@@ -608,20 +711,83 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             _isSyncing.value = true
             try {
                 val imported = googleCalSyncManager.importEventsFromGoogle()
+                if (imported.isEmpty()) {
+                    val msg = "هیچ رویدادی در تقویم گوگل یافت نشد یا مجوز دسترسی به تقویم داده نشده است."
+                    logMessage(msg)
+                    repository.recordLog("تقویم گوگل", msg, 0, true)
+                    return@launch
+                }
+
                 var added = 0
+                val existing = repository.allActiveEvents.first().toMutableList()
                 for (event in imported) {
-                    // Skip if similar event already exists
-                    val existing = repository.allActiveEvents.first()
-                    val alreadyExists = existing.any { it.title == event.title && it.persianDate == event.persianDate }
+                    val alreadyExists = existing.any {
+                        it.title.trim().equals(event.title.trim(), ignoreCase = true) &&
+                        (it.persianDate == event.persianDate || it.gregorianDate == event.gregorianDate)
+                    }
                     if (!alreadyExists) {
                         repository.insertEvent(event)
+                        existing.add(event)
                         added++
                     }
                 }
-                logMessage("✓ $added رویداد از تقویم گوگل دریافت شد")
-                repository.recordLog("تقویم گوگل", "دریافت $added رویداد جدید", added, true)
+
+                val msg = if (added > 0) {
+                    "✓ $added رویداد جدید از تقویم گوگل دریافت و اضافه شد (${imported.size} رویداد بررسی شد)"
+                } else {
+                    "تمامی ${imported.size} رویداد تقویم گوگل از قبل در برنامه وجود دارند."
+                }
+                logMessage(msg)
+                repository.recordLog("تقویم گوگل", msg, added, true)
             } catch (e: Exception) {
-                logMessage("خطا در دریافت: ${e.message}")
+                logMessage("خطا در دریافت از تقویم گوگل: ${e.message}")
+            } finally {
+                _isSyncing.value = false
+            }
+        }
+    }
+
+    fun syncSingleNoteToGoogleCalendar(note: NoteEntity, onComplete: (Boolean, String) -> Unit = { _, _ -> }) {
+        viewModelScope.launch {
+            try {
+                val result = googleCalSyncManager.syncNotesToGoogle(listOf(note))
+                val success = result.notesAdded > 0
+                val msg = if (success) {
+                    "یادداشت «${note.title}» با تقویم گوگل همگام شد ✓"
+                } else if (result.errors > 0) {
+                    if (result.message.isNotBlank()) result.message else "خطا در همگام‌سازی یادداشت با تقویم گوگل"
+                } else {
+                    "این یادداشت قبلاً با تقویم گوگل همگام شده است."
+                }
+                logMessage(msg)
+                repository.recordLog("تقویم گوگل", msg, result.notesAdded, success)
+                onComplete(success, msg)
+            } catch (e: Exception) {
+                val err = "خطا در همگام‌سازی یادداشت با تقویم گوگل: ${e.message}"
+                logMessage(err)
+                onComplete(false, err)
+            }
+        }
+    }
+
+    fun syncAllNotesToGoogleCalendar(onComplete: (Boolean, String) -> Unit = { _, _ -> }) {
+        if (_isSyncing.value) {
+            onComplete(false, "همگام‌سازی دیگری در حال انجام است...")
+            return
+        }
+        viewModelScope.launch {
+            _isSyncing.value = true
+            try {
+                val notes = repository.allActiveNotes.first()
+                val result = googleCalSyncManager.syncNotesToGoogle(notes)
+                logMessage(result.message)
+                val success = result.notesAdded > 0 || (result.errors == 0 && result.message.contains("✓"))
+                repository.recordLog("تقویم گوگل", result.message, result.notesAdded, success)
+                onComplete(success, result.message)
+            } catch (e: Exception) {
+                val err = "خطا در همگام‌سازی یادداشت‌ها با تقویم گوگل: ${e.message}"
+                logMessage(err)
+                onComplete(false, err)
             } finally {
                 _isSyncing.value = false
             }
@@ -672,11 +838,12 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
 
     // Task Actions
     fun addTask(title: String, dueDate: String, priority: String, category: String) {
-        val gDate = if (dueDate.isNotEmpty()) parsePersianToGregorian(dueDate) else null
+        val normalizedDue = if (dueDate.isNotBlank()) PersianCalendarHelper.normalizePersianDate(dueDate) else ""
+        val gDate = if (normalizedDue.isNotEmpty()) parsePersianToGregorian(normalizedDue) else null
         val task = TaskEntity(
             title = title,
             isCompleted = false,
-            persianDueDate = dueDate,
+            persianDueDate = normalizedDue,
             gregorianDueDate = gDate?.formatted ?: "",
             priority = priority,
             category = category
@@ -694,8 +861,15 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     fun updateTask(task: TaskEntity) {
+        val normalizedDue = if (task.persianDueDate.isNotBlank()) PersianCalendarHelper.normalizePersianDate(task.persianDueDate) else ""
+        val gDate = if (normalizedDue.isNotEmpty()) parsePersianToGregorian(normalizedDue) else null
+        val updated = task.copy(
+            persianDueDate = normalizedDue,
+            gregorianDueDate = gDate?.formatted ?: task.gregorianDueDate,
+            updatedAt = System.currentTimeMillis()
+        )
         viewModelScope.launch {
-            repository.updateTask(task)
+            repository.updateTask(updated)
             logMessage("وظیفه ویرایش شد: ${task.title}")
         }
     }
@@ -765,7 +939,8 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     private fun parsePersianToGregorian(pDate: String): GregorianDate? {
-        val parts = pDate.split("/").mapNotNull { it.trim().toIntOrNull() }
+        val normalized = PersianCalendarHelper.normalizePersianDate(pDate)
+        val parts = normalized.split("/").mapNotNull { it.trim().toIntOrNull() }
         if (parts.size == 3) {
             return PersianCalendarHelper.jalaliToGregorian(parts[0], parts[1], parts[2])
         }
@@ -776,7 +951,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         viewModelScope.launch {
             val existingEvents = repository.allActiveEvents.first()
             if (existingEvents.isEmpty()) {
-                // Try auto-restoring from safety backup first!
+                // Try auto-restoring from safety backup first if available
                 val safetyBackup = AppUpdateManager.getLatestSafetyBackup(getApplication())
                 if (!safetyBackup.isNullOrBlank()) {
                     importBackupJson(safetyBackup) { success, msg ->
@@ -784,87 +959,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                             logMessage("اطلاعات شما با موفقیت از پشتیبان اضطراری بازگردانی شد ✓")
                         }
                     }
-                    return@launch
                 }
-
-                val today = PersianCalendarHelper.getCurrentJalaliDate()
-                val gToday = PersianCalendarHelper.getCurrentGregorianDate()
-
-                val seedEvents = listOf(
-                    EventEntity(
-                        id = UUID.randomUUID().toString(),
-                        title = "جلسه بررسی همگام‌سازی محلی",
-                        description = "تست همگام‌سازی آفلاین با افزونه کروم روی شبکه محلی Wi-Fi و هات‌اسپات",
-                        persianDate = today.formatted,
-                        gregorianDate = gToday.formatted,
-                        startTime = "۱۰:۰۰",
-                        endTime = "۱۱:۳۰",
-                        category = "کاری",
-                        colorHex = "#3B82F6"
-                    ),
-                    EventEntity(
-                        id = UUID.randomUUID().toString(),
-                        title = "برنامه‌ریزی فصلی",
-                        description = "بررسی اهداف تقویم خورشیدی و وظایف جدید",
-                        persianDate = today.formatted,
-                        gregorianDate = gToday.formatted,
-                        startTime = "۱۴:۰۰",
-                        endTime = "۱۵:۰۰",
-                        category = "مهم",
-                        colorHex = "#F59E0B"
-                    )
-                )
-                for (e in seedEvents) repository.insertEvent(e)
-
-                val seedTasks = listOf(
-                    TaskEntity(
-                        id = UUID.randomUUID().toString(),
-                        title = "نصب افزونه مرورگر کروم از پوشه chrome-extension",
-                        isCompleted = false,
-                        persianDueDate = today.formatted,
-                        priority = "بالا",
-                        category = "همگام‌سازی"
-                    ),
-                    TaskEntity(
-                        id = UUID.randomUUID().toString(),
-                        title = "آزمایش همگام‌سازی هات‌اسپات بدون اینترنت",
-                        isCompleted = true,
-                        persianDueDate = today.formatted,
-                        priority = "متوسط",
-                        category = "آفلاین"
-                    ),
-                    TaskEntity(
-                        id = UUID.randomUUID().toString(),
-                        title = "بررسی تقویم شمسی و تبدیل تاریخ میلادی",
-                        isCompleted = false,
-                        persianDueDate = today.formatted,
-                        priority = "پایین",
-                        category = "تقویم"
-                    )
-                )
-                for (t in seedTasks) repository.insertTask(t)
-
-                val seedNotes = listOf(
-                    NoteEntity(
-                        id = UUID.randomUUID().toString(),
-                        title = "معماری همگام‌سازی صفر هزینه (Serverless)",
-                        content = "این نرم‌افزار بدون نیاز به هیچ سرور ابری پولی یا پایگاه‌داده اشتراکی، تمامی اطلاعات شما را روی پایگاه‌داده محلی SQLite/Room ذخیره نموده و از طریق Wi-Fi یا هات‌اسپات به صورت مستقیم و همتابه‌همتا (P2P) با افزونه کروم همگام می‌کند.",
-                        persianDate = today.formattedPersian,
-                        colorHex = "#FEF3C7",
-                        isPinned = true
-                    ),
-                    NoteEntity(
-                        id = UUID.randomUUID().toString(),
-                        title = "تنظیمات اتصال در کروم",
-                        content = "در افزونه مرورگر کروم، آدرس IP دستگاه خود (نمایش داده شده در تب همگام‌سازی) را وارد کنید تا با یک کلیک تمامی رویدادها، وظایف و یادداشت‌ها تبادل گردند.",
-                        persianDate = today.formattedPersian,
-                        colorHex = "#E0F2FE",
-                        isPinned = false
-                    )
-                )
-                for (n in seedNotes) repository.insertNote(n)
-
-                repository.recordLog("سیستم محلی", "راه‌اندازی اولیه و آماده‌سازی پایگاه‌داده آفلاین", 7, true)
             }
         }
     }

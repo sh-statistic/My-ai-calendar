@@ -1,6 +1,7 @@
 package com.example.ui.screens
 
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.animateColorAsState
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.rememberScrollState
@@ -63,6 +64,7 @@ import com.example.data.TaskEntity
 import com.example.ui.MainViewModel
 import com.example.ui.components.AddTaskDialog
 import com.example.ui.components.EditTaskDialog
+import com.example.ui.rememberAppStrings
 
 @Composable
 fun TasksScreen(
@@ -71,13 +73,16 @@ fun TasksScreen(
 ) {
     val tasks by viewModel.activeTasks.collectAsState()
     val selectedDate by viewModel.selectedDate.collectAsState()
+    val strings = rememberAppStrings()
 
-    var filterState by remember { mutableIntStateOf(0) } // 0: Selected Date, 1: This Week, 2: All, 3: Pending, 4: Completed
+    var isWeekMode by remember { mutableStateOf(false) }
+    var statusFilter by remember { mutableIntStateOf(0) } // 0: All, 1: Pending, 2: Completed, 3: All Time
     var showAddTaskDialog by remember { mutableStateOf(false) }
     var taskToEdit by remember { mutableStateOf<TaskEntity?>(null) }
 
+    val today = remember { PersianCalendarHelper.getCurrentJalaliDate() }
     val dayOfWeekIdx = PersianCalendarHelper.getPersianDayOfWeek(selectedDate.year, selectedDate.month, selectedDate.day)
-    val dayOfWeekName = PersianCalendarHelper.WEEKDAY_NAMES_PERSIAN.getOrElse(dayOfWeekIdx) { "روز" }
+    val dayOfWeekName = strings.weekdayNames.getOrElse(dayOfWeekIdx) { "" }
 
     // Week range calculation (Saturday to Friday)
     val weekDates = remember(selectedDate) {
@@ -88,34 +93,52 @@ fun TasksScreen(
     }
     val firstWeekDay = weekDates.first()
     val lastWeekDay = weekDates.last()
-    val weekRangeText = "${PersianCalendarHelper.toPersianDigits(firstWeekDay.day.toString())} ${firstWeekDay.monthName} تا ${PersianCalendarHelper.toPersianDigits(lastWeekDay.day.toString())} ${lastWeekDay.monthName}"
-
-    val selectedDateTasks = tasks.filter { it.persianDueDate == selectedDate.formatted }
-    val weekTasks = tasks.filter { it.persianDueDate in weekFormattedDates }.sortedBy { it.persianDueDate }
-
-    val filteredTasks = when (filterState) {
-        0 -> selectedDateTasks
-        1 -> weekTasks
-        2 -> tasks
-        3 -> tasks.filter { !it.isCompleted }
-        4 -> tasks.filter { it.isCompleted }
-        else -> selectedDateTasks
+    val weekRangeText = if (strings.isFa) {
+        "${strings.formatDigits(firstWeekDay.day.toString())} ${firstWeekDay.monthName} تا ${strings.formatDigits(lastWeekDay.day.toString())} ${lastWeekDay.monthName}"
+    } else {
+        "${firstWeekDay.day} ${strings.jalaliMonths[firstWeekDay.month - 1]} to ${lastWeekDay.day} ${strings.jalaliMonths[lastWeekDay.month - 1]}"
     }
 
-    val currentScopeTasks = when (filterState) {
-        0 -> selectedDateTasks
-        1 -> weekTasks
-        else -> tasks
+    val todayWeekDates = remember(today) {
+        PersianCalendarHelper.getWeekDates(today.year, today.month, today.day)
     }
-    val completedCount = currentScopeTasks.count { it.isCompleted }
-    val totalCount = currentScopeTasks.size
+    val isCurrentWeek = weekDates.first().formatted == todayWeekDates.first().formatted
+    val isToday = selectedDate.formatted == today.formatted
+
+    val selectedDateNormalized = remember(selectedDate) {
+        PersianCalendarHelper.normalizePersianDate(selectedDate.formatted)
+    }
+    val selectedDateTasks = tasks.filter {
+        PersianCalendarHelper.normalizePersianDate(it.persianDueDate) == selectedDateNormalized
+    }
+    val weekTasks = tasks.filter {
+        val normDue = PersianCalendarHelper.normalizePersianDate(it.persianDueDate)
+        normDue in weekFormattedDates
+    }.sortedWith(
+        compareBy({ it.isCompleted }, { PersianCalendarHelper.normalizePersianDate(it.persianDueDate) })
+    )
+
+    // وظایف بازه انتخابی (روز یا هفته)
+    val currentScopeTasks = if (isWeekMode) weekTasks else selectedDateTasks
+
+    // فیلتر وضعیت وظایف
+    val filteredTasks = when (statusFilter) {
+        0 -> currentScopeTasks
+        1 -> currentScopeTasks.filter { !it.isCompleted }
+        2 -> currentScopeTasks.filter { it.isCompleted }
+        3 -> tasks
+        else -> currentScopeTasks
+    }
+
+    val completedCount = if (statusFilter == 3) tasks.count { it.isCompleted } else currentScopeTasks.count { it.isCompleted }
+    val totalCount = if (statusFilter == 3) tasks.size else currentScopeTasks.size
     val progress = if (totalCount > 0) (completedCount.toFloat() / totalCount).coerceIn(0f, 1f) else 0f
 
     Box(modifier = modifier.fillMaxSize()) {
         Column(
             modifier = Modifier.fillMaxSize()
         ) {
-            // Header 1: Interactive Calendar Date Bar (Linked with Selected Calendar Date)
+            // Header 1: Time scope & Interactive Calendar Date Bar
             Surface(
                 color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.6f),
                 modifier = Modifier.fillMaxWidth()
@@ -127,13 +150,13 @@ fun TasksScreen(
                     horizontalArrangement = Arrangement.SpaceBetween,
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    // 1. Right side: Week tasks button (Fixed ergonomic dimensions)
+                    // 1. Right side: Week mode toggle button
                     Surface(
-                        color = if (filterState == 1) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.primaryContainer,
+                        color = if (isWeekMode) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.primaryContainer,
                         shape = RoundedCornerShape(10.dp),
                         modifier = Modifier
                             .height(34.dp)
-                            .clickable { filterState = if (filterState == 1) 0 else 1 }
+                            .clickable { isWeekMode = !isWeekMode }
                             .testTag("btn_week_tasks")
                     ) {
                         Row(
@@ -142,23 +165,23 @@ fun TasksScreen(
                         ) {
                             Icon(
                                 Icons.Default.DateRange,
-                                contentDescription = "وظایف هفته",
-                                tint = if (filterState == 1) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.primary,
+                                contentDescription = strings.weekTasks,
+                                tint = if (isWeekMode) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.primary,
                                 modifier = Modifier.size(15.dp)
                             )
                             Spacer(modifier = Modifier.width(4.dp))
                             Text(
-                                text = "وظایف هفته",
+                                text = strings.weekTasks,
                                 fontSize = 11.sp,
                                 fontWeight = FontWeight.Bold,
                                 maxLines = 1,
                                 softWrap = false,
-                                color = if (filterState == 1) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onPrimaryContainer
+                                color = if (isWeekMode) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onPrimaryContainer
                             )
                         }
                     }
 
-                    // 2. Center: Date display with previous/next day arrows (Fills remaining space stably)
+                    // 2. Center: Date display with previous/next arrows
                     Row(
                         modifier = Modifier
                             .weight(1f)
@@ -166,10 +189,10 @@ fun TasksScreen(
                         verticalAlignment = Alignment.CenterVertically,
                         horizontalArrangement = Arrangement.Center
                     ) {
-                        // Right Arrow: Previous day or previous week in RTL
+                        // Previous day or previous week
                         IconButton(
                             onClick = {
-                                if (filterState == 1) {
+                                if (isWeekMode) {
                                     viewModel.previousWeek()
                                 } else {
                                     viewModel.previousDay()
@@ -178,8 +201,8 @@ fun TasksScreen(
                             modifier = Modifier.size(28.dp)
                         ) {
                             Icon(
-                                Icons.AutoMirrored.Filled.ArrowForward,
-                                contentDescription = if (filterState == 1) "هفته قبل" else "روز قبل",
+                                Icons.AutoMirrored.Filled.ArrowBack,
+                                contentDescription = if (isWeekMode) strings.prevWeek else strings.prevDay,
                                 modifier = Modifier.size(16.dp)
                             )
                         }
@@ -189,10 +212,9 @@ fun TasksScreen(
                             horizontalArrangement = Arrangement.Center,
                             modifier = Modifier
                                 .weight(1f, fill = false)
-                                .clickable { filterState = 0 }
                         ) {
                             Icon(
-                                if (filterState == 1) Icons.Default.DateRange else Icons.Default.CalendarMonth,
+                                if (isWeekMode) Icons.Default.DateRange else Icons.Default.CalendarMonth,
                                 contentDescription = null,
                                 tint = MaterialTheme.colorScheme.primary,
                                 modifier = Modifier.size(14.dp)
@@ -200,7 +222,7 @@ fun TasksScreen(
                             Spacer(modifier = Modifier.width(3.dp))
                             Column(horizontalAlignment = Alignment.CenterHorizontally) {
                                 Text(
-                                    text = if (filterState == 1) weekRangeText else "$dayOfWeekName ${selectedDate.formattedPersian}",
+                                    text = if (isWeekMode) weekRangeText else "$dayOfWeekName ${strings.formatDigits(selectedDate.day.toString())} ${strings.jalaliMonths[selectedDate.month - 1]}",
                                     style = MaterialTheme.typography.titleSmall,
                                     fontWeight = FontWeight.Bold,
                                     fontSize = 12.sp,
@@ -209,10 +231,31 @@ fun TasksScreen(
                                     color = MaterialTheme.colorScheme.primary
                                 )
                                 Text(
-                                    text = if (filterState == 1)
-                                        "${PersianCalendarHelper.toPersianDigits(weekTasks.size.toString())} وظیفه این هفته"
-                                    else
-                                        "${PersianCalendarHelper.toPersianDigits(selectedDateTasks.size.toString())} وظیفه امروز",
+                                    text = if (isWeekMode) {
+                                        if (strings.isFa) {
+                                            if (isCurrentWeek)
+                                                "${strings.formatDigits(weekTasks.size.toString())} وظیفه این هفته"
+                                            else
+                                                "${strings.formatDigits(weekTasks.size.toString())} وظیفه در این بازه"
+                                        } else {
+                                            if (isCurrentWeek)
+                                                "${weekTasks.size} tasks this week"
+                                            else
+                                                "${weekTasks.size} tasks in range"
+                                        }
+                                    } else {
+                                        if (strings.isFa) {
+                                            if (isToday)
+                                                "${strings.formatDigits(selectedDateTasks.size.toString())} وظیفه امروز"
+                                            else
+                                                "${strings.formatDigits(selectedDateTasks.size.toString())} وظیفه در این روز"
+                                        } else {
+                                            if (isToday)
+                                                "${selectedDateTasks.size} tasks today"
+                                            else
+                                                "${selectedDateTasks.size} tasks on this day"
+                                        }
+                                    },
                                     fontSize = 10.sp,
                                     maxLines = 1,
                                     overflow = TextOverflow.Ellipsis,
@@ -221,10 +264,10 @@ fun TasksScreen(
                             }
                         }
 
-                        // Left Arrow: Next day or next week in RTL
+                        // Next day or next week
                         IconButton(
                             onClick = {
-                                if (filterState == 1) {
+                                if (isWeekMode) {
                                     viewModel.nextWeek()
                                 } else {
                                     viewModel.nextDay()
@@ -233,22 +276,40 @@ fun TasksScreen(
                             modifier = Modifier.size(28.dp)
                         ) {
                             Icon(
-                                Icons.AutoMirrored.Filled.ArrowBack,
-                                contentDescription = if (filterState == 1) "هفته بعد" else "روز بعد",
+                                Icons.AutoMirrored.Filled.ArrowForward,
+                                contentDescription = if (isWeekMode) strings.nextWeek else strings.nextDay,
                                 modifier = Modifier.size(16.dp)
                             )
                         }
                     }
 
-                    // 3. Left side: Today button (Fixed ergonomic dimensions)
+                    // 3. Left side: Today button (Jumps to today)
+                    val isTodayActive = if (isWeekMode) isCurrentWeek else isToday
+                    val tasksTodayBtnContainerColor by animateColorAsState(
+                        targetValue = if (isTodayActive) {
+                            MaterialTheme.colorScheme.primary
+                        } else {
+                            MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.35f)
+                        },
+                        label = "tasks_today_btn_container_color"
+                    )
+
+                    val tasksTodayBtnContentColor by animateColorAsState(
+                        targetValue = if (isTodayActive) {
+                            MaterialTheme.colorScheme.onPrimary
+                        } else {
+                            MaterialTheme.colorScheme.primary.copy(alpha = 0.55f)
+                        },
+                        label = "tasks_today_btn_content_color"
+                    )
+
                     Surface(
-                        color = MaterialTheme.colorScheme.primary,
+                        color = tasksTodayBtnContainerColor,
                         shape = RoundedCornerShape(10.dp),
                         modifier = Modifier
                             .height(34.dp)
                             .clickable {
                                 viewModel.setToday()
-                                filterState = 0
                             }
                     ) {
                         Box(
@@ -256,19 +317,19 @@ fun TasksScreen(
                             modifier = Modifier.padding(horizontal = 12.dp)
                         ) {
                             Text(
-                                text = "امروز",
+                                text = strings.today,
                                 fontSize = 11.sp,
-                                fontWeight = FontWeight.Bold,
+                                fontWeight = if (isTodayActive) FontWeight.Bold else FontWeight.Medium,
                                 maxLines = 1,
                                 softWrap = false,
-                                color = MaterialTheme.colorScheme.onPrimary
+                                color = tasksTodayBtnContentColor
                             )
                         }
                     }
                 }
             }
 
-            // Header 2: Progress & Filter Tabs
+            // Header 2: Task Status Filters (Distinct from time scope)
             Card(
                 colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
                 shape = RoundedCornerShape(bottomStart = 16.dp, bottomEnd = 16.dp),
@@ -276,7 +337,7 @@ fun TasksScreen(
                 modifier = Modifier.fillMaxWidth()
             ) {
                 Column(modifier = Modifier.padding(horizontal = 14.dp, vertical = 10.dp)) {
-                    // Filter Chips (Including Date & Week Filter with Horizontal Scroll)
+                    // Status Filter Chips
                     Row(
                         modifier = Modifier
                             .fillMaxWidth()
@@ -284,29 +345,24 @@ fun TasksScreen(
                         horizontalArrangement = Arrangement.spacedBy(6.dp)
                     ) {
                         FilterChip(
-                            selected = filterState == 0,
-                            onClick = { filterState = 0 },
-                            label = { Text("این روز (${PersianCalendarHelper.toPersianDigits(selectedDateTasks.size.toString())})", fontSize = 11.sp) }
+                            selected = statusFilter == 0,
+                            onClick = { statusFilter = 0 },
+                            label = { Text("${strings.allTasks} (${strings.formatDigits(currentScopeTasks.size.toString())})", fontSize = 11.sp) }
                         )
                         FilterChip(
-                            selected = filterState == 1,
-                            onClick = { filterState = 1 },
-                            label = { Text("این هفته (${PersianCalendarHelper.toPersianDigits(weekTasks.size.toString())})", fontSize = 11.sp) }
+                            selected = statusFilter == 1,
+                            onClick = { statusFilter = 1 },
+                            label = { Text("${strings.pendingTasks} (${strings.formatDigits(currentScopeTasks.count { !it.isCompleted }.toString())})", fontSize = 11.sp) }
                         )
                         FilterChip(
-                            selected = filterState == 2,
-                            onClick = { filterState = 2 },
-                            label = { Text("همه (${PersianCalendarHelper.toPersianDigits(tasks.size.toString())})", fontSize = 11.sp) }
+                            selected = statusFilter == 2,
+                            onClick = { statusFilter = 2 },
+                            label = { Text("${strings.completedTasks} (${strings.formatDigits(currentScopeTasks.count { it.isCompleted }.toString())})", fontSize = 11.sp) }
                         )
                         FilterChip(
-                            selected = filterState == 3,
-                            onClick = { filterState = 3 },
-                            label = { Text("در انتظار", fontSize = 11.sp) }
-                        )
-                        FilterChip(
-                            selected = filterState == 4,
-                            onClick = { filterState = 4 },
-                            label = { Text("انجام شده", fontSize = 11.sp) }
+                            selected = statusFilter == 3,
+                            onClick = { statusFilter = 3 },
+                            label = { Text("${strings.allTimeTasks} (${strings.formatDigits(tasks.size.toString())})", fontSize = 11.sp) }
                         )
                     }
 
@@ -341,10 +397,16 @@ fun TasksScreen(
                         )
                         Spacer(modifier = Modifier.height(8.dp))
                         Text(
-                            text = when (filterState) {
-                                0 -> "هیچ وظیفه‌ای برای $dayOfWeekName ${selectedDate.formattedPersian} ثبت نشده است."
-                                1 -> "هیچ وظیفه‌ای برای این هفته ($weekRangeText) ثبت نشده است."
-                                else -> "وظیفه‌ای در این دسته‌بندی یافت نشد."
+                            text = when (statusFilter) {
+                                0 -> if (strings.isFa) {
+                                    if (isWeekMode) "هیچ وظیفه‌ای برای بازه ($weekRangeText) ثبت نشده است." else "هیچ وظیفه‌ای برای $dayOfWeekName ${selectedDate.formattedPersian} ثبت نشده است."
+                                } else {
+                                    if (isWeekMode) "No tasks scheduled for ($weekRangeText)." else "No tasks scheduled for $dayOfWeekName."
+                                }
+                                1 -> if (strings.isFa) "هیچ وظیفه در انتظاری در این بازه وجود ندارد." else "No pending tasks in this range."
+                                2 -> if (strings.isFa) "هنوز وظیفه‌ای در این بازه تکمیل نشده است." else "No completed tasks in this range yet."
+                                3 -> if (strings.isFa) "هیچ وظیفه‌ای در کل برنامه ثبت نشده است." else "No tasks found in the app."
+                                else -> strings.noTasks
                             },
                             style = MaterialTheme.typography.bodyMedium,
                             color = MaterialTheme.colorScheme.outline
@@ -354,7 +416,7 @@ fun TasksScreen(
                             Icon(Icons.Default.Add, contentDescription = null, modifier = Modifier.size(16.dp))
                             Spacer(modifier = Modifier.width(4.dp))
                             Text(
-                                text = if (filterState == 1) "افزودن وظیفه برای این هفته" else "افزودن وظیفه برای $dayOfWeekName",
+                                text = strings.addTask,
                                 fontSize = 11.sp
                             )
                         }
@@ -389,7 +451,7 @@ fun TasksScreen(
                 .padding(16.dp)
                 .testTag("fab_add_task")
         ) {
-            Icon(Icons.Default.Add, contentDescription = "افزودن کار جدید")
+            Icon(Icons.Default.Add, contentDescription = strings.addTask)
         }
     }
 
@@ -437,11 +499,16 @@ fun TaskItemCard(
     onEdit: () -> Unit,
     onDelete: () -> Unit
 ) {
+    val strings = rememberAppStrings()
     val priorityColor = when (task.priority) {
         "فوری", "بالا" -> Color(0xFFEF4444)
         "متوسط" -> Color(0xFFF59E0B)
         else -> Color(0xFF10B981)
     }
+
+    val todayFormatted = remember { PersianCalendarHelper.getCurrentJalaliDate().formatted }
+    val isOverdue = !task.isCompleted && task.persianDueDate.isNotBlank() &&
+        PersianCalendarHelper.normalizePersianDate(task.persianDueDate) < todayFormatted
 
     Card(
         colors = CardDefaults.cardColors(
@@ -488,10 +555,25 @@ fun TaskItemCard(
                 ) {
                     if (task.persianDueDate.isNotBlank()) {
                         Text(
-                            text = "📅 ${PersianCalendarHelper.toPersianDigits(task.persianDueDate)}",
+                            text = "📅 ${strings.formatDigits(task.persianDueDate)}",
                             fontSize = 11.sp,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                            color = if (isOverdue) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurfaceVariant
                         )
+                    }
+
+                    if (isOverdue) {
+                        Surface(
+                            color = MaterialTheme.colorScheme.error.copy(alpha = 0.15f),
+                            shape = RoundedCornerShape(4.dp)
+                        ) {
+                            Text(
+                                text = strings.overdue,
+                                fontSize = 10.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = MaterialTheme.colorScheme.error,
+                                modifier = Modifier.padding(horizontal = 5.dp, vertical = 1.dp)
+                            )
+                        }
                     }
 
                     Surface(
@@ -499,7 +581,7 @@ fun TaskItemCard(
                         shape = RoundedCornerShape(4.dp)
                     ) {
                         Text(
-                            text = task.priority,
+                            text = strings.taskPriority(task.priority),
                             fontSize = 10.sp,
                             fontWeight = FontWeight.Bold,
                             color = priorityColor,
@@ -507,13 +589,13 @@ fun TaskItemCard(
                         )
                     }
 
-                    if (task.category.isNotBlank() && task.category != "عمومی") {
+                    if (task.category.isNotBlank()) {
                         Surface(
                             color = MaterialTheme.colorScheme.surfaceVariant,
                             shape = RoundedCornerShape(4.dp)
                         ) {
                             Text(
-                                text = task.category,
+                                text = strings.taskTag(task.category),
                                 fontSize = 10.sp,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                                 modifier = Modifier.padding(horizontal = 5.dp, vertical = 1.dp)

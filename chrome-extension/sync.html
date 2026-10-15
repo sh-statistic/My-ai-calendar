@@ -379,12 +379,21 @@
       statusText.textContent = text;
     }
 
-    // مقداردهی اولیه آدرس سرور
+    // مقداردهی اولیه آدرس سرور و بررسی تب‌های باز
     (async () => {
       try {
+        const detectedFromTab = await SyncClient.detectServerUrlFromOpenTabs();
         const savedUrl = await SyncClient.getServerUrl();
-        if (serverUrlInput) serverUrlInput.value = savedUrl;
-        
+        const urlToUse = detectedFromTab || savedUrl;
+        if (serverUrlInput) serverUrlInput.value = urlToUse;
+
+        if (detectedFromTab) {
+          log(`آدرس سرور گوشی به‌طور خودکار از تب باز مرورگر شناسایی شد: ${detectedFromTab} ✓`, "success");
+          setStatus("online", "آدرس گوشی از تب مرورگر شناسایی شد");
+        } else if (savedUrl) {
+          log(`آدرس ذخیره‌شده قبلی لود شد: ${savedUrl}`, "info");
+        }
+
         const storage = await SyncClient.getStorage(["lastSyncTimestamp", "lastSyncStatus"]);
         if (storage.lastSyncTimestamp) {
           const d = new Date(storage.lastSyncTimestamp);
@@ -395,22 +404,21 @@
 
     // ۱. تست پینگ و بررسی ارتباط با گوشی
     btnTestPing.addEventListener("click", async () => {
-      let url = serverUrlInput.value.trim();
-      if (!url) {
+      let rawUrl = serverUrlInput.value.trim();
+      if (!rawUrl) {
         alert("لطفاً ابتدا آدرس سرور گوشی را وارد کنید.");
         return;
       }
-      if (!url.startsWith("http://") && !url.startsWith("https://")) {
-        url = "http://" + url;
-        serverUrlInput.value = url;
-      }
+      const url = SyncClient.cleanServerUrl(rawUrl);
+      serverUrlInput.value = url;
+      await SyncClient.setServerUrl(url);
 
       btnTestPing.disabled = true;
       setStatus("busy", "در حال ارسال پینگ به گوشی...");
       log(`ارسال درخواست وضعیت به ${url}/api/status ...`, "info");
 
       const startTime = Date.now();
-      const statusRes = await SyncClient.pingServer(url, 3500);
+      const statusRes = await SyncClient.pingServer(url, 4000);
       const pingMs = Date.now() - startTime;
 
       if (statusRes && statusRes.status === "online") {
@@ -420,7 +428,7 @@
       } else {
         setStatus("error", "ارتباط با گوشی برقرار نشد");
         log(`پاسخی از ${url} در مدت ${pingMs}ms دریافت نشد!`, "error");
-        log(`علت‌های متداول: ۱. اپ در گوشی باز نیست ۲. آی‌پی گوشی تغییر کرده ۳. فیلترشکن لپ‌تاپ (Windscribe) شبکه محلی را مسدود کرده است.`, "warn");
+        log(`نکته: اگر آدرس را در نوار بالای مرورگر باز کرده‌اید، مطمئن شوید همان آدرس دقیقاً در کادر بالا درج شده است. همچنین اگر فیلترشکن لپ‌تاپ روشن است، گزینه Allow LAN Traffic را فعال کنید.`, "warn");
       }
 
       btnTestPing.disabled = false;
@@ -482,15 +490,13 @@
 
     // ۳. همگام‌سازی فوری دوطرفه با لاگ زنده لحظه‌ای
     btnStartSync.addEventListener("click", async () => {
-      let customUrl = serverUrlInput.value.trim();
-      if (!customUrl) {
+      let rawUrl = serverUrlInput.value.trim();
+      if (!rawUrl) {
         alert("لطفاً آدرس سرور گوشی را وارد کنید.");
         return;
       }
-      if (!customUrl.startsWith("http://") && !customUrl.startsWith("https://")) {
-        customUrl = "http://" + customUrl;
-        serverUrlInput.value = customUrl;
-      }
+      const customUrl = SyncClient.cleanServerUrl(rawUrl);
+      serverUrlInput.value = customUrl;
 
       btnStartSync.disabled = true;
       setStatus("busy", "در حال همگام‌سازی با گوشی...");

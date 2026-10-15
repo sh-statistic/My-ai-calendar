@@ -15,7 +15,8 @@ data class LifeProgress(
     val percentElapsed: Float,
     val currentMonthIndex: Int,
     val birthYear: Int,
-    val birthMonth: Int
+    val birthMonth: Int,
+    val isConfigured: Boolean = true
 )
 
 class MementoMoriManager(private val context: Context) {
@@ -44,9 +45,20 @@ class MementoMoriManager(private val context: Context) {
         return getExpectedLifespan() * 12
     }
 
+    fun isBirthDateConfigured(): Boolean {
+        return prefs.contains(KEY_BIRTH_YEAR)
+    }
+
+    fun clearBirthDate() {
+        prefs.edit()
+            .remove(KEY_BIRTH_YEAR)
+            .remove(KEY_BIRTH_MONTH)
+            .apply()
+    }
+
     fun getBirthYear(): Int {
         val currentYear = PersianCalendarHelper.getCurrentJalaliDate().year
-        return prefs.getInt(KEY_BIRTH_YEAR, currentYear - 25) // Default 25 years old
+        return prefs.getInt(KEY_BIRTH_YEAR, currentYear)
     }
 
     fun getBirthMonth(): Int {
@@ -62,14 +74,31 @@ class MementoMoriManager(private val context: Context) {
 
     fun calculateProgress(): LifeProgress {
         val today = PersianCalendarHelper.getCurrentJalaliDate()
+        val totalLifetimeMonths = getTotalLifetimeMonths()
+
+        if (!isBirthDateConfigured()) {
+            return LifeProgress(
+                elapsedMonths = 0,
+                totalMonths = totalLifetimeMonths,
+                elapsedYears = 0,
+                elapsedRemainingMonths = 0,
+                remainingYears = getExpectedLifespan(),
+                remainingMonths = 0,
+                percentElapsed = 0f,
+                currentMonthIndex = -1,
+                birthYear = today.year,
+                birthMonth = 1,
+                isConfigured = false
+            )
+        }
+
         val birthY = getBirthYear()
         val birthM = getBirthMonth()
-        val totalLifetimeMonths = getTotalLifetimeMonths()
 
         // Calculate actual lived months
         var rawMonths = (today.year - birthY) * 12 + (today.month - birthM)
         if (rawMonths < 0) rawMonths = 0
-        
+
         // Calculate grid index (calendar months since Farvardin of birth year)
         var gridIndex = (today.year - birthY) * 12 + (today.month - 1)
         if (gridIndex < 0) gridIndex = 0
@@ -84,7 +113,7 @@ class MementoMoriManager(private val context: Context) {
         val remainingRemMonths = remaining % 12
 
         val percent = (totalElapsed.toFloat() / totalLifetimeMonths.toFloat()) * 100f
-        
+
         // The grid has `totalLifetimeMonths + birthM - 1` total slots because of the grayed out pre-birth months
         val totalGridSlots = totalLifetimeMonths + (birthM - 1)
         val currentMonthIdx = gridIndex.coerceAtMost(totalGridSlots - 1)
@@ -99,11 +128,13 @@ class MementoMoriManager(private val context: Context) {
             percentElapsed = percent,
             currentMonthIndex = currentMonthIdx,
             birthYear = birthY,
-            birthMonth = birthM
+            birthMonth = birthM,
+            isConfigured = true
         )
     }
 
     fun checkNewMonthCompleted(currentMonthIdx: Int): Boolean {
+        if (currentMonthIdx < 0) return false
         val lastSeen = prefs.getInt("last_seen_month", currentMonthIdx)
         if (currentMonthIdx > lastSeen) {
             prefs.edit().putInt("last_seen_month", currentMonthIdx).apply()

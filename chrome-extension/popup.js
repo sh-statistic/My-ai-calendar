@@ -15,8 +15,6 @@ document.addEventListener("DOMContentLoaded", async () => {
   const btnSync = document.getElementById("btnSync");
   const btnFullSync = document.getElementById("btnFullSync");
   const syncStatus = document.getElementById("syncStatus");
-  const qrImg = document.getElementById("qrImg");
-  const serverInfoText = document.getElementById("serverInfoText");
 
   // Prayer times elements
   const citySelect = document.getElementById("citySelect");
@@ -35,13 +33,6 @@ document.addEventListener("DOMContentLoaded", async () => {
   if (dow === 6) { // Friday
     occasionBadge.style.display = "inline-block";
     occasionBadge.textContent = "تعطیل رسمی (جمعه)";
-  }
-
-  // Setup Server Info and Live QR Code for Laptop Screen
-  const serverUrl = await SyncClient.getServerUrl();
-  serverInfoText.textContent = `آدرس سرور گوشی: ${serverUrl}`;
-  if (qrImg) {
-    qrImg.src = `https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=${encodeURIComponent(serverUrl)}`;
   }
 
   // Populate Iranian cities dropdown
@@ -78,6 +69,7 @@ document.addEventListener("DOMContentLoaded", async () => {
     }
 
     updatePrayerTimes();
+    setInterval(updatePrayerTimes, 60000);
     citySelect.addEventListener("change", async () => {
       updatePrayerTimes();
       if (typeof chrome !== 'undefined' && chrome.storage && chrome.storage.local) {
@@ -114,48 +106,98 @@ document.addEventListener("DOMContentLoaded", async () => {
       eventsList.innerHTML = `<div class="empty-state">رویدادی برای امروز ثبت نشده است.</div>`;
     }
 
-    // Tasks
-    const pendingTasks = (data.tasks || []).filter((t) => !t.isDeleted);
-    tasksCount.textContent = PersianDateUtil.toPersianDigits(pendingTasks.filter((t) => !t.isCompleted).length);
+    // Tasks Scope Filter
+    const tabTodayTasks = document.getElementById("tabTodayTasks");
+    const tabAllTasks = document.getElementById("tabAllTasks");
+    let currentTaskScope = "today";
 
-    if (pendingTasks.length > 0) {
-      tasksList.innerHTML = pendingTasks
-        .slice(0, 5)
-        .map(
-          (t) => `
-        <div class="item-card task-item ${t.isCompleted ? 'completed' : ''}">
-          <label style="display: flex; align-items: center; gap: 6px; cursor: pointer;">
-            <input type="checkbox" ${t.isCompleted ? "checked" : ""} data-task-id="${t.id}" class="task-checkbox">
-            <span>${t.title}</span>
-          </label>
-          <span style="font-size: 9px; color: #64748b;">${t.priority || "عادی"}</span>
-        </div>
-      `
-        )
-        .join("");
-
-      // Bind checkboxes
-      document.querySelectorAll(".task-checkbox").forEach((cb) => {
-        cb.addEventListener("change", async (ev) => {
-          const taskId = ev.target.getAttribute("data-task-id");
-          const task = (data.tasks || []).find((x) => x.id === taskId);
-          if (task) {
-            task.isCompleted = ev.target.checked;
-            task.updatedAt = Date.now();
-            await SyncClient.saveLocalData(data.events, data.tasks, data.notes);
-            loadData();
-          }
-        });
+    if (tabTodayTasks && !tabTodayTasks.dataset.bound) {
+      tabTodayTasks.dataset.bound = "true";
+      tabTodayTasks.addEventListener("click", () => {
+        currentTaskScope = "today";
+        tabTodayTasks.classList.add("active");
+        if (tabAllTasks) tabAllTasks.classList.remove("active");
+        renderTasksList();
       });
-    } else {
-      tasksList.innerHTML = `<div class="empty-state">کاری برای امروز ثبت نشده است.</div>`;
     }
+    if (tabAllTasks && !tabAllTasks.dataset.bound) {
+      tabAllTasks.dataset.bound = "true";
+      tabAllTasks.addEventListener("click", () => {
+        currentTaskScope = "all";
+        tabAllTasks.classList.add("active");
+        if (tabTodayTasks) tabTodayTasks.classList.remove("active");
+        renderTasksList();
+      });
+    }
+
+    function renderTasksList() {
+      const allActive = (data.tasks || []).filter((t) => !t.isDeleted);
+      let tasksToShow = allActive;
+
+      if (currentTaskScope === "today") {
+        tasksToShow = allActive.filter(
+          (t) => PersianDateUtil.normalizePersianDate(t.persianDueDate) === jalaliFormatted
+        );
+      }
+
+      const pendingCount = tasksToShow.filter((t) => !t.isCompleted).length;
+      tasksCount.textContent = PersianDateUtil.toPersianDigits(pendingCount);
+
+      if (tasksToShow.length > 0) {
+        tasksList.innerHTML = tasksToShow
+          .slice(0, 8)
+          .map(
+            (t) => {
+              const priority = t.priority || "متوسط";
+              const pClass = priority === "بالا" ? "priority-high" : (priority === "پایین" ? "priority-low" : "priority-medium");
+              const showDate = currentTaskScope === "all" && t.persianDueDate;
+              return `
+              <div class="item-card task-item ${t.isCompleted ? 'completed' : ''} ${pClass}">
+                <label style="display: flex; align-items: center; gap: 6px; cursor: pointer; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; flex: 1;">
+                  <input type="checkbox" ${t.isCompleted ? "checked" : ""} data-task-id="${t.id}" class="task-checkbox">
+                  <span style="overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">${t.title}</span>
+                  ${showDate ? `<span style="font-size: 9px; color: #64748b; margin-right: 4px;">(${PersianDateUtil.toPersianDigits(t.persianDueDate)})</span>` : ""}
+                </label>
+                <span style="font-size: 9px; font-weight: bold; color: ${priority === 'بالا' ? '#ef4444' : (priority === 'پایین' ? '#10b981' : '#f59e0b')}; margin-right: 4px;">${priority}</span>
+              </div>
+            `;
+            }
+          )
+          .join("");
+
+        // Bind checkboxes
+        tasksList.querySelectorAll(".task-checkbox").forEach((cb) => {
+          cb.addEventListener("change", async (ev) => {
+            const taskId = ev.target.getAttribute("data-task-id");
+            const task = (data.tasks || []).find((x) => x.id === taskId);
+            if (task) {
+              task.isCompleted = ev.target.checked;
+              task.updatedAt = Date.now();
+              await SyncClient.saveLocalData(data.events, data.tasks, data.notes);
+              loadData();
+            }
+          });
+        });
+      } else {
+        const emptyMsg = currentTaskScope === "today" ? "کاری برای امروز ثبت نشده است." : "هیچ وظیفه‌ای ثبت نشده است.";
+        tasksList.innerHTML = `<div class="empty-state">${emptyMsg}</div>`;
+      }
+    }
+
+    renderTasksList();
 
     // Notes
     const popupNotesList = document.getElementById("popupNotesList");
     const notesCount = document.getElementById("notesCount");
-    const activeNotes = (data.notes || []).filter((n) => !n.isDeleted);
+    let activeNotes = (data.notes || []).filter((n) => !n.isDeleted);
     if (notesCount) notesCount.textContent = PersianDateUtil.toPersianDigits(activeNotes.length);
+
+    // مرتب‌سازی: یادداشت‌های پین‌شده در اولویت قرار می‌گیرند
+    activeNotes.sort((a, b) => {
+      if (a.isPinned && !b.isPinned) return -1;
+      if (!a.isPinned && b.isPinned) return 1;
+      return (b.updatedAt || 0) - (a.updatedAt || 0);
+    });
 
     if (popupNotesList) {
       if (activeNotes.length > 0) {
@@ -163,9 +205,9 @@ document.addEventListener("DOMContentLoaded", async () => {
           .slice(0, 5)
           .map(
             (n) => `
-          <div class="item-card" style="border-right-color: ${n.colorHex || '#f59e0b'}; background: #fefce8;">
+          <div class="item-card" style="border-right-color: ${n.colorHex || '#f59e0b'}; background: ${n.isPinned ? '#FEF08A' : '#fefce8'};">
             <div>
-              <strong>${n.title || "یادداشت"}</strong>
+              <strong>${n.isPinned ? '📌 ' : ''}${n.title || "یادداشت"}</strong>
               <div style="font-size: 10px; color: #854d0e; white-space: pre-wrap;">${n.content}</div>
             </div>
             ${n.persianDate ? `<span style="font-size: 9px; color: #a16207;">${PersianDateUtil.toPersianDigits(n.persianDate)}</span>` : ""}
@@ -211,11 +253,13 @@ document.addEventListener("DOMContentLoaded", async () => {
 
   // Save Quick Task in Popup
   const popupTaskInput = document.getElementById("popupTaskInput");
+  const popupTaskPriority = document.getElementById("popupTaskPriority");
   const btnPopupAddTask = document.getElementById("btnPopupAddTask");
   if (btnPopupAddTask && popupTaskInput) {
     btnPopupAddTask.addEventListener("click", async () => {
       const text = popupTaskInput.value.trim();
       if (!text) return;
+      const priorityVal = popupTaskPriority ? popupTaskPriority.value : "متوسط";
 
       const data = await SyncClient.getLocalData();
       const newTask = {
@@ -223,7 +267,7 @@ document.addEventListener("DOMContentLoaded", async () => {
         title: text,
         isCompleted: false,
         persianDueDate: jalaliFormatted,
-        priority: "متوسط",
+        priority: priorityVal,
         category: "عمومی",
         updatedAt: Date.now(),
         isDeleted: false
@@ -256,9 +300,10 @@ document.addEventListener("DOMContentLoaded", async () => {
           savedUrl || "http://192.168.43.1:8080"
         );
         if (manualUrl && manualUrl.trim()) {
+          const cleanManual = SyncClient.cleanServerUrl(manualUrl);
           syncStatus.textContent = "درحال اتصال...";
-          await SyncClient.setServerUrl(manualUrl.trim());
-          result = await SyncClient.syncWithAndroid(manualUrl.trim());
+          await SyncClient.setServerUrl(cleanManual);
+          result = await SyncClient.syncWithAndroid(cleanManual);
         }
       }
 
