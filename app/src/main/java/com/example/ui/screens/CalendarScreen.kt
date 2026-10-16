@@ -29,6 +29,7 @@ import androidx.compose.material.icons.filled.CalendarToday
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.Event
+import androidx.compose.material.icons.filled.Repeat
 import androidx.compose.material.icons.filled.Schedule
 import androidx.compose.material.icons.filled.Star
 import androidx.compose.material3.AssistChip
@@ -68,6 +69,7 @@ import com.example.data.TaskEntity
 import com.example.ui.MainViewModel
 import com.example.ui.components.AddEventDialog
 import com.example.ui.components.AddTaskDialog
+import com.example.ui.components.DeleteRecurringEventDialog
 import com.example.ui.components.EditEventDialog
 import com.example.ui.components.EditTaskDialog
 import com.example.ui.components.EditOccasionDialog
@@ -92,6 +94,7 @@ fun CalendarScreen(
     var showAddTaskDialog by remember { mutableStateOf(false) }
     var eventToEdit by remember { mutableStateOf<EventEntity?>(null) }
     var taskToEdit by remember { mutableStateOf<TaskEntity?>(null) }
+    var recurringEventToDelete by remember { mutableStateOf<EventEntity?>(null) }
 
     val today = PersianCalendarHelper.getCurrentJalaliDate()
     val daysInMonth = PersianCalendarHelper.getDaysInJalaliMonth(viewYear, viewMonth)
@@ -630,7 +633,13 @@ fun CalendarScreen(
                                 event = event,
                                 onClick = { eventToEdit = event },
                                 onEdit = { eventToEdit = event },
-                                onDelete = { viewModel.deleteEvent(event.id) }
+                                onDelete = {
+                                    if (event.recurrenceRule == "WEEKLY" && !event.recurrenceId.isNullOrBlank()) {
+                                        recurringEventToDelete = event
+                                    } else {
+                                        viewModel.deleteEvent(event.id)
+                                    }
+                                }
                             )
                         }
                     }
@@ -678,8 +687,8 @@ fun CalendarScreen(
         AddEventDialog(
             initialDate = selectedDate,
             onDismiss = { showAddEventDialog = false },
-            onConfirm = { title, desc, pDate, time, cat, col ->
-                viewModel.addEvent(title, desc, pDate, time, cat, col)
+            onConfirm = { title, desc, pDate, time, cat, col, isRecurring ->
+                viewModel.addEvent(title, desc, pDate, time, cat, col, isRecurring)
                 showAddEventDialog = false
             }
         )
@@ -739,8 +748,32 @@ fun CalendarScreen(
                 eventToEdit = null
             },
             onDelete = {
-                viewModel.deleteEvent(event.id)
+                val ev = event
                 eventToEdit = null
+                if (ev.recurrenceRule == "WEEKLY" && !ev.recurrenceId.isNullOrBlank()) {
+                    recurringEventToDelete = ev
+                } else {
+                    viewModel.deleteEvent(ev.id)
+                }
+            }
+        )
+    }
+
+    recurringEventToDelete?.let { event ->
+        DeleteRecurringEventDialog(
+            onDismiss = { recurringEventToDelete = null },
+            onDeleteSingle = {
+                viewModel.deleteEvent(event.id)
+                recurringEventToDelete = null
+            },
+            onDeleteFuture = {
+                val recId = event.recurrenceId
+                if (!recId.isNullOrBlank()) {
+                    viewModel.deleteRecurringEventsFromDate(recId, event.persianDate)
+                } else {
+                    viewModel.deleteEvent(event.id)
+                }
+                recurringEventToDelete = null
             }
         )
     }
@@ -838,6 +871,32 @@ fun EventItemCard(
                                     fontSize = 9.sp,
                                     fontWeight = FontWeight.SemiBold,
                                     color = MaterialTheme.colorScheme.onPrimaryContainer
+                                )
+                            }
+                        }
+                    }
+
+                    if (event.recurrenceRule == "WEEKLY") {
+                        Surface(
+                            color = MaterialTheme.colorScheme.secondaryContainer,
+                            shape = RoundedCornerShape(4.dp)
+                        ) {
+                            Row(
+                                modifier = Modifier.padding(horizontal = 4.dp, vertical = 1.dp),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Icon(
+                                    Icons.Default.Repeat,
+                                    contentDescription = null,
+                                    modifier = Modifier.size(10.dp),
+                                    tint = MaterialTheme.colorScheme.onSecondaryContainer
+                                )
+                                Spacer(modifier = Modifier.width(2.dp))
+                                Text(
+                                    text = if (strings.isFa) "تکرار هفتگی" else "Weekly",
+                                    fontSize = 9.sp,
+                                    fontWeight = FontWeight.SemiBold,
+                                    color = MaterialTheme.colorScheme.onSecondaryContainer
                                 )
                             }
                         }

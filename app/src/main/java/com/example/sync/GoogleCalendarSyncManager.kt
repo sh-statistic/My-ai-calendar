@@ -5,7 +5,6 @@ import android.content.ContentUris
 import android.content.ContentValues
 import android.content.Context
 import android.database.Cursor
-import android.net.Uri
 import android.provider.CalendarContract
 import com.example.calendar.PersianCalendarHelper
 import com.example.data.EventEntity
@@ -16,8 +15,8 @@ import java.util.TimeZone
 
 /**
  * Manages real sync with Google Calendar via the Android Calendar Content Provider.
- * Events, tasks and notes are written to the device calendar, and Google Calendar
- * automatically syncs them to Google servers when connected.
+ * Events, tasks and notes are written to the selected device calendar, and Google Calendar
+ * automatically syncs them to Google cloud servers.
  *
  * Tasks are stored as all-day events with title prefix "[وظیفه] ".
  * Notes are stored as all-day events with title prefix "[یادداشت] ".
@@ -44,6 +43,7 @@ class GoogleCalendarSyncManager(private val context: Context) {
         val displayName: String,
         val accountName: String,
         val ownerAccount: String,
+        val accountType: String,
         val isGoogle: Boolean
     )
 
@@ -61,7 +61,7 @@ class GoogleCalendarSyncManager(private val context: Context) {
                 CalendarContract.Calendars.CONTENT_URI,
                 projection, null, null, null
             )
-        } catch (e: SecurityException) { null }
+        } catch (_: SecurityException) { null }
 
         cursor?.use {
             while (it.moveToNext()) {
@@ -76,7 +76,8 @@ class GoogleCalendarSyncManager(private val context: Context) {
                         displayName = displayName,
                         accountName = accountName,
                         ownerAccount = ownerAccount,
-                        isGoogle = accountType == "com.google"
+                        accountType = accountType,
+                        isGoogle = accountType.equals("com.google", ignoreCase = true)
                     )
                 )
             }
@@ -100,8 +101,11 @@ class GoogleCalendarSyncManager(private val context: Context) {
     }
 
     fun ensureCalendarSelected(): Boolean {
-        if (getSelectedCalendarId() != -1L) return true
+        val currentId = getSelectedCalendarId()
         val calendars = getAvailableCalendars()
+        if (currentId != -1L && calendars.any { it.id == currentId }) {
+            return true
+        }
         val target = calendars.firstOrNull { it.isGoogle } ?: calendars.firstOrNull()
         return if (target != null) {
             selectCalendar(target.id, target.displayName)
@@ -124,24 +128,54 @@ class GoogleCalendarSyncManager(private val context: Context) {
     )
 
     fun syncEventsToGoogle(events: List<EventEntity>): SyncResult {
+        ensureCalendarSelected()
         val calId = getSelectedCalendarId()
-        if (calId == -1L) return SyncResult(message = "تقویمی انتخاب نشده است")
+        if (calId == -1L) return SyncResult(message = "تقویمی انتخاب نشده است یا مجوز تقویم داده نشده است")
 
         var added = 0
+        var updated = 0
+        var deleted = 0
         var errors = 0
         val resolver = context.contentResolver
 
         for (event in events) {
-            if (event.isDeleted) continue
-            try {
-                // Check if already exists
-                if (findEventByAppId(resolver, calId, event.id) != null) continue
+            // رویدادهای دریافتی از تقویم گوگل نباید دوباره به عنوان رویداد محلی پوش شوند
+            if (event.category == "تقویم گوگل") continue
 
-                val startMillis = parseEventToMillis(event.gregorianDate, event.startTime)
-                val endMillis = if (event.endTime.isNotBlank()) {
-                    parseEventToMillis(event.gregorianDate, event.endTime)
+            try {
+                val existingEventId = findEventByAppId(resolver, calId, event.id)
+
+                if (event.isDeleted) {
+                    if (existingEventId != null) {
+                        val deleteUri = ContentUris.withAppendedId(CalendarContract.Events.CONTENT_URI, existingEventId)
+                        resolver.delete(deleteUri, null, null)
+                        deleted++
+                    }
+                    continue
+                }
+
+                val isAllDay = event.startTime.isBlank()
+                val startMillis: Long
+                val endMillis: Long
+
+                if (isAllDay) {
+                    val dateStr = if (event.gregorianDate.isNotBlank()) event.gregorianDate else {
+                        val pParts = event.persianDate.split("-", "/").mapNotNull { it.toIntOrNull() }
+                        if (pParts.size == 3) {
+                            PersianCalendarHelper.jalaliToGregorian(pParts[0], pParts[1], pParts[2]).formatted
+                        } else {
+                            PersianCalendarHelper.getCurrentGregorianDate().formatted
+                        }
+                    }
+                    startMillis = parseDateToMillis(dateStr)
+                    endMillis = startMillis + 86400000L
                 } else {
-                    startMillis + 3600000L // +1 hour default
+                    startMillis = parseEventToMillis(event.persianDate, event.gregorianDate, event.startTime)
+                    endMillis = if (event.endTime.isNotBlank()) {
+                        parseEventToMillis(event.persianDate, event.gregorianDate, event.endTime)
+                    } else {
+                        startMillis + 3600000L
+                    }
                 }
 
                 val values = ContentValues().apply {
@@ -150,38 +184,75 @@ class GoogleCalendarSyncManager(private val context: Context) {
                     put(CalendarContract.Events.DESCRIPTION, buildDescription(event))
                     put(CalendarContract.Events.DTSTART, startMillis)
                     put(CalendarContract.Events.DTEND, endMillis)
-                    put(CalendarContract.Events.EVENT_TIMEZONE, TimeZone.getDefault().id)
+                    if (isAllDay) {
+                        put(CalendarContract.Events.ALL_DAY, 1)
+                        put(CalendarContract.Events.EVENT_TIMEZONE, "UTC")
+                    } else {
+                        put(CalendarContract.Events.ALL_DAY, 0)
+                        put(CalendarContract.Events.EVENT_TIMEZONE, TimeZone.getDefault().id)
+                    }
                     put(CalendarContract.Events.HAS_ALARM, 1)
                 }
 
-                resolver.insert(CalendarContract.Events.CONTENT_URI, values)
-                added++
-            } catch (e: Exception) {
+                if (existingEventId != null) {
+                    val updateUri = ContentUris.withAppendedId(CalendarContract.Events.CONTENT_URI, existingEventId)
+                    resolver.update(updateUri, values, null, null)
+                    updated++
+                } else {
+                    resolver.insert(CalendarContract.Events.CONTENT_URI, values)
+                    added++
+                }
+            } catch (_: Exception) {
                 errors++
             }
         }
 
-        return SyncResult(eventsAdded = added, errors = errors,
-            message = "✓ $added رویداد به تقویم گوگل اضافه شد" +
-                    if (errors > 0) " ($errors خطا)" else "")
+        val totalChanges = added + updated + deleted
+        val msg = buildString {
+            append("✓ $totalChanges رویداد پردازش شد ($added جدید، $updated به‌روزرسانی")
+            if (deleted > 0) append("، $deleted حذف")
+            append(")")
+            if (errors > 0) append(" ($errors خطا)")
+        }
+
+        return SyncResult(eventsAdded = added + updated, errors = errors, message = msg)
     }
 
     fun syncTasksToGoogle(tasks: List<TaskEntity>): SyncResult {
+        ensureCalendarSelected()
         val calId = getSelectedCalendarId()
-        if (calId == -1L) return SyncResult(message = "تقویمی انتخاب نشده است")
+        if (calId == -1L) return SyncResult(message = "تقویمی انتخاب نشده است یا مجوز تقویم داده نشده است")
 
         var added = 0
+        var updated = 0
+        var deleted = 0
         var errors = 0
         val resolver = context.contentResolver
 
         for (task in tasks) {
-            if (task.isDeleted) continue
             try {
-                if (findEventByAppId(resolver, calId, task.id) != null) continue
+                val existingEventId = findEventByAppId(resolver, calId, task.id)
 
-                val dateStr = task.gregorianDueDate.ifBlank {
-                    val today = PersianCalendarHelper.getCurrentGregorianDate()
-                    today.formatted
+                if (task.isDeleted) {
+                    if (existingEventId != null) {
+                        val deleteUri = ContentUris.withAppendedId(CalendarContract.Events.CONTENT_URI, existingEventId)
+                        resolver.delete(deleteUri, null, null)
+                        deleted++
+                    }
+                    continue
+                }
+
+                val dateStr = if (task.gregorianDueDate.isNotBlank()) {
+                    task.gregorianDueDate
+                } else if (task.persianDueDate.isNotBlank()) {
+                    val pParts = task.persianDueDate.split("-", "/").mapNotNull { it.toIntOrNull() }
+                    if (pParts.size == 3) {
+                        PersianCalendarHelper.jalaliToGregorian(pParts[0], pParts[1], pParts[2]).formatted
+                    } else {
+                        PersianCalendarHelper.getCurrentGregorianDate().formatted
+                    }
+                } else {
+                    PersianCalendarHelper.getCurrentGregorianDate().formatted
                 }
                 val startMillis = parseDateToMillis(dateStr)
 
@@ -199,33 +270,53 @@ class GoogleCalendarSyncManager(private val context: Context) {
                     put(CalendarContract.Events.EVENT_TIMEZONE, "UTC")
                 }
 
-                resolver.insert(CalendarContract.Events.CONTENT_URI, values)
-                added++
-            } catch (e: Exception) {
+                if (existingEventId != null) {
+                    val updateUri = ContentUris.withAppendedId(CalendarContract.Events.CONTENT_URI, existingEventId)
+                    resolver.update(updateUri, values, null, null)
+                    updated++
+                } else {
+                    resolver.insert(CalendarContract.Events.CONTENT_URI, values)
+                    added++
+                }
+            } catch (_: Exception) {
                 errors++
             }
         }
 
-        return SyncResult(tasksAdded = added, errors = errors,
-            message = "✓ $added وظیفه به تقویم گوگل اضافه شد" +
-                    if (errors > 0) " ($errors خطا)" else "")
+        val totalChanges = added + updated + deleted
+        val msg = buildString {
+            append("✓ $totalChanges وظیفه پردازش شد ($added جدید، $updated به‌روزرسانی")
+            if (deleted > 0) append("، $deleted حذف")
+            append(")")
+            if (errors > 0) append(" ($errors خطا)")
+        }
+
+        return SyncResult(tasksAdded = added + updated, errors = errors, message = msg)
     }
 
     fun syncNotesToGoogle(notes: List<NoteEntity>): SyncResult {
-        if (getSelectedCalendarId() == -1L) {
-            ensureCalendarSelected()
-        }
+        ensureCalendarSelected()
         val calId = getSelectedCalendarId()
         if (calId == -1L) return SyncResult(message = "تقویمی انتخاب نشده است یا مجوز تقویم داده نشده است")
 
         var added = 0
+        var updated = 0
+        var deleted = 0
         var errors = 0
         val resolver = context.contentResolver
 
         for (note in notes) {
-            if (note.isDeleted) continue
             try {
-                if (findEventByAppId(resolver, calId, note.id) != null) continue
+                val existingEventId = findEventByAppId(resolver, calId, note.id)
+
+                if (note.isDeleted) {
+                    if (existingEventId != null) {
+                        val deleteUri = ContentUris.withAppendedId(CalendarContract.Events.CONTENT_URI, existingEventId)
+                        resolver.delete(deleteUri, null, null)
+                        deleted++
+                    }
+                    continue
+                }
 
                 val dateStr = if (note.persianDate.isNotBlank()) {
                     val pParts = note.persianDate.split("-", "/").mapNotNull { it.toIntOrNull() }
@@ -238,6 +329,7 @@ class GoogleCalendarSyncManager(private val context: Context) {
                     PersianCalendarHelper.getCurrentGregorianDate().formatted
                 }
                 val startMillis = parseDateToMillis(dateStr)
+
                 val title = "$NOTE_PREFIX${note.title}"
                 val desc = "${note.content}\n\napp_id:${note.id}"
 
@@ -251,16 +343,28 @@ class GoogleCalendarSyncManager(private val context: Context) {
                     put(CalendarContract.Events.EVENT_TIMEZONE, "UTC")
                 }
 
-                resolver.insert(CalendarContract.Events.CONTENT_URI, values)
-                added++
-            } catch (e: Exception) {
+                if (existingEventId != null) {
+                    val updateUri = ContentUris.withAppendedId(CalendarContract.Events.CONTENT_URI, existingEventId)
+                    resolver.update(updateUri, values, null, null)
+                    updated++
+                } else {
+                    resolver.insert(CalendarContract.Events.CONTENT_URI, values)
+                    added++
+                }
+            } catch (_: Exception) {
                 errors++
             }
         }
 
-        return SyncResult(notesAdded = added, errors = errors,
-            message = "✓ $added یادداشت به تقویم گوگل اضافه شد" +
-                    if (errors > 0) " ($errors خطا)" else "")
+        val totalChanges = added + updated + deleted
+        val msg = buildString {
+            append("✓ $totalChanges یادداشت پردازش شد ($added جدید، $updated به‌روزرسانی")
+            if (deleted > 0) append("، $deleted حذف")
+            append(")")
+            if (errors > 0) append(" ($errors خطا)")
+        }
+
+        return SyncResult(notesAdded = added + updated, errors = errors, message = msg)
     }
 
     /**
@@ -283,7 +387,7 @@ class GoogleCalendarSyncManager(private val context: Context) {
             tasksAdded = tkResult.tasksAdded,
             notesAdded = ntResult.notesAdded,
             errors = totalErrors,
-            message = "همگام‌سازی کامل: $totalAdded مورد اضافه شد" +
+            message = "همگام‌سازی کامل انجام شد: $totalAdded مورد پردازش شد" +
                     " (${evResult.eventsAdded} رویداد، ${tkResult.tasksAdded} وظیفه، ${ntResult.notesAdded} یادداشت)" +
                     if (totalErrors > 0) " — $totalErrors خطا" else ""
         )
@@ -291,34 +395,12 @@ class GoogleCalendarSyncManager(private val context: Context) {
 
     /**
      * Import events from Google Calendar into the app (pull).
-     * Retrieves events from the past (up to pastDays) and future (up to futureDays),
-     * supporting both standard and recurring events via CalendarContract.Instances with
-     * fallback to CalendarContract.Events.
+     * Retrieves events ONLY from the selected calendar to respect user choice.
      */
     fun importEventsFromGoogle(pastDays: Int = 1095, futureDays: Int = 1095): List<EventEntity> {
-        if (getSelectedCalendarId() == -1L) {
-            ensureCalendarSelected()
-        }
-
-        val available = getAvailableCalendars()
+        ensureCalendarSelected()
         val selectedId = getSelectedCalendarId()
-
-        // Find candidate calendar IDs: selected calendar + any other Google calendar accounts
-        val targetCalendarIds = mutableListOf<Long>()
-        if (selectedId != -1L) {
-            targetCalendarIds.add(selectedId)
-        }
-        val googleCalIds = available.filter { it.isGoogle }.map { it.id }
-        for (gId in googleCalIds) {
-            if (!targetCalendarIds.contains(gId)) {
-                targetCalendarIds.add(gId)
-            }
-        }
-        if (targetCalendarIds.isEmpty()) {
-            targetCalendarIds.addAll(available.map { it.id })
-        }
-
-        if (targetCalendarIds.isEmpty()) return emptyList()
+        if (selectedId == -1L) return emptyList()
 
         val imported = mutableListOf<EventEntity>()
         val seenKeys = mutableSetOf<String>()
@@ -340,7 +422,7 @@ class GoogleCalendarSyncManager(private val context: Context) {
         val startMillis = startCal.timeInMillis
         val endMillis = endCal.timeInMillis
 
-        // 1. Try querying CalendarContract.Instances first (expands recurring events and covers past/future instances)
+        // 1. Try querying CalendarContract.Instances first (handles recurring events and instances)
         try {
             val builder = CalendarContract.Instances.CONTENT_URI.buildUpon()
             ContentUris.appendId(builder, startMillis)
@@ -357,9 +439,8 @@ class GoogleCalendarSyncManager(private val context: Context) {
                 CalendarContract.Instances.CALENDAR_ID
             )
 
-            val calPlaceholders = targetCalendarIds.joinToString(",") { "?" }
-            val selection = "${CalendarContract.Instances.CALENDAR_ID} IN ($calPlaceholders)"
-            val selArgs = targetCalendarIds.map { it.toString() }.toTypedArray()
+            val selection = "${CalendarContract.Instances.CALENDAR_ID} = ?"
+            val selArgs = arrayOf(selectedId.toString())
 
             val cursor = context.contentResolver.query(
                 instancesUri,
@@ -399,7 +480,7 @@ class GoogleCalendarSyncManager(private val context: Context) {
                     } else {
                         val hour = cal.get(Calendar.HOUR_OF_DAY)
                         val minute = cal.get(Calendar.MINUTE)
-                        PersianCalendarHelper.toPersianDigits("%02d:%02d".format(hour, minute))
+                        "%02d:%02d".format(hour, minute)
                     }
 
                     val endTime = if (isAllDay || dtEnd <= dtStart) {
@@ -408,7 +489,7 @@ class GoogleCalendarSyncManager(private val context: Context) {
                         val endCalLocal = Calendar.getInstance().apply { timeInMillis = dtEnd }
                         val hour = endCalLocal.get(Calendar.HOUR_OF_DAY)
                         val minute = endCalLocal.get(Calendar.MINUTE)
-                        PersianCalendarHelper.toPersianDigits("%02d:%02d".format(hour, minute))
+                        "%02d:%02d".format(hour, minute)
                     }
 
                     val dedupKey = "$title|$gregorianDate|$startTime"
@@ -430,7 +511,7 @@ class GoogleCalendarSyncManager(private val context: Context) {
             }
         } catch (_: Exception) {}
 
-        // 2. Fallback or supplement with CalendarContract.Events if needed
+        // 2. Fallback to CalendarContract.Events if Instances returned nothing
         if (imported.isEmpty()) {
             try {
                 val eventsProjection = arrayOf(
@@ -443,10 +524,9 @@ class GoogleCalendarSyncManager(private val context: Context) {
                     CalendarContract.Events.CALENDAR_ID
                 )
 
-                val calPlaceholders = targetCalendarIds.joinToString(",") { "?" }
-                val selection = "${CalendarContract.Events.CALENDAR_ID} IN ($calPlaceholders) AND " +
+                val selection = "${CalendarContract.Events.CALENDAR_ID} = ? AND " +
                         "${CalendarContract.Events.DTSTART} >= ? AND ${CalendarContract.Events.DTSTART} <= ?"
-                val selArgs = (targetCalendarIds.map { it.toString() } + listOf(startMillis.toString(), endMillis.toString())).toTypedArray()
+                val selArgs = arrayOf(selectedId.toString(), startMillis.toString(), endMillis.toString())
 
                 val cursor = context.contentResolver.query(
                     CalendarContract.Events.CONTENT_URI,
@@ -486,7 +566,7 @@ class GoogleCalendarSyncManager(private val context: Context) {
                         } else {
                             val hour = cal.get(Calendar.HOUR_OF_DAY)
                             val minute = cal.get(Calendar.MINUTE)
-                            PersianCalendarHelper.toPersianDigits("%02d:%02d".format(hour, minute))
+                            "%02d:%02d".format(hour, minute)
                         }
 
                         val endTime = if (isAllDay || dtEnd <= dtStart) {
@@ -495,7 +575,7 @@ class GoogleCalendarSyncManager(private val context: Context) {
                             val endCalLocal = Calendar.getInstance().apply { timeInMillis = dtEnd }
                             val hour = endCalLocal.get(Calendar.HOUR_OF_DAY)
                             val minute = endCalLocal.get(Calendar.MINUTE)
-                            PersianCalendarHelper.toPersianDigits("%02d:%02d".format(hour, minute))
+                            "%02d:%02d".format(hour, minute)
                         }
 
                         val dedupKey = "$title|$gregorianDate|$startTime"
@@ -541,7 +621,7 @@ class GoogleCalendarSyncManager(private val context: Context) {
 
         val cursor: Cursor? = try {
             resolver.query(CalendarContract.Events.CONTENT_URI, projection, selection, selArgs, null)
-        } catch (e: SecurityException) { null }
+        } catch (_: SecurityException) { null }
 
         cursor?.use {
             if (it.moveToFirst()) return it.getLong(0)
@@ -549,16 +629,23 @@ class GoogleCalendarSyncManager(private val context: Context) {
         return null
     }
 
-    private fun parseEventToMillis(gregorianDate: String, time: String): Long {
+    private fun parseEventToMillis(persianDate: String, gregorianDate: String, time: String): Long {
         val cal = Calendar.getInstance()
-        val dateParts = gregorianDate.split("-").mapNotNull { it.toIntOrNull() }
+        var dateParts = gregorianDate.split("-").mapNotNull { it.toIntOrNull() }
+        if (dateParts.size != 3 && persianDate.isNotBlank()) {
+            val pParts = persianDate.split("-", "/").mapNotNull { it.toIntOrNull() }
+            if (pParts.size == 3) {
+                val g = PersianCalendarHelper.jalaliToGregorian(pParts[0], pParts[1], pParts[2])
+                dateParts = listOf(g.year, g.month, g.day)
+            }
+        }
+
         if (dateParts.size == 3) {
             cal.set(Calendar.YEAR, dateParts[0])
             cal.set(Calendar.MONTH, dateParts[1] - 1)
             cal.set(Calendar.DAY_OF_MONTH, dateParts[2])
         }
 
-        // Parse Persian digits in time
         val latinTime = persianToLatinDigits(time)
         val timeParts = latinTime.split(":").mapNotNull { it.toIntOrNull() }
         if (timeParts.size >= 2) {
@@ -589,8 +676,8 @@ class GoogleCalendarSyncManager(private val context: Context) {
     }
 
     private fun persianToLatinDigits(text: String): String {
-        val persian = charArrayOf('\u06F0','\u06F1','\u06F2','\u06F3','\u06F4','\u06F5','\u06F6','\u06F7','\u06F8','\u06F9')
-        val arabic  = charArrayOf('\u0660','\u0661','\u0662','\u0663','\u0664','\u0665','\u0666','\u0667','\u0668','\u0669')
+        val persian = charArrayOf('۰','۱','۲','۳','۴','۵','۶','۷','۸','۹')
+        val arabic  = charArrayOf('٠','١','٢','٣','٤','٥','٦','٧','٨','٩')
         val sb = StringBuilder()
         for (ch in text) {
             val pi = persian.indexOf(ch)

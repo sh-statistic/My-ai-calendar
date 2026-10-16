@@ -482,10 +482,40 @@
             </select>
           </label>
         </div>
+        <div style="display: flex; align-items: center; gap: 8px; margin-top: 4px; padding: 6px 10px; background: #f8fafc; border-radius: 8px; border: 1px solid #e2e8f0;">
+          <input type="checkbox" id="eventWeeklyRepeatCheckbox" style="cursor: pointer; width: 16px; height: 16px; accent-color: var(--primary);">
+          <label for="eventWeeklyRepeatCheckbox" style="font-size: 12px; color: #334155; cursor: pointer; user-select: none;">
+            🔁 تکرار هفتگی (ثبت برای ۵۲ هفته آینده در همین روز)
+          </label>
+        </div>
       </div>
       <div class="shortcut-modal-footer">
         <button id="btnCancelEvent" class="btn-cancel">لغو</button>
         <button id="btnSaveEvent" class="btn-save" style="background: var(--primary);">ذخیره در تقویم</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Recurring Event Delete Modal -->
+  <div class="shortcut-modal-overlay" id="deleteRecurringModal" style="display: none;">
+    <div class="shortcut-modal-card" style="width: 360px;">
+      <div class="shortcut-modal-header">
+        <h4>🗑️ حذف رویداد تکرارشونده</h4>
+        <button id="btnCloseDeleteRecurringModal" class="shortcut-modal-close" title="بستن">✕</button>
+      </div>
+      <div class="shortcut-modal-body" style="font-size: 12.5px; color: #475569; line-height: 20px;">
+        این رویداد به صورت هفتگی تکرار می‌شود. مایلید چگونه حذف شود؟
+      </div>
+      <div class="shortcut-modal-footer" style="flex-direction: column; gap: 8px;">
+        <button id="btnDeleteOnlyThisEvent" class="w7-sync-btn" style="background: #f1f5f9; color: #334155; border: 1px solid #cbd5e1; width: 100%; padding: 8px;">
+          فقط همین رویداد
+        </button>
+        <button id="btnDeleteThisAndFutureEvents" class="w7-sync-btn" style="background: #ef4444; color: #fff; width: 100%; padding: 8px;">
+          این رویداد و تکرارهای بعدی (از این تاریخ به بعد)
+        </button>
+        <button id="btnCancelDeleteRecurring" class="btn-cancel" style="width: 100%; text-align: center;">
+          انصراف
+        </button>
       </div>
     </div>
   </div>

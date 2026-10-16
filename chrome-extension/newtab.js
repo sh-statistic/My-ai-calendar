@@ -805,7 +805,7 @@ document.addEventListener("DOMContentLoaded", async () => {
           (e) => `
         <div class="cal-event-row" style="border-right-color: ${e.colorHex || '#d97706'}">
           <div class="cal-event-content">
-            <span class="cal-event-title">${e.title}</span>
+            <span class="cal-event-title">${e.recurrenceRule === 'WEEKLY' ? '<span title="تکرار هفتگی" style="margin-left: 4px;">🔁</span>' : ''}${e.title}</span>
             ${e.startTime ? `<span class="cal-event-time">⏰ ${PersianDateUtil.toPersianDigits(e.startTime)}${e.endTime ? ' تا ' + PersianDateUtil.toPersianDigits(e.endTime) : ''}</span>` : ""}
           </div>
           <button class="cal-event-delete-btn" data-event-id="${e.id}" title="حذف رویداد">✕</button>
@@ -863,12 +863,17 @@ document.addEventListener("DOMContentLoaded", async () => {
           const evId = btn.getAttribute("data-event-id");
           const evItem = localEvents.find((x) => x.id === evId);
           if (evItem) {
-            evItem.isDeleted = true;
-            evItem.updatedAt = Date.now();
-            await SyncClient.saveLocalData(localEvents, localTasks, localNotes);
-            renderSelectedDayInfo();
-            renderCalendar();
-            showToast("رویداد با موفقیت حذف شد", "info");
+            if (evItem.recurrenceRule === "WEEKLY" && evItem.recurrenceId) {
+              pendingRecurringEventToDelete = evItem;
+              if (deleteRecurringModal) deleteRecurringModal.style.display = "flex";
+            } else {
+              evItem.isDeleted = true;
+              evItem.updatedAt = Date.now();
+              await SyncClient.saveLocalData(localEvents, localTasks, localNotes);
+              renderSelectedDayInfo();
+              renderCalendar();
+              showToast("رویداد با موفقیت حذف شد", "info");
+            }
           }
         });
       });
@@ -909,7 +914,7 @@ document.addEventListener("DOMContentLoaded", async () => {
   }
 
   // =========================================================================
-  // CALENDAR ADD-EVENT MODAL
+  // CALENDAR ADD-EVENT MODAL & RECURRING DELETE MODAL
   // =========================================================================
   const addEventModal = document.getElementById("addEventModal");
   const btnOpenAddEvent = document.getElementById("btnOpenAddEvent");
@@ -921,6 +926,58 @@ document.addEventListener("DOMContentLoaded", async () => {
   const eventStartTimeInput = document.getElementById("eventStartTimeInput");
   const eventEndTimeInput = document.getElementById("eventEndTimeInput");
   const eventCategorySelect = document.getElementById("eventCategorySelect");
+  const eventWeeklyRepeatCheckbox = document.getElementById("eventWeeklyRepeatCheckbox");
+
+  // Recurring Delete Modal
+  const deleteRecurringModal = document.getElementById("deleteRecurringModal");
+  const btnCloseDeleteRecurringModal = document.getElementById("btnCloseDeleteRecurringModal");
+  const btnDeleteOnlyThisEvent = document.getElementById("btnDeleteOnlyThisEvent");
+  const btnDeleteThisAndFutureEvents = document.getElementById("btnDeleteThisAndFutureEvents");
+  const btnCancelDeleteRecurring = document.getElementById("btnCancelDeleteRecurring");
+  let pendingRecurringEventToDelete = null;
+
+  function closeDeleteRecurringModal() {
+    if (deleteRecurringModal) deleteRecurringModal.style.display = "none";
+    pendingRecurringEventToDelete = null;
+  }
+
+  if (btnCloseDeleteRecurringModal) btnCloseDeleteRecurringModal.addEventListener("click", closeDeleteRecurringModal);
+  if (btnCancelDeleteRecurring) btnCancelDeleteRecurring.addEventListener("click", closeDeleteRecurringModal);
+
+  if (btnDeleteOnlyThisEvent) {
+    btnDeleteOnlyThisEvent.addEventListener("click", async () => {
+      if (!pendingRecurringEventToDelete) return;
+      pendingRecurringEventToDelete.isDeleted = true;
+      pendingRecurringEventToDelete.updatedAt = Date.now();
+      await SyncClient.saveLocalData(localEvents, localTasks, localNotes);
+      closeDeleteRecurringModal();
+      renderSelectedDayInfo();
+      renderCalendar();
+      showToast("فقط همین یک رویداد حذف شد", "info");
+    });
+  }
+
+  if (btnDeleteThisAndFutureEvents) {
+    btnDeleteThisAndFutureEvents.addEventListener("click", async () => {
+      if (!pendingRecurringEventToDelete) return;
+      const recId = pendingRecurringEventToDelete.recurrenceId;
+      const fromDate = pendingRecurringEventToDelete.persianDate;
+      const now = Date.now();
+      let count = 0;
+      localEvents.forEach((item) => {
+        if (item.recurrenceId === recId && item.persianDate >= fromDate) {
+          item.isDeleted = true;
+          item.updatedAt = now;
+          count++;
+        }
+      });
+      await SyncClient.saveLocalData(localEvents, localTasks, localNotes);
+      closeDeleteRecurringModal();
+      renderSelectedDayInfo();
+      renderCalendar();
+      showToast(`این رویداد و ${PersianDateUtil.toPersianDigits(count)} تکرار بعدی حذف شدند`, "info");
+    });
+  }
 
   function openEventModal() {
     if (!addEventModal) return;
@@ -929,6 +986,7 @@ document.addEventListener("DOMContentLoaded", async () => {
     if (eventTitleInput) eventTitleInput.value = "";
     if (eventStartTimeInput) eventStartTimeInput.value = "";
     if (eventEndTimeInput) eventEndTimeInput.value = "";
+    if (eventWeeklyRepeatCheckbox) eventWeeklyRepeatCheckbox.checked = false;
     addEventModal.style.display = "flex";
     if (eventTitleInput) eventTitleInput.focus();
   }
@@ -952,6 +1010,7 @@ document.addEventListener("DOMContentLoaded", async () => {
       const sTime = (eventStartTimeInput?.value || "").trim();
       const eTime = (eventEndTimeInput?.value || "").trim();
       const cat = eventCategorySelect?.value || "کاری";
+      const isWeekly = eventWeeklyRepeatCheckbox ? eventWeeklyRepeatCheckbox.checked : false;
 
       const colorMap = {
         "کاری": "#2563EB",
@@ -961,26 +1020,70 @@ document.addEventListener("DOMContentLoaded", async () => {
         "عمومی": "#D97706"
       };
 
-      const newEvent = {
-        id: "evt_" + Date.now() + "_" + Math.random().toString(36).substring(2, 7),
-        title: title,
-        description: "",
-        persianDate: PersianDateUtil.normalizePersianDate(pDate),
-        gregorianDate: "",
-        startTime: sTime,
-        endTime: eTime,
-        category: cat,
-        colorHex: colorMap[cat] || "#D97706",
-        updatedAt: Date.now(),
-        isDeleted: false
-      };
+      if (isWeekly) {
+        const parts = pDate.split("/").map(Number);
+        const jY = parts[0] || selectedDate.year;
+        const jM = parts[1] || selectedDate.month;
+        const jD = parts[2] || selectedDate.day;
+        const gBase = PersianDateUtil.jalaliToGregorian(jY, jM, jD);
+        const baseDate = new Date(gBase.year, gBase.month - 1, gBase.day, 12, 0, 0);
 
-      localEvents.unshift(newEvent);
-      await SyncClient.saveLocalData(localEvents, localTasks, localNotes);
-      closeEventModal();
-      renderCalendar();
-      renderSelectedDayInfo();
-      showToast("رویداد جدید ذخیره شد ✓ (آماده همگام‌سازی با گوشی)", "success");
+        const recId = "rec_" + Date.now() + "_" + Math.random().toString(36).substring(2, 7);
+        const recurringEvents = [];
+
+        for (let i = 0; i < 52; i++) {
+          const d = new Date(baseDate.getTime());
+          d.setDate(d.getDate() + (i * 7));
+          const jConverted = PersianDateUtil.gregorianToJalali(d.getFullYear(), d.getMonth() + 1, d.getDate());
+          const curJalali = PersianDateUtil.formatJalali(jConverted);
+
+          recurringEvents.push({
+            id: "evt_" + Date.now() + "_" + i + "_" + Math.random().toString(36).substring(2, 7),
+            title: title,
+            description: "",
+            persianDate: curJalali,
+            gregorianDate: `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`,
+            startTime: sTime,
+            endTime: eTime,
+            category: cat,
+            colorHex: colorMap[cat] || "#D97706",
+            recurrenceId: recId,
+            recurrenceRule: "WEEKLY",
+            updatedAt: Date.now(),
+            isDeleted: false
+          });
+        }
+
+        localEvents.unshift(...recurringEvents);
+        await SyncClient.saveLocalData(localEvents, localTasks, localNotes);
+        closeEventModal();
+        renderCalendar();
+        renderSelectedDayInfo();
+        showToast("رویداد تکرارشونده هفتگی (۵۲ هفته) ذخیره شد ✓", "success");
+      } else {
+        const newEvent = {
+          id: "evt_" + Date.now() + "_" + Math.random().toString(36).substring(2, 7),
+          title: title,
+          description: "",
+          persianDate: PersianDateUtil.normalizePersianDate(pDate),
+          gregorianDate: "",
+          startTime: sTime,
+          endTime: eTime,
+          category: cat,
+          colorHex: colorMap[cat] || "#D97706",
+          recurrenceId: null,
+          recurrenceRule: "NONE",
+          updatedAt: Date.now(),
+          isDeleted: false
+        };
+
+        localEvents.unshift(newEvent);
+        await SyncClient.saveLocalData(localEvents, localTasks, localNotes);
+        closeEventModal();
+        renderCalendar();
+        renderSelectedDayInfo();
+        showToast("رویداد جدید ذخیره شد ✓ (آماده همگام‌سازی با گوشی)", "success");
+      }
     });
   }
 

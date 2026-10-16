@@ -34,6 +34,12 @@ class FajrAlarmReceiver : BroadcastReceiver() {
             val cityName = intent.getStringExtra("cityName") ?: "شهر شما"
             val offsetMinutes = intent.getIntExtra("offsetMinutes", 5)
 
+            com.example.data.AppLogger.log(
+                context,
+                "اذان صبح",
+                "زمان بیدارباش فرارسید (شهر: $cityName). ارسال درخواست اجرای سرویس زنگ ممتد..."
+            )
+
             // Start foreground continuous alarm service with looping ringtone
             val serviceIntent = Intent(context, FajrAlarmService::class.java).apply {
                 this.action = FajrAlarmService.ACTION_START_ALARM
@@ -47,7 +53,13 @@ class FajrAlarmReceiver : BroadcastReceiver() {
                 } else {
                     context.startService(serviceIntent)
                 }
-            } catch (_: Exception) {
+            } catch (e: Exception) {
+                com.example.data.AppLogger.log(
+                    context,
+                    "اذان صبح",
+                    "محدودیت اجرای سرویس پس‌زمینه؛ پخش زنگ از طریق اعلان سیستم: ${e.message}",
+                    isSuccess = false
+                )
                 // Fallback to simple notification if background service start fails
                 showAlarmNotification(context, cityName, offsetMinutes)
             }

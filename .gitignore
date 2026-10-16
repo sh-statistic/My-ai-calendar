@@ -24,6 +24,8 @@ local.properties
 *.jks
 *.key
 *.keystore
+keystore.properties
+KEYSTORE_BASE64_FOR_GITHUB.txt
 !debug.keystore
 
 # Android Studio / IntelliJ IDEA

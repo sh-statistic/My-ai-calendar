@@ -246,6 +246,7 @@ document.addEventListener("DOMContentLoaded", async () => {
 
     noteInput.value = "";
     syncStatus.textContent = "یادداشت ذخیره شد (آفلاین)";
+    await loadData();
     setTimeout(() => {
       syncStatus.textContent = "آماده همگام‌سازی محلی";
     }, 2500);

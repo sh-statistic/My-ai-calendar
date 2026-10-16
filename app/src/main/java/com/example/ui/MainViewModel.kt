@@ -31,6 +31,8 @@ import com.example.prayer.PrayerTimes
 import com.example.prayer.PrayerTimesCalculator
 import com.example.update.AppUpdateManager
 import com.example.update.UpdateInfo
+import com.example.update.UpdateDownloadState
+import java.io.File
 import com.example.alarm.EventAlarmScheduler
 import com.example.settings.AppPreferences
 import java.util.Calendar
@@ -118,6 +120,9 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     private val _selectedGoogleCalName = MutableStateFlow(googleCalSyncManager.getSelectedCalendarName())
     val selectedGoogleCalName: StateFlow<String> = _selectedGoogleCalName.asStateFlow()
 
+    private val _selectedGoogleCalId = MutableStateFlow(googleCalSyncManager.getSelectedCalendarId())
+    val selectedGoogleCalId: StateFlow<Long> = _selectedGoogleCalId.asStateFlow()
+
     private val _isSyncing = MutableStateFlow(false)
     val isSyncing: StateFlow<Boolean> = _isSyncing.asStateFlow()
 
@@ -145,6 +150,9 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
 
     private val _updateStatusMessage = MutableStateFlow<String?>(null)
     val updateStatusMessage: StateFlow<String?> = _updateStatusMessage.asStateFlow()
+
+    private val _updateDownloadState = MutableStateFlow<UpdateDownloadState>(UpdateDownloadState.Idle)
+    val updateDownloadState: StateFlow<UpdateDownloadState> = _updateDownloadState.asStateFlow()
 
     private fun calculateCurrentPrayerTimes(): PrayerTimes {
         val date = _selectedDate?.value ?: PersianCalendarHelper.getCurrentJalaliDate()
@@ -605,6 +613,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         initServer()
         checkForAppUpdate(isManual = false)
         startPrayerCountdownTicker()
+        refreshGoogleCalendars()
     }
 
     private fun startPrayerCountdownTicker() {
@@ -624,7 +633,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         }
     }
 
-    private fun logMessage(msg: String) {
+    fun logMessage(msg: String, source: String = "سیستم") {
         val current = _activityLogList.value.toMutableList()
         val timestamp = PersianCalendarHelper.toPersianDigits(
             java.text.SimpleDateFormat("HH:mm:ss", java.util.Locale.getDefault()).format(java.util.Date())
@@ -632,6 +641,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         current.add(0, "[$timestamp] $msg")
         if (current.size > 50) current.removeAt(current.size - 1)
         _activityLogList.value = current
+        com.example.data.AppLogger.log(getApplication(), source, msg)
     }
 
     private fun initServer() {
@@ -677,11 +687,16 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     fun refreshGoogleCalendars() {
-        _googleCalendars.value = googleCalSyncManager.getAvailableCalendars()
+        val list = googleCalSyncManager.getAvailableCalendars()
+        _googleCalendars.value = list
+        googleCalSyncManager.ensureCalendarSelected()
+        _selectedGoogleCalId.value = googleCalSyncManager.getSelectedCalendarId()
+        _selectedGoogleCalName.value = googleCalSyncManager.getSelectedCalendarName()
     }
 
     fun selectGoogleCalendar(calId: Long, calName: String) {
         googleCalSyncManager.selectCalendar(calId, calName)
+        _selectedGoogleCalId.value = calId
         _selectedGoogleCalName.value = calName
         logMessage("تقویم «$calName» برای همگام‌سازی انتخاب شد")
     }
@@ -801,23 +816,97 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         persianDate: String,
         time: String,
         category: String,
-        colorHex: String
+        colorHex: String,
+        isWeeklyRecurring: Boolean = false
     ) {
-        val gDate = parsePersianToGregorian(persianDate)
-        val event = EventEntity(
-            title = title,
-            description = description,
-            persianDate = persianDate,
-            gregorianDate = gDate?.formatted ?: "",
-            startTime = time,
-            endTime = "",
-            category = category,
-            colorHex = colorHex
-        )
-        viewModelScope.launch {
-            repository.insertEvent(event)
-            EventAlarmScheduler.scheduleEventAlarm(getApplication(), event)
-            logMessage("رویداد جدید افزوده و زنگ یادآور تنظیم شد: $title")
+        val normalizedDate = PersianCalendarHelper.normalizePersianDate(persianDate)
+        val gDate = parsePersianToGregorian(normalizedDate)
+
+        if (!isWeeklyRecurring) {
+            val event = EventEntity(
+                title = title,
+                description = description,
+                persianDate = normalizedDate,
+                gregorianDate = gDate?.formatted ?: "",
+                startTime = time,
+                endTime = "",
+                category = category,
+                colorHex = colorHex,
+                recurrenceId = null,
+                recurrenceRule = "NONE"
+            )
+            viewModelScope.launch {
+                repository.insertEvent(event)
+                EventAlarmScheduler.scheduleEventAlarm(getApplication(), event)
+                logMessage("رویداد جدید افزوده و زنگ یادآور تنظیم شد: $title")
+            }
+        } else {
+            val recurrenceGroupId = java.util.UUID.randomUUID().toString()
+            val eventsList = mutableListOf<EventEntity>()
+
+            val parts = normalizedDate.split("/").mapNotNull { it.toIntOrNull() }
+            if (parts.size == 3) {
+                val jYear = parts[0]
+                val jMonth = parts[1]
+                val jDay = parts[2]
+                val initialGregorian = PersianCalendarHelper.jalaliToGregorian(jYear, jMonth, jDay)
+
+                for (week in 0 until 52) {
+                    val cal = java.util.Calendar.getInstance().apply {
+                        set(initialGregorian.year, initialGregorian.month - 1, initialGregorian.day)
+                        add(java.util.Calendar.DAY_OF_YEAR, week * 7)
+                    }
+                    val nextJalali = PersianCalendarHelper.gregorianToJalali(
+                        cal.get(java.util.Calendar.YEAR),
+                        cal.get(java.util.Calendar.MONTH) + 1,
+                        cal.get(java.util.Calendar.DAY_OF_MONTH)
+                    )
+                    val gDateFormatted = "%04d-%02d-%02d".format(
+                        cal.get(java.util.Calendar.YEAR),
+                        cal.get(java.util.Calendar.MONTH) + 1,
+                        cal.get(java.util.Calendar.DAY_OF_MONTH)
+                    )
+
+                    eventsList.add(
+                        EventEntity(
+                            id = java.util.UUID.randomUUID().toString(),
+                            title = title,
+                            description = description,
+                            persianDate = nextJalali.formatted,
+                            gregorianDate = gDateFormatted,
+                            startTime = time,
+                            endTime = "",
+                            category = category,
+                            colorHex = colorHex,
+                            recurrenceId = recurrenceGroupId,
+                            recurrenceRule = "WEEKLY"
+                        )
+                    )
+                }
+            } else {
+                eventsList.add(
+                    EventEntity(
+                        title = title,
+                        description = description,
+                        persianDate = normalizedDate,
+                        gregorianDate = gDate?.formatted ?: "",
+                        startTime = time,
+                        endTime = "",
+                        category = category,
+                        colorHex = colorHex,
+                        recurrenceId = recurrenceGroupId,
+                        recurrenceRule = "WEEKLY"
+                    )
+                )
+            }
+
+            viewModelScope.launch {
+                repository.insertEvents(eventsList)
+                eventsList.firstOrNull()?.let {
+                    EventAlarmScheduler.scheduleEventAlarm(getApplication(), it)
+                }
+                logMessage("رویداد تکرارشونده هفتگی برای ۵۲ هفته ثبت شد: $title")
+            }
         }
     }
 
@@ -833,6 +922,13 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             EventAlarmScheduler.cancelEventAlarm(getApplication(), id)
             repository.deleteEvent(id)
             logMessage("رویداد حذف شد")
+        }
+    }
+
+    fun deleteRecurringEventsFromDate(recurrenceId: String, fromPersianDate: String) {
+        viewModelScope.launch {
+            repository.deleteRecurringEventsFromDate(recurrenceId, fromPersianDate)
+            logMessage("رویدادهای تکرارشونده از تاریخ $fromPersianDate به بعد حذف شدند")
         }
     }
 
@@ -986,6 +1082,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
 
     fun dismissUpdateDialog() {
         _availableUpdate.value = null
+        _updateDownloadState.value = UpdateDownloadState.Idle
     }
 
     fun clearUpdateStatusMessage() {
@@ -994,15 +1091,61 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
 
     fun startUpdateWithSafetyBackup(context: android.content.Context, updateInfo: UpdateInfo) {
         viewModelScope.launch {
+            val existingApk = AppUpdateManager.getDownloadedApkIfReady(context, updateInfo.apkName)
+            if (existingApk != null) {
+                logMessage("فایل نصبی نسخه جدید قبلاً آماده شده است. اجرای نصاب...")
+                installDownloadedUpdate(context, existingApk)
+                return@launch
+            }
+
             exportBackupJson { json ->
                 val saved = AppUpdateManager.performSafetyBackup(context, json)
                 if (saved) {
                     logMessage("پشتیبان اضطراری پیش از به‌روزرسانی ذخیره شد ✓")
                 }
-                AppUpdateManager.startDownload(context, updateInfo.downloadUrl, updateInfo.apkName)
-                _availableUpdate.value = null
+                viewModelScope.launch {
+                    _updateDownloadState.value = UpdateDownloadState.Downloading(0f, 0L, 0L)
+                    val result = AppUpdateManager.downloadApkWithProgress(
+                        context = context,
+                        downloadUrl = updateInfo.downloadUrl,
+                        apkName = updateInfo.apkName,
+                        onProgress = { progress, downloaded, total ->
+                            _updateDownloadState.value = UpdateDownloadState.Downloading(progress, downloaded, total)
+                        }
+                    )
+
+                    result.onSuccess { apkFile ->
+                        logMessage("دانلود نسخه جدید با موفقیت تکمیل شد.")
+                        installDownloadedUpdate(context, apkFile)
+                    }.onFailure { error ->
+                        val errText = error.message ?: "خطا در برقراری ارتباط با سرور دانلود"
+                        logMessage("خطا در دانلود نسخه جدید: $errText")
+                        _updateDownloadState.value = UpdateDownloadState.Error(errText)
+                    }
+                }
             }
         }
+    }
+
+    fun installDownloadedUpdate(context: android.content.Context, apkFile: File) {
+        if (AppUpdateManager.canInstallPackages(context)) {
+            _updateDownloadState.value = UpdateDownloadState.ReadyToInstall(apkFile)
+            val success = AppUpdateManager.installApk(context, apkFile)
+            if (!success) {
+                _updateStatusMessage.value = "امکان باز کردن نصاب اندروید میسر نشد."
+            }
+        } else {
+            _updateDownloadState.value = UpdateDownloadState.PermissionRequired(apkFile)
+            AppUpdateManager.openInstallPermissionSettings(context)
+        }
+    }
+
+    fun requestInstallPermission(context: android.content.Context) {
+        AppUpdateManager.openInstallPermissionSettings(context)
+    }
+
+    fun cancelUpdateDownload() {
+        _updateDownloadState.value = UpdateDownloadState.Idle
     }
 
     override fun onCleared() {

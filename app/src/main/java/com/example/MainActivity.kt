@@ -440,15 +440,23 @@ class MainActivity : ComponentActivity() {
 
                     // In-App Update Dialog with Automatic Safety Backup
                     val availableUpdate by viewModel.availableUpdate.collectAsState()
+                    val updateDownloadState by viewModel.updateDownloadState.collectAsState()
                     val context = androidx.compose.ui.platform.LocalContext.current
                     val uriHandler = androidx.compose.ui.platform.LocalUriHandler.current
 
                     availableUpdate?.let { updateInfo ->
                         com.example.ui.components.UpdateDialog(
                             updateInfo = updateInfo,
+                            downloadState = updateDownloadState,
                             onDismiss = { viewModel.dismissUpdateDialog() },
                             onConfirmUpdate = {
                                 viewModel.startUpdateWithSafetyBackup(context, updateInfo)
+                            },
+                            onInstallApk = { apkFile ->
+                                viewModel.installDownloadedUpdate(context, apkFile)
+                            },
+                            onRequestPermission = {
+                                viewModel.requestInstallPermission(context)
                             },
                             onOpenBrowser = {
                                 viewModel.dismissUpdateDialog()

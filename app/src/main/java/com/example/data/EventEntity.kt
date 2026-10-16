@@ -17,5 +17,7 @@ data class EventEntity(
     val category: String = "کاری", // کاری, شخصی, مهم, جلسه, یادآوری
     val colorHex: String = "#F59E0B",
     val updatedAt: Long = System.currentTimeMillis(),
-    val isDeleted: Boolean = false
+    val isDeleted: Boolean = false,
+    val recurrenceId: String? = null,
+    val recurrenceRule: String = "NONE" // NONE, WEEKLY
 )

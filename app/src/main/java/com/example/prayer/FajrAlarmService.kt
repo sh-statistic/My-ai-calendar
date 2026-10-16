@@ -70,9 +70,22 @@ class FajrAlarmService : Service() {
             startContinuousVibration()
 
             val notification = buildAlarmNotification(cityName, offsetMinutes)
-            startForeground(NOTIFICATION_ID, notification)
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+                startForeground(
+                    NOTIFICATION_ID,
+                    notification,
+                    android.content.pm.ServiceInfo.FOREGROUND_SERVICE_TYPE_MEDIA_PLAYBACK
+                )
+            } else {
+                startForeground(NOTIFICATION_ID, notification)
+            }
 
             isRinging = true
+            com.example.data.AppLogger.log(
+                this,
+                "اذان صبح",
+                "پخش زنگ ممتد و لرزش بیدارباش اذان صبح آغاز شد ($cityName)"
+            )
 
             // Schedule safety auto-stop after 20 minutes to prevent battery drain
             handler.removeCallbacks(autoStopRunnable)
@@ -226,6 +239,9 @@ class FajrAlarmService : Service() {
 
     private fun stopAlarmAndSelf() {
         handler.removeCallbacks(autoStopRunnable)
+        if (isRinging) {
+            com.example.data.AppLogger.log(this, "اذان صبح", "زنگ بیدارباش اذان صبح متوقف شد")
+        }
         isRinging = false
 
         try {

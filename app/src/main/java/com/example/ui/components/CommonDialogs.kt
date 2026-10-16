@@ -25,8 +25,12 @@ import androidx.compose.material.icons.filled.CalendarMonth
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.ContentCopy
 import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.DeleteForever
+import androidx.compose.material.icons.filled.DeleteSweep
 import androidx.compose.material.icons.filled.Edit
+import androidx.compose.material.icons.filled.EventBusy
 import androidx.compose.material.icons.filled.NotificationsActive
+import androidx.compose.material.icons.filled.Repeat
 import androidx.compose.material.icons.filled.Schedule
 import androidx.compose.material.icons.filled.Star
 import androidx.compose.material3.AlertDialog
@@ -215,7 +219,8 @@ fun AddEventDialog(
         persianDate: String,
         time: String,
         category: String,
-        colorHex: String
+        colorHex: String,
+        isWeeklyRecurring: Boolean
     ) -> Unit
 ) {
     val strings = rememberAppStrings()
@@ -223,6 +228,7 @@ fun AddEventDialog(
     var description by remember { mutableStateOf("") }
     var persianDate by remember { mutableStateOf(initialDate.formatted) }
     var isAllDay by remember { mutableStateOf(false) }
+    var isWeeklyRecurring by remember { mutableStateOf(false) }
     var eventTime by remember { mutableStateOf("10:00") }
     var reminderOption by remember { mutableStateOf("همزمان با رویداد") }
     var category by remember { mutableStateOf("کاری") }
@@ -287,6 +293,50 @@ fun AddEventDialog(
                     Switch(
                         checked = isAllDay,
                         onCheckedChange = { isAllDay = it }
+                    )
+                }
+
+                // Weekly recurrence switch
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .background(
+                            if (isWeeklyRecurring) MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.45f)
+                            else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f),
+                            RoundedCornerShape(10.dp)
+                        )
+                        .padding(horizontal = 10.dp, vertical = 6.dp),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        modifier = Modifier.weight(1f)
+                    ) {
+                        Icon(
+                            Icons.Default.Repeat,
+                            contentDescription = null,
+                            tint = if (isWeeklyRecurring) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
+                            modifier = Modifier.size(18.dp)
+                        )
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Column {
+                            Text(
+                                text = if (strings.isFa) "تکرار هفتگی رویداد" else "Repeat weekly",
+                                fontSize = 12.sp,
+                                fontWeight = FontWeight.SemiBold,
+                                color = MaterialTheme.colorScheme.onSurface
+                            )
+                            Text(
+                                text = if (strings.isFa) "ثبت خودکار هر هفته در همین روز (۵۲ هفته)" else "Repeats on this day every week (52 weeks)",
+                                fontSize = 10.sp,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+                    }
+                    Switch(
+                        checked = isWeeklyRecurring,
+                        onCheckedChange = { isWeeklyRecurring = it }
                     )
                 }
 
@@ -368,7 +418,7 @@ fun AddEventDialog(
                         } else {
                             if (description.isNotBlank()) "${description.trim()}\n[یادآوری: $reminderOption]" else "[یادآوری: $reminderOption]"
                         }
-                        onConfirm(title.trim(), descWithReminder, persianDate.trim(), finalTime, category, selectedColor)
+                        onConfirm(title.trim(), descWithReminder, persianDate.trim(), finalTime, category, selectedColor, isWeeklyRecurring)
                     }
                 },
                 enabled = title.isNotBlank(),
@@ -553,6 +603,125 @@ fun EditEventDialog(
                 Text(strings.saveChanges)
             }
         },
+        dismissButton = {
+            TextButton(onClick = onDismiss) { Text(strings.cancel) }
+        }
+    )
+}
+
+/**
+ * Dialog to delete recurring events with 2 specific options:
+ * 1. This event only
+ * 2. This and all future recurring events from this date forward
+ */
+@Composable
+fun DeleteRecurringEventDialog(
+    onDismiss: () -> Unit,
+    onDeleteSingle: () -> Unit,
+    onDeleteFuture: () -> Unit
+) {
+    val strings = rememberAppStrings()
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Icon(
+                    Icons.Default.DeleteSweep,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.error,
+                    modifier = Modifier.size(24.dp)
+                )
+                Spacer(modifier = Modifier.width(8.dp))
+                Text(
+                    text = if (strings.isFa) "حذف رویداد تکرارشونده" else "Delete Recurring Event",
+                    fontWeight = FontWeight.Bold,
+                    fontSize = 16.sp
+                )
+            }
+        },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                Text(
+                    text = if (strings.isFa)
+                        "این رویداد به صورت هفتگی تکرار می‌شود. مایلید چگونه حذف شود؟"
+                    else
+                        "This event repeats weekly. How would you like to delete it?",
+                    fontSize = 13.sp,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+
+                // گزینه ۱: فقط همین رویداد
+                Surface(
+                    color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
+                    shape = RoundedCornerShape(10.dp),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clickable { onDeleteSingle() }
+                ) {
+                    Row(
+                        modifier = Modifier.padding(12.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Icon(
+                            Icons.Default.EventBusy,
+                            contentDescription = null,
+                            tint = MaterialTheme.colorScheme.primary,
+                            modifier = Modifier.size(22.dp)
+                        )
+                        Spacer(modifier = Modifier.width(10.dp))
+                        Column {
+                            Text(
+                                text = if (strings.isFa) "فقط همین رویداد" else "This event only",
+                                fontWeight = FontWeight.Bold,
+                                fontSize = 13.sp,
+                                color = MaterialTheme.colorScheme.onSurface
+                            )
+                            Text(
+                                text = if (strings.isFa) "رویدادهای سایر هفته‌ها دست‌نخورده باقی می‌مانند" else "Other recurring events will stay intact",
+                                fontSize = 10.sp,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+                    }
+                }
+
+                // گزینه ۲: این رویداد و تکرارهای بعدی
+                Surface(
+                    color = MaterialTheme.colorScheme.errorContainer.copy(alpha = 0.35f),
+                    shape = RoundedCornerShape(10.dp),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clickable { onDeleteFuture() }
+                ) {
+                    Row(
+                        modifier = Modifier.padding(12.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Icon(
+                            Icons.Default.DeleteForever,
+                            contentDescription = null,
+                            tint = MaterialTheme.colorScheme.error,
+                            modifier = Modifier.size(22.dp)
+                        )
+                        Spacer(modifier = Modifier.width(10.dp))
+                        Column {
+                            Text(
+                                text = if (strings.isFa) "این رویداد و تکرارهای بعدی" else "This and following events",
+                                fontWeight = FontWeight.Bold,
+                                fontSize = 13.sp,
+                                color = MaterialTheme.colorScheme.error
+                            )
+                            Text(
+                                text = if (strings.isFa) "از این تاریخ به بعد تمام تکرارهای هفتگی حذف می‌شوند" else "Deletes this and all future recurring events",
+                                fontSize = 10.sp,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+                    }
+                }
+            }
+        },
+        confirmButton = {},
         dismissButton = {
             TextButton(onClick = onDismiss) { Text(strings.cancel) }
         }

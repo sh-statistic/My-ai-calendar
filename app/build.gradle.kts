@@ -16,21 +16,30 @@ android {
     applicationId = "com.aistudio.localsync.pkwnvt"
     minSdk = 23
     targetSdk = 36
-    versionCode = 3
-    versionName = "0.6.0"
+    versionCode = 4
+    versionName = "0.7.0"
 
     testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
   }
 
   signingConfigs {
     create("release") {
-      val keystorePath = System.getenv("KEYSTORE_PATH") ?: "${rootDir}/my-upload-key.jks"
-      val keyFile = file(keystorePath)
+      val keystorePropsFile = file("${rootDir}/keystore.properties")
+      val keystoreProps = java.util.Properties()
+      if (keystorePropsFile.exists()) {
+        keystoreProps.load(keystorePropsFile.inputStream())
+      }
+
+      val envKeystorePath = System.getenv("KEYSTORE_PATH")
+      val propKeystorePath = keystoreProps.getProperty("storeFile")
+      val resolvedPath = envKeystorePath ?: propKeystorePath?.let { "${rootDir}/$it" } ?: "${rootDir}/my-upload-key.jks"
+      val keyFile = file(resolvedPath)
+
       if (keyFile.exists()) {
         storeFile = keyFile
-        storePassword = System.getenv("STORE_PASSWORD")
-        keyAlias = "upload"
-        keyPassword = System.getenv("KEY_PASSWORD")
+        storePassword = System.getenv("STORE_PASSWORD") ?: keystoreProps.getProperty("storePassword") ?: "HamgamReleaseKey2026!"
+        keyAlias = System.getenv("KEY_ALIAS") ?: keystoreProps.getProperty("keyAlias") ?: "upload"
+        keyPassword = System.getenv("KEY_PASSWORD") ?: keystoreProps.getProperty("keyPassword") ?: "HamgamReleaseKey2026!"
       } else {
         val debugKey = file("${rootDir}/debug.keystore")
         storeFile = if (debugKey.exists()) debugKey else null

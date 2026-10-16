@@ -112,14 +112,43 @@ object FajrAlarmManager {
         val pendingIntent = PendingIntent.getBroadcast(context, ALARM_REQUEST_CODE, intent, flags)
 
         try {
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
+                val showIntent = Intent(context, com.example.MainActivity::class.java).apply {
+                    setFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP)
+                }
+                val showPendingIntent = PendingIntent.getActivity(
+                    context,
+                    ALARM_REQUEST_CODE + 1,
+                    showIntent,
+                    flags
+                )
+                val alarmClockInfo = AlarmManager.AlarmClockInfo(triggerTimeMs, showPendingIntent)
+                alarmManager.setAlarmClock(alarmClockInfo, pendingIntent)
+            } else if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
                 alarmManager.setExactAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, triggerTimeMs, pendingIntent)
             } else {
                 alarmManager.setExact(AlarmManager.RTC_WAKEUP, triggerTimeMs, pendingIntent)
             }
             Log.d("FajrAlarmManager", "Fajr alarm scheduled for ${alarmCal.time}")
+            val timeFormat = java.text.SimpleDateFormat("yyyy/MM/dd HH:mm", java.util.Locale.getDefault()).format(alarmCal.time)
+            com.example.data.AppLogger.log(
+                context,
+                "اذان صبح",
+                "تنظیم زنگ بیدارباش برای ساعت ${com.example.calendar.PersianCalendarHelper.toPersianDigits(timeFormat)} به افق ${settings.cityName}"
+            )
         } catch (e: Exception) {
             Log.e("FajrAlarmManager", "Failed to schedule exact alarm: ${e.message}")
+            com.example.data.AppLogger.log(
+                context,
+                "اذان صبح",
+                "خطا در زمان‌بندی آلارم: ${e.message}",
+                isSuccess = false
+            )
+            try {
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+                    alarmManager.setExactAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, triggerTimeMs, pendingIntent)
+                }
+            } catch (_: Exception) {}
         }
     }
 
@@ -134,5 +163,11 @@ object FajrAlarmManager {
 
         val prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
         prefs.edit().putLong(KEY_NEXT_TIMESTAMP, 0L).apply()
+
+        com.example.data.AppLogger.log(
+            context,
+            "اذان صبح",
+            "زنگ بیدارباش اذان صبح غیرفعال شد"
+        )
     }
 }

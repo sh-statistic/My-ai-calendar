@@ -31,6 +31,7 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Alarm
 import androidx.compose.material.icons.filled.AutoAwesome
+import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.CloudOff
 import androidx.compose.material.icons.filled.CloudQueue
 import androidx.compose.material.icons.filled.ContentCopy
@@ -45,11 +46,15 @@ import androidx.compose.material.icons.filled.Upload
 import androidx.compose.material.icons.filled.Event
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Edit
+import androidx.compose.material.icons.filled.InstallMobile
 import androidx.compose.material.icons.filled.SystemUpdate
 import androidx.compose.material.icons.filled.Share
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Checkbox
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.LinearProgressIndicator
+import com.example.calendar.PersianCalendarHelper
+import com.example.update.UpdateDownloadState
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
@@ -127,6 +132,7 @@ fun SettingsScreen(
     val fajrSettings by viewModel.fajrAlarmSettings.collectAsState()
     val isCheckingUpdate by viewModel.isCheckingUpdate.collectAsState()
     val updateStatusMessage by viewModel.updateStatusMessage.collectAsState()
+    val updateDownloadState by viewModel.updateDownloadState.collectAsState()
 
     LaunchedEffect(updateStatusMessage) {
         updateStatusMessage?.let { msg ->
@@ -219,10 +225,17 @@ fun SettingsScreen(
                 // --- 1.2 Google Calendar ---
                 val googleCalendars by viewModel.googleCalendars.collectAsState()
                 val selectedGCalName by viewModel.selectedGoogleCalName.collectAsState()
+                val selectedGCalId by viewModel.selectedGoogleCalId.collectAsState()
                 val isSyncing by viewModel.isSyncing.collectAsState()
 
                 val hasCalendarPerms = ContextCompat.checkSelfPermission(context, Manifest.permission.READ_CALENDAR) == PackageManager.PERMISSION_GRANTED &&
                                      ContextCompat.checkSelfPermission(context, Manifest.permission.WRITE_CALENDAR) == PackageManager.PERMISSION_GRANTED
+
+                LaunchedEffect(hasCalendarPerms) {
+                    if (hasCalendarPerms) {
+                        viewModel.refreshGoogleCalendars()
+                    }
+                }
 
                 Row(
                     modifier = Modifier.fillMaxWidth(),
@@ -267,53 +280,88 @@ fun SettingsScreen(
 
                     // Calendar account picker
                     if (googleCalendars.isNotEmpty()) {
-                        Text(strings.selectCalendar, fontSize = 11.sp, fontWeight = FontWeight.SemiBold, modifier = Modifier.padding(bottom = 4.dp))
-                        Column(verticalArrangement = Arrangement.spacedBy(3.dp)) {
-                            googleCalendars.filter { it.isGoogle }.forEach { cal ->
-                                val isSelected = selectedGCalName == cal.displayName
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Text(strings.selectCalendar, fontSize = 11.sp, fontWeight = FontWeight.SemiBold, modifier = Modifier.padding(bottom = 4.dp))
+                            IconButton(
+                                onClick = { viewModel.refreshGoogleCalendars() },
+                                modifier = Modifier.size(24.dp)
+                            ) {
+                                Icon(
+                                    Icons.Default.Refresh,
+                                    contentDescription = null,
+                                    tint = MaterialTheme.colorScheme.primary,
+                                    modifier = Modifier.size(16.dp)
+                                )
+                            }
+                        }
+
+                        Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                            googleCalendars.forEach { cal ->
+                                val isSelected = selectedGCalId == cal.id || (selectedGCalId == -1L && selectedGCalName == cal.displayName)
                                 Surface(
                                     color = if (isSelected) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
                                     shape = RoundedCornerShape(8.dp),
+                                    border = if (isSelected) androidx.compose.foundation.BorderStroke(1.dp, MaterialTheme.colorScheme.primary) else null,
                                     modifier = Modifier
                                         .fillMaxWidth()
                                         .clickable { viewModel.selectGoogleCalendar(cal.id, cal.displayName) }
                                 ) {
                                     Row(
-                                        modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp),
+                                        modifier = Modifier.padding(horizontal = 10.dp, vertical = 7.dp),
                                         verticalAlignment = Alignment.CenterVertically
                                     ) {
                                         Box(
                                             modifier = Modifier
-                                                .size(8.dp)
+                                                .size(10.dp)
                                                 .clip(CircleShape)
                                                 .background(if (isSelected) MaterialTheme.colorScheme.primary else Color.Gray)
                                         )
-                                        Spacer(modifier = Modifier.width(8.dp))
-                                        Column {
-                                            Text(cal.displayName, fontSize = 12.sp, fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal)
-                                            Text(cal.accountName, fontSize = 10.sp, color = Color.Gray)
+                                        Spacer(modifier = Modifier.width(10.dp))
+                                        Column(modifier = Modifier.weight(1f)) {
+                                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                                Text(
+                                                    text = cal.displayName.ifBlank { cal.accountName },
+                                                    fontSize = 12.sp,
+                                                    fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal,
+                                                    color = if (isSelected) MaterialTheme.colorScheme.onPrimaryContainer else MaterialTheme.colorScheme.onSurface
+                                                )
+                                                if (cal.isGoogle) {
+                                                    Spacer(modifier = Modifier.width(6.dp))
+                                                    Surface(
+                                                        color = MaterialTheme.colorScheme.primary.copy(alpha = 0.12f),
+                                                        shape = RoundedCornerShape(4.dp)
+                                                    ) {
+                                                        Text(
+                                                            text = "Google",
+                                                            fontSize = 9.sp,
+                                                            fontWeight = FontWeight.SemiBold,
+                                                            color = MaterialTheme.colorScheme.primary,
+                                                            modifier = Modifier.padding(horizontal = 4.dp, vertical = 1.dp)
+                                                        )
+                                                    }
+                                                }
+                                            }
+                                            if (cal.accountName.isNotBlank() && cal.accountName != cal.displayName) {
+                                                Text(
+                                                    text = cal.accountName,
+                                                    fontSize = 10.sp,
+                                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                                )
+                                            }
+                                        }
+                                        if (isSelected) {
+                                            Icon(
+                                                Icons.Default.CheckCircle,
+                                                contentDescription = null,
+                                                tint = MaterialTheme.colorScheme.primary,
+                                                modifier = Modifier.size(18.dp)
+                                            )
                                         }
                                     }
-                                }
-                            }
-                        }
-
-                        // Show non-Google calendars if no Google ones found
-                        if (googleCalendars.none { it.isGoogle }) {
-                            googleCalendars.forEach { cal ->
-                                val isSelected = selectedGCalName == cal.displayName
-                                Surface(
-                                    color = if (isSelected) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
-                                    shape = RoundedCornerShape(8.dp),
-                                    modifier = Modifier
-                                        .fillMaxWidth()
-                                        .clickable { viewModel.selectGoogleCalendar(cal.id, cal.displayName) }
-                                ) {
-                                    Text(
-                                        "${cal.displayName} (${cal.accountName})",
-                                        fontSize = 12.sp,
-                                        modifier = Modifier.padding(8.dp)
-                                    )
                                 }
                             }
                         }
@@ -705,15 +753,63 @@ fun SettingsScreen(
 
                 Spacer(modifier = Modifier.height(8.dp))
 
-                if (logs.isEmpty() && dbLogs.isEmpty()) {
+                if (dbLogs.isEmpty() && logs.isEmpty()) {
                     Text(
                         text = strings.noSyncLogsYet,
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
+                } else if (dbLogs.isNotEmpty()) {
+                    Column(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .heightIn(max = 260.dp)
+                            .verticalScroll(rememberScrollState()),
+                        verticalArrangement = Arrangement.spacedBy(6.dp)
+                    ) {
+                        dbLogs.take(25).forEach { log ->
+                            Surface(
+                                color = if (log.isSuccess) MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f) else MaterialTheme.colorScheme.errorContainer.copy(alpha = 0.4f),
+                                shape = RoundedCornerShape(8.dp),
+                                modifier = Modifier.fillMaxWidth()
+                            ) {
+                                Row(
+                                    modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp),
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Surface(
+                                        color = if (log.isSuccess) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.error,
+                                        shape = RoundedCornerShape(4.dp)
+                                    ) {
+                                        Text(
+                                            text = log.source,
+                                            fontSize = 9.sp,
+                                            fontWeight = FontWeight.Bold,
+                                            color = if (log.isSuccess) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onError,
+                                            modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
+                                        )
+                                    }
+                                    Spacer(modifier = Modifier.width(8.dp))
+                                    Column(modifier = Modifier.weight(1f)) {
+                                        Text(
+                                            text = log.details,
+                                            fontSize = 11.sp,
+                                            color = MaterialTheme.colorScheme.onSurface,
+                                            lineHeight = 16.sp
+                                        )
+                                        Text(
+                                            text = formatLogTime(log.timestamp),
+                                            fontSize = 9.sp,
+                                            color = MaterialTheme.colorScheme.outline
+                                        )
+                                    }
+                                }
+                            }
+                        }
+                    }
                 } else {
                     Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                        logs.take(5).forEach { log ->
+                        logs.take(10).forEach { log ->
                             Surface(
                                 color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
                                 shape = RoundedCornerShape(6.dp),
@@ -807,7 +903,7 @@ fun SettingsScreen(
 
                     OutlinedButton(
                         onClick = { viewModel.checkForAppUpdate(isManual = true) },
-                        enabled = !isCheckingUpdate
+                        enabled = !isCheckingUpdate && updateDownloadState !is UpdateDownloadState.Downloading
                     ) {
                         if (isCheckingUpdate) {
                             CircularProgressIndicator(modifier = Modifier.size(14.dp), strokeWidth = 2.dp)
@@ -818,6 +914,58 @@ fun SettingsScreen(
                             Spacer(modifier = Modifier.width(4.dp))
                             Text(strings.checkNewVersion, fontSize = 10.sp)
                         }
+                    }
+                }
+
+                // نوار وضعیت دانلود یا دکمه نصب نسخه آماده‌شده
+                if (updateDownloadState is UpdateDownloadState.Downloading) {
+                    val progress = (updateDownloadState as UpdateDownloadState.Downloading).progress
+                    Column(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clip(RoundedCornerShape(10.dp))
+                            .background(MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.35f))
+                            .padding(10.dp),
+                        verticalArrangement = Arrangement.spacedBy(6.dp)
+                    ) {
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Text("در حال دریافت نسخه جدید...", fontSize = 11.sp, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
+                            if (progress >= 0f) {
+                                Text(PersianCalendarHelper.toPersianDigits("${(progress * 100).toInt()}%"), fontSize = 11.sp, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
+                            }
+                        }
+                        if (progress >= 0f) {
+                            LinearProgressIndicator(
+                                progress = { progress },
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .height(6.dp),
+                                color = MaterialTheme.colorScheme.primary
+                            )
+                        } else {
+                            LinearProgressIndicator(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .height(6.dp),
+                                color = MaterialTheme.colorScheme.primary
+                            )
+                        }
+                    }
+                } else if (updateDownloadState is UpdateDownloadState.ReadyToInstall) {
+                    val apk = (updateDownloadState as UpdateDownloadState.ReadyToInstall).apkFile
+                    Button(
+                        onClick = { viewModel.installDownloadedUpdate(context, apk) },
+                        colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF10B981)),
+                        shape = RoundedCornerShape(10.dp),
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Icon(Icons.Default.InstallMobile, contentDescription = null, modifier = Modifier.size(16.dp))
+                        Spacer(modifier = Modifier.width(6.dp))
+                        Text("نصب نسخه جدید آماده شده", fontSize = 11.sp, fontWeight = FontWeight.Bold)
                     }
                 }
 
@@ -938,3 +1086,10 @@ fun SettingsScreen(
         )
     }
 }
+
+private fun formatLogTime(timestamp: Long): String {
+    val date = java.util.Date(timestamp)
+    val sdf = java.text.SimpleDateFormat("yyyy/MM/dd HH:mm:ss", java.util.Locale.getDefault())
+    return PersianCalendarHelper.toPersianDigits(sdf.format(date))
+}
+

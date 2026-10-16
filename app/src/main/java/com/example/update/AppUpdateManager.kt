@@ -8,6 +8,7 @@ import android.content.IntentFilter
 import android.net.Uri
 import android.os.Build
 import android.os.Environment
+import android.provider.Settings
 import android.util.Log
 import androidx.core.content.FileProvider
 import com.example.BuildConfig
@@ -16,6 +17,8 @@ import kotlinx.coroutines.withContext
 import org.json.JSONObject
 import java.io.BufferedReader
 import java.io.File
+import java.io.FileOutputStream
+import java.io.InputStream
 import java.io.InputStreamReader
 import java.net.HttpURLConnection
 import java.net.URL
@@ -204,41 +207,208 @@ object AppUpdateManager {
     }
 
     /**
-     * Initiates the download of the APK file using Android's DownloadManager.
+     * Checks if the app is allowed to install unknown apps (Android 8.0+ / API 26+)
+     */
+    fun canInstallPackages(context: Context): Boolean {
+        return if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            context.packageManager.canRequestPackageInstalls()
+        } else {
+            true
+        }
+    }
+
+    /**
+     * Opens the system settings to allow this app to install unknown apps
+     */
+    fun openInstallPermissionSettings(context: Context) {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            try {
+                val intent = Intent(Settings.ACTION_MANAGE_UNKNOWN_APP_SOURCES).apply {
+                    data = Uri.parse("package:${context.packageName}")
+                    addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                }
+                context.startActivity(intent)
+            } catch (e: Exception) {
+                Log.e(TAG, "Error opening install settings: ${e.message}", e)
+                val fallbackIntent = Intent(Settings.ACTION_SECURITY_SETTINGS).apply {
+                    addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                }
+                try { context.startActivity(fallbackIntent) } catch (_: Exception) {}
+            }
+        }
+    }
+
+    /**
+     * Target file location for the downloaded update APK in app's private external/internal storage
+     */
+    fun getUpdateApkFile(context: Context, apkName: String): File {
+        val dir = context.getExternalFilesDir(Environment.DIRECTORY_DOWNLOADS)
+            ?: File(context.filesDir, "updates")
+        if (!dir.exists()) dir.mkdirs()
+        return File(dir, apkName)
+    }
+
+    /**
+     * Checks if an APK file has already been downloaded and is valid (> 500 KB)
+     */
+    fun getDownloadedApkIfReady(context: Context, apkName: String): File? {
+        val file = getUpdateApkFile(context, apkName)
+        return if (file.exists() && file.length() > 500_000) file else null
+    }
+
+    /**
+     * Downloads the APK directly with live progress tracking and automatic GitHub 30x redirect following.
+     */
+    suspend fun downloadApkWithProgress(
+        context: Context,
+        downloadUrl: String,
+        apkName: String,
+        onProgress: (progress: Float, downloadedBytes: Long, totalBytes: Long) -> Unit
+    ): Result<File> = withContext(Dispatchers.IO) {
+        var connection: HttpURLConnection? = null
+        var inputStream: InputStream? = null
+        var outputStream: FileOutputStream? = null
+        try {
+            val targetFile = getUpdateApkFile(context, apkName)
+            val tempFile = File(targetFile.parentFile, "$apkName.tmp")
+            if (tempFile.exists()) tempFile.delete()
+
+            var currentUrl = downloadUrl
+            var redirects = 0
+            val maxRedirects = 7
+
+            // Follow HTTP/HTTPS redirects (GitHub Releases redirect to AWS S3 CDN)
+            while (redirects < maxRedirects) {
+                val url = URL(currentUrl)
+                connection = (url.openConnection() as HttpURLConnection).apply {
+                    instanceFollowRedirects = true
+                    connectTimeout = 15000
+                    readTimeout = 30000
+                    setRequestProperty("User-Agent", "My-AI-Calendar-Android-App")
+                    setRequestProperty("Accept", "application/octet-stream, application/vnd.android.package-archive, */*")
+                }
+
+                val status = connection.responseCode
+                if (status in 300..399) {
+                    val newUrl = connection.getHeaderField("Location")
+                    connection.disconnect()
+                    if (newUrl.isNullOrBlank()) {
+                        return@withContext Result.failure(Exception("آدرس تغییر مسیر (Redirect) دریافت نشد"))
+                    }
+                    currentUrl = newUrl
+                    redirects++
+                } else if (status == HttpURLConnection.HTTP_OK) {
+                    break
+                } else {
+                    return@withContext Result.failure(Exception("خطای سرور دانلود: کد $status"))
+                }
+            }
+
+            val totalBytes = connection!!.contentLengthLong
+            inputStream = connection.inputStream
+            outputStream = FileOutputStream(tempFile)
+
+            val buffer = ByteArray(8 * 1024)
+            var downloadedBytes = 0L
+            var lastProgressUpdateTime = 0L
+
+            var bytesRead: Int
+            while (inputStream.read(buffer).also { bytesRead = it } != -1) {
+                outputStream.write(buffer, 0, bytesRead)
+                downloadedBytes += bytesRead
+
+                val now = System.currentTimeMillis()
+                if (now - lastProgressUpdateTime > 80 || downloadedBytes == totalBytes) {
+                    lastProgressUpdateTime = now
+                    val progress = if (totalBytes > 0) {
+                        (downloadedBytes.toFloat() / totalBytes.toFloat()).coerceIn(0f, 1f)
+                    } else {
+                        -1f
+                    }
+                    withContext(Dispatchers.Main) {
+                        onProgress(progress, downloadedBytes, totalBytes)
+                    }
+                }
+            }
+
+            outputStream.flush()
+            outputStream.close()
+            inputStream.close()
+            connection.disconnect()
+
+            if (tempFile.length() < 100_000) {
+                tempFile.delete()
+                return@withContext Result.failure(Exception("فایل دانلود شده ناقص است"))
+            }
+
+            // Move temp file to final target APK
+            if (targetFile.exists()) targetFile.delete()
+            if (!tempFile.renameTo(targetFile)) {
+                tempFile.copyTo(targetFile, overwrite = true)
+                tempFile.delete()
+            }
+
+            withContext(Dispatchers.Main) {
+                onProgress(1f, targetFile.length(), targetFile.length())
+            }
+
+            Result.success(targetFile)
+        } catch (e: Exception) {
+            Log.e(TAG, "Download failed: ${e.message}", e)
+            Result.failure(e)
+        } finally {
+            try { inputStream?.close() } catch (_: Exception) {}
+            try { outputStream?.close() } catch (_: Exception) {}
+            connection?.disconnect()
+        }
+    }
+
+    /**
+     * Opens the installer prompt for the downloaded APK using FileProvider.
+     * Returns true if installer intent was successfully dispatched.
+     */
+    fun installApk(context: Context, apkFile: File): Boolean {
+        if (!apkFile.exists() || apkFile.length() == 0L) {
+            Log.e(TAG, "APK file does not exist or empty: ${apkFile.absolutePath}")
+            return false
+        }
+
+        return try {
+            val uri: Uri = FileProvider.getUriForFile(
+                context,
+                "${context.packageName}.fileprovider",
+                apkFile
+            )
+
+            val intent = Intent(Intent.ACTION_VIEW).apply {
+                setDataAndType(uri, "application/vnd.android.package-archive")
+                addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+            }
+            context.startActivity(intent)
+            true
+        } catch (e: Exception) {
+            Log.e(TAG, "Failed to launch installer intent: ${e.message}", e)
+            false
+        }
+    }
+
+    /**
+     * Initiates the download of the APK file using Android's DownloadManager (Alternative/Legacy).
      */
     fun startDownload(context: Context, downloadUrl: String, apkName: String): Long {
+        val targetFile = getUpdateApkFile(context, apkName)
+        if (targetFile.exists()) targetFile.delete()
+
         val request = DownloadManager.Request(Uri.parse(downloadUrl)).apply {
             setTitle("دانلود به‌روزرسانی تقویم")
             setDescription("در حال دانلود نسخه جدید برنامه...")
             setNotificationVisibility(DownloadManager.Request.VISIBILITY_VISIBLE_NOTIFY_COMPLETED)
-            setDestinationInExternalPublicDir(Environment.DIRECTORY_DOWNLOADS, apkName)
+            setDestinationInExternalFilesDir(context, Environment.DIRECTORY_DOWNLOADS, apkName)
             setMimeType("application/vnd.android.package-archive")
         }
 
         val downloadManager = context.getSystemService(Context.DOWNLOAD_SERVICE) as DownloadManager
         return downloadManager.enqueue(request)
-    }
-
-    /**
-     * Opens the installer prompt for the downloaded APK using FileProvider.
-     */
-    fun installApk(context: Context, apkFile: File) {
-        if (!apkFile.exists()) {
-            Log.e(TAG, "APK file does not exist: ${apkFile.absolutePath}")
-            return
-        }
-
-        val uri: Uri = FileProvider.getUriForFile(
-            context,
-            "${context.packageName}.fileprovider",
-            apkFile
-        )
-
-        val intent = Intent(Intent.ACTION_VIEW).apply {
-            setDataAndType(uri, "application/vnd.android.package-archive")
-            addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
-            addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-        }
-        context.startActivity(intent)
     }
 }

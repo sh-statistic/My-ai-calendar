@@ -27,6 +27,8 @@ data class SyncData(
             obj.put("endTime", e.endTime)
             obj.put("category", e.category)
             obj.put("colorHex", e.colorHex)
+            obj.put("recurrenceId", e.recurrenceId ?: JSONObject.NULL)
+            obj.put("recurrenceRule", e.recurrenceRule)
             obj.put("updatedAt", e.updatedAt)
             obj.put("isDeleted", e.isDeleted)
             eventsArray.put(obj)
@@ -89,6 +91,8 @@ data class SyncData(
                             endTime = obj.optString("endTime", ""),
                             category = obj.optString("category", "کاری"),
                             colorHex = obj.optString("colorHex", "#F59E0B"),
+                            recurrenceId = if (obj.isNull("recurrenceId")) null else obj.optString("recurrenceId").takeIf { it.isNotBlank() },
+                            recurrenceRule = obj.optString("recurrenceRule", "NONE"),
                             updatedAt = obj.optLong("updatedAt", System.currentTimeMillis()),
                             isDeleted = obj.optBoolean("isDeleted", false)
                         )

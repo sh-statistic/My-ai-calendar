@@ -33,6 +33,9 @@ interface EventDao {
     @Query("UPDATE events SET isDeleted = 1, updatedAt = :updatedAt WHERE id = :id")
     suspend fun softDeleteEvent(id: String, updatedAt: Long = System.currentTimeMillis())
 
+    @Query("UPDATE events SET isDeleted = 1, updatedAt = :updatedAt WHERE recurrenceId = :recurrenceId AND persianDate >= :fromPersianDate")
+    suspend fun softDeleteRecurringEventsFromDate(recurrenceId: String, fromPersianDate: String, updatedAt: Long = System.currentTimeMillis())
+
     @Query("DELETE FROM events WHERE id = :id")
     suspend fun hardDeleteEvent(id: String)
 }
@@ -96,7 +99,7 @@ interface NoteDao {
 
 @Dao
 interface SyncLogDao {
-    @Query("SELECT * FROM sync_logs ORDER BY timestamp DESC LIMIT 50")
+    @Query("SELECT * FROM sync_logs ORDER BY timestamp DESC LIMIT 100")
     fun getRecentLogs(): Flow<List<SyncLogEntity>>
 
     @Insert

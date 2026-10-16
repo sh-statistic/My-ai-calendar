@@ -24,12 +24,21 @@ class AppRepository(private val database: AppDatabase) {
         eventDao.insertEvent(event.copy(updatedAt = System.currentTimeMillis()))
     }
 
+    suspend fun insertEvents(events: List<EventEntity>) = withContext(Dispatchers.IO) {
+        val timestamp = System.currentTimeMillis()
+        eventDao.insertEvents(events.map { it.copy(updatedAt = timestamp) })
+    }
+
     suspend fun updateEvent(event: EventEntity) = withContext(Dispatchers.IO) {
         eventDao.updateEvent(event.copy(updatedAt = System.currentTimeMillis()))
     }
 
     suspend fun deleteEvent(id: String) = withContext(Dispatchers.IO) {
         eventDao.softDeleteEvent(id, System.currentTimeMillis())
+    }
+
+    suspend fun deleteRecurringEventsFromDate(recurrenceId: String, fromPersianDate: String) = withContext(Dispatchers.IO) {
+        eventDao.softDeleteRecurringEventsFromDate(recurrenceId, fromPersianDate, System.currentTimeMillis())
     }
 
     // Tasks
