@@ -44,9 +44,9 @@ jobs:
       - name: Build Release APK
         env:
           KEYSTORE_PATH: my-upload-key.jks
-          STORE_PASSWORD: ${{ secrets.STORE_PASSWORD || 'HamgamReleaseKey2026!' }}
-          KEY_ALIAS: ${{ secrets.KEY_ALIAS || 'upload' }}
-          KEY_PASSWORD: ${{ secrets.KEY_PASSWORD || 'HamgamReleaseKey2026!' }}
+          STORE_PASSWORD: ${{ secrets.STORE_PASSWORD }}
+          KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
+          KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
         run: ./gradlew assembleRelease --stacktrace
 
       - name: Upload APK Artifact

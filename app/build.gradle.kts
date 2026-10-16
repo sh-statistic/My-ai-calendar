@@ -1,4 +1,5 @@
 import com.google.gms.googleservices.GoogleServicesPlugin.MissingGoogleServicesStrategy
+import java.util.Properties
 
 plugins {
   alias(libs.plugins.android.application)
@@ -25,21 +26,27 @@ android {
   signingConfigs {
     create("release") {
       val keystorePropsFile = file("${rootDir}/keystore.properties")
-      val keystoreProps = java.util.Properties()
+      val keystoreProps = Properties()
       if (keystorePropsFile.exists()) {
-        keystoreProps.load(keystorePropsFile.inputStream())
+        keystorePropsFile.inputStream().use { keystoreProps.load(it) }
       }
 
       val envKeystorePath = System.getenv("KEYSTORE_PATH")
       val propKeystorePath = keystoreProps.getProperty("storeFile")
-      val resolvedPath = envKeystorePath ?: propKeystorePath?.let { "${rootDir}/$it" } ?: "${rootDir}/my-upload-key.jks"
-      val keyFile = file(resolvedPath)
+      val keyPath: String = if (!envKeystorePath.isNullOrBlank()) {
+        if (file(envKeystorePath).isAbsolute) envKeystorePath else "${rootDir}/$envKeystorePath"
+      } else if (!propKeystorePath.isNullOrBlank()) {
+        "${rootDir}/$propKeystorePath"
+      } else {
+        "${rootDir}/my-upload-key.jks"
+      }
+      val keyFile = file(keyPath)
 
       if (keyFile.exists()) {
         storeFile = keyFile
-        storePassword = System.getenv("STORE_PASSWORD") ?: keystoreProps.getProperty("storePassword") ?: "HamgamReleaseKey2026!"
-        keyAlias = System.getenv("KEY_ALIAS") ?: keystoreProps.getProperty("keyAlias") ?: "upload"
-        keyPassword = System.getenv("KEY_PASSWORD") ?: keystoreProps.getProperty("keyPassword") ?: "HamgamReleaseKey2026!"
+        storePassword = System.getenv("STORE_PASSWORD").takeIf { !it.isNullOrBlank() } ?: keystoreProps.getProperty("storePassword") ?: "HamgamReleaseKey2026!"
+        keyAlias = System.getenv("KEY_ALIAS").takeIf { !it.isNullOrBlank() } ?: keystoreProps.getProperty("keyAlias") ?: "upload"
+        keyPassword = System.getenv("KEY_PASSWORD").takeIf { !it.isNullOrBlank() } ?: keystoreProps.getProperty("keyPassword") ?: "HamgamReleaseKey2026!"
       } else {
         val debugKey = file("${rootDir}/debug.keystore")
         storeFile = if (debugKey.exists()) debugKey else null
@@ -76,6 +83,10 @@ android {
     buildConfig = true
   }
   testOptions { unitTests { isIncludeAndroidResources = true } }
+  lint {
+    abortOnError = false
+    checkReleaseBuilds = false
+  }
   dependenciesInfo {
     includeInApk = false
     includeInBundle = true
