@@ -44,6 +44,14 @@
             </intent-filter>
         </activity>
 
+        <activity
+            android:name=".prayer.FajrAlarmActivity"
+            android:exported="false"
+            android:showWhenLocked="true"
+            android:turnScreenOn="true"
+            android:excludeFromRecents="true"
+            android:theme="@style/Theme.MyApplication" />
+
         <receiver
             android:name=".prayer.FajrAlarmReceiver"
             android:enabled="true"

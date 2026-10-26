@@ -37,8 +37,6 @@ import androidx.compose.material.icons.filled.HourglassBottom
 import androidx.compose.material.icons.filled.NoteAlt
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.Sync
-import androidx.compose.material3.Badge
-import androidx.compose.material3.BadgedBox
 import androidx.compose.material3.CenterAlignedTopAppBar
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
@@ -141,7 +139,6 @@ class MainActivity : ComponentActivity() {
                         }
 
                         var selectedTab by remember { mutableIntStateOf(0) }
-                        val isServerRunning by viewModel.isServerRunning.collectAsState()
                         val todayJalali = remember { PersianCalendarHelper.getCurrentJalaliDate() }
                         val selectedDate by viewModel.selectedDate.collectAsState()
                         val viewYear by viewModel.currentViewYear.collectAsState()
@@ -404,15 +401,7 @@ class MainActivity : ComponentActivity() {
                                         selected = selectedTab == 4,
                                         onClick = { selectedTab = 4 },
                                         icon = {
-                                            BadgedBox(
-                                                badge = {
-                                                    if (isServerRunning) {
-                                                        Badge(containerColor = Color(0xFF10B981))
-                                                    }
-                                                }
-                                            ) {
-                                                Icon(Icons.Default.Settings, contentDescription = strings.navSettings, modifier = Modifier.size(20.dp))
-                                            }
+                                            Icon(Icons.Default.Settings, contentDescription = strings.navSettings, modifier = Modifier.size(20.dp))
                                         },
                                         label = { Text(strings.navSettings, fontSize = 10.sp, maxLines = 1) },
                                         alwaysShowLabel = false,

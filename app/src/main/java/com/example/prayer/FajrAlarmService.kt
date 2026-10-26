@@ -9,6 +9,7 @@ import android.content.Intent
 import android.media.AudioAttributes
 import android.media.AudioManager
 import android.media.MediaPlayer
+import android.media.Ringtone
 import android.media.RingtoneManager
 import android.net.Uri
 import android.os.Build
@@ -20,7 +21,7 @@ import android.os.VibrationEffect
 import android.os.Vibrator
 import android.os.VibratorManager
 import androidx.core.app.NotificationCompat
-import com.example.MainActivity
+import com.example.data.AppLogger
 
 class FajrAlarmService : Service() {
 
@@ -39,11 +40,14 @@ class FajrAlarmService : Service() {
             val intent = Intent(context, FajrAlarmService::class.java).apply {
                 action = ACTION_STOP_ALARM
             }
-            context.startService(intent)
+            try {
+                context.startService(intent)
+            } catch (_: Exception) {}
         }
     }
 
     private var mediaPlayer: MediaPlayer? = null
+    private var fallbackRingtone: Ringtone? = null
     private var vibrator: Vibrator? = null
     private var wakeLock: PowerManager.WakeLock? = null
     private val handler = Handler(Looper.getMainLooper())
@@ -63,9 +67,10 @@ class FajrAlarmService : Service() {
 
         if (action == ACTION_START_ALARM) {
             val cityName = intent.getStringExtra("cityName") ?: "شهر شما"
-            val offsetMinutes = intent.getIntExtra("offsetMinutes", 5)
+            val offsetMinutes = intent.getIntExtra("offsetMinutes", 0)
 
             acquireWakeLock()
+            ensureAlarmVolumeIsAdequate()
             startContinuousRingtone()
             startContinuousVibration()
 
@@ -81,13 +86,13 @@ class FajrAlarmService : Service() {
             }
 
             isRinging = true
-            com.example.data.AppLogger.log(
+            AppLogger.log(
                 this,
                 "اذان صبح",
-                "پخش زنگ ممتد و لرزش بیدارباش اذان صبح آغاز شد ($cityName)"
+                "پخش زنگ ممتد و لرزش بیدارباش اذان صبح با کانال آلارم آغاز شد ($cityName)"
             )
 
-            // Schedule safety auto-stop after 20 minutes to prevent battery drain
+            // Auto-stop safety timeout
             handler.removeCallbacks(autoStopRunnable)
             handler.postDelayed(autoStopRunnable, AUTO_STOP_DELAY_MS)
         }
@@ -98,8 +103,11 @@ class FajrAlarmService : Service() {
     private fun acquireWakeLock() {
         if (wakeLock == null) {
             val powerManager = getSystemService(Context.POWER_SERVICE) as? PowerManager
+            @Suppress("DEPRECATION")
             wakeLock = powerManager?.newWakeLock(
-                PowerManager.PARTIAL_WAKE_LOCK or PowerManager.ACQUIRE_CAUSES_WAKEUP,
+                PowerManager.SCREEN_BRIGHT_WAKE_LOCK or
+                        PowerManager.ACQUIRE_CAUSES_WAKEUP or
+                        PowerManager.ON_AFTER_RELEASE,
                 "Hamgam:FajrAlarmServiceWakeLock"
             )?.apply {
                 acquire(AUTO_STOP_DELAY_MS)
@@ -107,44 +115,91 @@ class FajrAlarmService : Service() {
         }
     }
 
-    private fun startContinuousRingtone() {
-        if (mediaPlayer != null) return
-
+    private fun ensureAlarmVolumeIsAdequate() {
         try {
-            val alarmUri: Uri = RingtoneManager.getDefaultUri(RingtoneManager.TYPE_ALARM)
-                ?: RingtoneManager.getDefaultUri(RingtoneManager.TYPE_RINGTONE)
-                ?: RingtoneManager.getDefaultUri(RingtoneManager.TYPE_NOTIFICATION)
-
-            val audioAttributes = AudioAttributes.Builder()
-                .setContentType(AudioAttributes.CONTENT_TYPE_MUSIC)
-                .setUsage(AudioAttributes.USAGE_ALARM)
-                .build()
-
-            mediaPlayer = MediaPlayer().apply {
-                setDataSource(applicationContext, alarmUri)
-                setAudioAttributes(audioAttributes)
-                isLooping = true // پشت سر هم و بدون وقفه پخش می‌شود
-                setVolume(1.0f, 1.0f)
-                prepare()
-                start()
+            val audioManager = getSystemService(Context.AUDIO_SERVICE) as? AudioManager ?: return
+            val maxVol = audioManager.getStreamMaxVolume(AudioManager.STREAM_ALARM)
+            val currentVol = audioManager.getStreamVolume(AudioManager.STREAM_ALARM)
+            // Ensure alarm stream volume is at least 70% of max volume so it is audible
+            val minTargetVol = ((maxVol * 0.7f).toInt()).coerceAtLeast(1)
+            if (currentVol < minTargetVol) {
+                audioManager.setStreamVolume(AudioManager.STREAM_ALARM, minTargetVol, 0)
             }
-        } catch (_: Exception) {
-            // Fallback: try default ringtone if alarm sound fails
+        } catch (_: Exception) {}
+    }
+
+    private fun startContinuousRingtone() {
+        if (mediaPlayer != null || fallbackRingtone != null) return
+
+        val audioAttributes = AudioAttributes.Builder()
+            .setContentType(AudioAttributes.CONTENT_TYPE_SONIFICATION)
+            .setUsage(AudioAttributes.USAGE_ALARM)
+            .setFlags(AudioAttributes.FLAG_AUDIBILITY_ENFORCED)
+            .build()
+
+        val alarmUri: Uri? = RingtoneManager.getDefaultUri(RingtoneManager.TYPE_ALARM)
+            ?: RingtoneManager.getDefaultUri(RingtoneManager.TYPE_RINGTONE)
+            ?: RingtoneManager.getDefaultUri(RingtoneManager.TYPE_NOTIFICATION)
+
+        var playerInitialized = false
+
+        if (alarmUri != null) {
             try {
-                val ringtoneUri = RingtoneManager.getDefaultUri(RingtoneManager.TYPE_RINGTONE)
                 mediaPlayer = MediaPlayer().apply {
-                    setDataSource(applicationContext, ringtoneUri)
-                    setAudioAttributes(
-                        AudioAttributes.Builder()
-                            .setContentType(AudioAttributes.CONTENT_TYPE_SONIFICATION)
-                            .setUsage(AudioAttributes.USAGE_ALARM)
-                            .build()
-                    )
+                    @Suppress("DEPRECATION")
+                    setAudioStreamType(AudioManager.STREAM_ALARM)
+                    setAudioAttributes(audioAttributes)
+                    setDataSource(applicationContext, alarmUri)
                     isLooping = true
+                    setVolume(1.0f, 1.0f)
                     prepare()
                     start()
                 }
-            } catch (_: Exception) {}
+                playerInitialized = true
+            } catch (e: Exception) {
+                AppLogger.log(this, "اذان صبح", "خطا در بارگذاری مدیاپلیر با آدرس آلارم: ${e.message}", isSuccess = false)
+            }
+        }
+
+        // Secondary fallback: Try default ringtone with MediaPlayer
+        if (!playerInitialized) {
+            try {
+                val ringtoneUri = RingtoneManager.getDefaultUri(RingtoneManager.TYPE_RINGTONE)
+                if (ringtoneUri != null) {
+                    mediaPlayer = MediaPlayer().apply {
+                        @Suppress("DEPRECATION")
+                        setAudioStreamType(AudioManager.STREAM_ALARM)
+                        setAudioAttributes(audioAttributes)
+                        setDataSource(applicationContext, ringtoneUri)
+                        isLooping = true
+                        setVolume(1.0f, 1.0f)
+                        prepare()
+                        start()
+                    }
+                    playerInitialized = true
+                }
+            } catch (e: Exception) {
+                AppLogger.log(this, "اذان صبح", "خطا در فال‌بک مدیاپلیر: ${e.message}", isSuccess = false)
+            }
+        }
+
+        // Tertiary fallback: Use RingtoneManager direct playback on STREAM_ALARM
+        if (!playerInitialized) {
+            try {
+                val targetUri = alarmUri ?: RingtoneManager.getDefaultUri(RingtoneManager.TYPE_RINGTONE)
+                if (targetUri != null) {
+                    fallbackRingtone = RingtoneManager.getRingtone(applicationContext, targetUri)?.apply {
+                        @Suppress("DEPRECATION")
+                        streamType = AudioManager.STREAM_ALARM
+                        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
+                            this.audioAttributes = audioAttributes
+                        }
+                        play()
+                    }
+                }
+            } catch (e: Exception) {
+                AppLogger.log(this, "اذان صبح", "خطا در اجرای فال‌بک رینگتون: ${e.message}", isSuccess = false)
+            }
         }
     }
 
@@ -159,10 +214,17 @@ class FajrAlarmService : Service() {
             }
 
             val pattern = longArrayOf(0, 1000, 500, 1000, 500, 1500)
+            val audioAttributes = AudioAttributes.Builder()
+                .setContentType(AudioAttributes.CONTENT_TYPE_SONIFICATION)
+                .setUsage(AudioAttributes.USAGE_ALARM)
+                .build()
+
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-                // repeat at index 0 makes it repeat indefinitely
                 val effect = VibrationEffect.createWaveform(pattern, 0)
-                vibrator?.vibrate(effect)
+                vibrator?.vibrate(effect, audioAttributes)
+            } else if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
+                @Suppress("DEPRECATION")
+                vibrator?.vibrate(pattern, 0, audioAttributes)
             } else {
                 @Suppress("DEPRECATION")
                 vibrator?.vibrate(pattern, 0)
@@ -183,13 +245,18 @@ class FajrAlarmService : Service() {
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
         )
 
-        val openAppIntent = Intent(this, MainActivity::class.java).apply {
-            flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP
+        // Launch full-screen FajrAlarmActivity
+        val fullScreenIntent = Intent(this, FajrAlarmActivity::class.java).apply {
+            flags = Intent.FLAG_ACTIVITY_NEW_TASK or
+                    Intent.FLAG_ACTIVITY_CLEAR_TOP or
+                    Intent.FLAG_ACTIVITY_EXCLUDE_FROM_RECENTS
+            putExtra("cityName", cityName)
+            putExtra("offsetMinutes", offsetMinutes)
         }
-        val openAppPendingIntent = PendingIntent.getActivity(
+        val fullScreenPendingIntent = PendingIntent.getActivity(
             this,
             102,
-            openAppIntent,
+            fullScreenIntent,
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
         )
 
@@ -206,10 +273,10 @@ class FajrAlarmService : Service() {
             .setStyle(NotificationCompat.BigTextStyle().bigText(message))
             .setPriority(NotificationCompat.PRIORITY_MAX)
             .setCategory(NotificationCompat.CATEGORY_ALARM)
-            .setOngoing(true) // کاربر نمی‌تواند نوتیفیکیشن را سوایپ کند
+            .setOngoing(true)
             .setAutoCancel(false)
-            .setContentIntent(openAppPendingIntent)
-            .setFullScreenIntent(openAppPendingIntent, true)
+            .setContentIntent(fullScreenPendingIntent)
+            .setFullScreenIntent(fullScreenPendingIntent, true)
             .setVisibility(NotificationCompat.VISIBILITY_PUBLIC)
             .addAction(
                 android.R.drawable.ic_menu_close_clear_cancel,
@@ -228,7 +295,6 @@ class FajrAlarmService : Service() {
                 NotificationManager.IMPORTANCE_HIGH
             ).apply {
                 description = "پخش مداوم زنگ بیدارباش تا زمان قطع توسط کاربر"
-                // No sound in notification itself because MediaPlayer is playing it in a continuous loop
                 setSound(null, null)
                 enableVibration(false)
                 lockscreenVisibility = NotificationCompat.VISIBILITY_PUBLIC
@@ -240,7 +306,7 @@ class FajrAlarmService : Service() {
     private fun stopAlarmAndSelf() {
         handler.removeCallbacks(autoStopRunnable)
         if (isRinging) {
-            com.example.data.AppLogger.log(this, "اذان صبح", "زنگ بیدارباش اذان صبح متوقف شد")
+            AppLogger.log(this, "اذان صبح", "زنگ بیدارباش اذان صبح متوقف شد")
         }
         isRinging = false
 
@@ -250,6 +316,13 @@ class FajrAlarmService : Service() {
             }
             mediaPlayer?.release()
             mediaPlayer = null
+        } catch (_: Exception) {}
+
+        try {
+            if (fallbackRingtone?.isPlaying == true) {
+                fallbackRingtone?.stop()
+            }
+            fallbackRingtone = null
         } catch (_: Exception) {}
 
         try {

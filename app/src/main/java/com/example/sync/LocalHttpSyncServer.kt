@@ -12,8 +12,9 @@ import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import org.json.JSONObject
-import java.io.BufferedReader
-import java.io.InputStreamReader
+import java.io.BufferedInputStream
+import java.io.ByteArrayOutputStream
+import java.io.InputStream
 import java.io.OutputStream
 import java.net.ServerSocket
 import java.net.Socket
@@ -72,13 +73,30 @@ class LocalHttpSyncServer(
         onLog("سرور محلی متوقف شد")
     }
 
+    private fun readHeaderLine(input: InputStream): String? {
+        val baos = ByteArrayOutputStream()
+        while (true) {
+            val b = input.read()
+            if (b == -1) {
+                return if (baos.size() == 0) null else baos.toString(StandardCharsets.ISO_8859_1.name())
+            }
+            if (b == '\n'.code) {
+                break
+            }
+            if (b != '\r'.code) {
+                baos.write(b)
+            }
+        }
+        return baos.toString(StandardCharsets.ISO_8859_1.name())
+    }
+
     private suspend fun handleClient(socket: Socket) {
         socket.use { s ->
             try {
-                val reader = BufferedReader(InputStreamReader(s.getInputStream(), StandardCharsets.UTF_8))
+                val rawInput = BufferedInputStream(s.getInputStream())
                 val output = s.getOutputStream()
 
-                val requestLine = reader.readLine() ?: return
+                val requestLine = readHeaderLine(rawInput) ?: return
                 val parts = requestLine.split(" ")
                 if (parts.size < 2) return
 
@@ -90,7 +108,7 @@ class LocalHttpSyncServer(
                 var contentLength = 0
                 var acceptsHtml = false
                 var line: String?
-                while (reader.readLine().also { line = it } != null) {
+                while (readHeaderLine(rawInput).also { line = it } != null) {
                     if (line.isNullOrEmpty()) break
                     val headerLower = line!!.lowercase()
                     if (headerLower.startsWith("content-length:")) {
@@ -107,14 +125,14 @@ class LocalHttpSyncServer(
                 }
 
                 val body = if (contentLength > 0) {
-                    val charBuffer = CharArray(contentLength)
+                    val bodyBytes = ByteArray(contentLength)
                     var readTotal = 0
                     while (readTotal < contentLength) {
-                        val read = reader.read(charBuffer, readTotal, contentLength - readTotal)
-                        if (read == -1) break
-                        readTotal += read
+                        val count = rawInput.read(bodyBytes, readTotal, contentLength - readTotal)
+                        if (count == -1) break
+                        readTotal += count
                     }
-                    String(charBuffer, 0, readTotal)
+                    String(bodyBytes, 0, readTotal, StandardCharsets.UTF_8)
                 } else ""
 
                 when {

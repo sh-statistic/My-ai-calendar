@@ -650,8 +650,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             port = _serverPort.value,
             onLog = { msg -> logMessage(msg) }
         )
-        // Automatically start the zero-cost local sync server on app launch
-        startServer()
+        // سرور به صورت پیش‌فرض خاموش است و فقط با درخواست و روشن کردن سوییچ توسط کاربر فعال می‌شود
     }
 
     fun refreshNetworkInfo() {

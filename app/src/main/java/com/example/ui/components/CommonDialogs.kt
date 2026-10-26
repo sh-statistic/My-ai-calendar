@@ -1238,7 +1238,11 @@ fun PairingInfoDialog(
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Icon(Icons.Default.Schedule, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
                 Spacer(modifier = Modifier.width(8.dp))
-                Text(if (strings.isFa) "اتصال به افزونه مرورگر کروم" else "Connect to Chrome Extension", fontWeight = FontWeight.Bold)
+                Text(
+                    text = if (strings.isFa) "راهنمای اتصال به افزونه مرورگر کروم" else "Connect to Chrome Extension Guide",
+                    fontWeight = FontWeight.Bold,
+                    fontSize = 16.sp
+                )
             }
         },
         text = {
@@ -1248,19 +1252,7 @@ fun PairingInfoDialog(
                     .verticalScroll(rememberScrollState()),
                 verticalArrangement = Arrangement.spacedBy(10.dp)
             ) {
-                Text(
-                    if (strings.isFa) "برای همگام‌سازی مستقیم و بدون نیاز به اینترنت:" else "For direct offline local sync:",
-                    style = MaterialTheme.typography.bodyMedium
-                )
-                Text(
-                    if (strings.isFa) "۱. گوشی و رایانه را به یک شبکه Wi-Fi متصل کنید، یا هات‌اسپات (نقطه اتصال) یکی از دستگاه‌ها را روشن کنید." else "1. Connect phone and PC to the same Wi-Fi network, or enable hotspot on one device.",
-                    style = MaterialTheme.typography.bodySmall
-                )
-                Text(
-                    if (strings.isFa) "۲. آدرس زیر را در مرورگر لپ‌تاپ باز کنید یا در افزونه کروم وارد نمایید:" else "2. Open the URL below in your PC browser or enter it in the Chrome extension:",
-                    style = MaterialTheme.typography.bodySmall
-                )
-
+                // Address Card
                 Card(
                     colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
                     modifier = Modifier.fillMaxWidth()
@@ -1272,23 +1264,96 @@ fun PairingInfoDialog(
                         horizontalArrangement = Arrangement.SpaceBetween,
                         verticalAlignment = Alignment.CenterVertically
                     ) {
-                        Text(
-                            text = url,
-                            style = MaterialTheme.typography.titleMedium,
-                            fontWeight = FontWeight.Bold,
-                            color = MaterialTheme.colorScheme.primary
-                        )
+                        Column {
+                            Text(
+                                text = if (strings.isFa) "آدرس سرور گوشی در شبکه محلی:" else "Local Server URL:",
+                                style = MaterialTheme.typography.labelSmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                            Text(
+                                text = url,
+                                style = MaterialTheme.typography.titleMedium,
+                                fontWeight = FontWeight.Bold,
+                                color = MaterialTheme.colorScheme.primary
+                            )
+                        }
                         IconButton(onClick = { clipboardManager.setText(AnnotatedString(url)) }) {
                             Icon(Icons.Default.ContentCopy, contentDescription = if (strings.isFa) "کپی آدرس" else "Copy URL")
                         }
                     }
                 }
 
-                Text(
-                    if (strings.isFa) "۳. با فشردن دکمه همگام‌سازی در افزونه کروم، اطلاعات رویدادها، وظایف و یادداشت‌ها به صورت خودکار در شبکه محلی تبادل می‌شوند." else "3. By clicking sync in the Chrome extension, events, tasks, and notes are exchanged automatically over the local network.",
-                    style = MaterialTheme.typography.bodySmall,
-                    fontSize = 11.sp
-                )
+                // Method 1: Cable USB
+                Surface(
+                    color = MaterialTheme.colorScheme.primary.copy(alpha = 0.08f),
+                    shape = RoundedCornerShape(10.dp),
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Column(modifier = Modifier.padding(10.dp)) {
+                        Text(
+                            text = if (strings.isFa) "🔌 روش ۱: با کابل USB (سریع‌ترین و ۱۰۰٪ پایدار)" else "🔌 Method 1: USB Cable (Fast & Stable)",
+                            fontWeight = FontWeight.Bold,
+                            color = MaterialTheme.colorScheme.primary,
+                            fontSize = 13.sp
+                        )
+                        Spacer(modifier = Modifier.height(4.dp))
+                        Text(
+                            text = if (strings.isFa)
+                                "۱. کابل را بین گوشی و کامپیوتر متصل کنید.\n۲. در تنظیمات گوشی (Settings > Connections) گزینه «اتصال با کابل (USB Tethering)» را روشن کنید.\n۳. در افزونه کروم دکمه «اتصال با کابل (USB)» را بزنید."
+                            else
+                                "1. Connect USB cable to PC.\n2. In Phone Settings > Connections, turn on 'USB Tethering'.\n3. In Chrome extension click 'Connect via Cable (USB)'.",
+                            style = MaterialTheme.typography.bodySmall,
+                            lineHeight = 18.sp
+                        )
+                    }
+                }
+
+                // Method 2: Wi-Fi
+                Surface(
+                    color = MaterialTheme.colorScheme.secondary.copy(alpha = 0.08f),
+                    shape = RoundedCornerShape(10.dp),
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Column(modifier = Modifier.padding(10.dp)) {
+                        Text(
+                            text = if (strings.isFa) "📶 روش ۲: بی‌سیم با Wi-Fi یا هات‌اسپات" else "📶 Method 2: Wireless via Wi-Fi / Hotspot",
+                            fontWeight = FontWeight.Bold,
+                            color = MaterialTheme.colorScheme.secondary,
+                            fontSize = 13.sp
+                        )
+                        Spacer(modifier = Modifier.height(4.dp))
+                        Text(
+                            text = if (strings.isFa)
+                                "۱. گوشی و لپ‌تاپ به یک مودم Wi-Fi متصل باشند (یا هات‌اسپات گوشی را روشن کنید).\n۲. در افزونه کروم دکمه «جستجوی خودکار گوشی» را بزنید یا آدرس بالا را درج کنید.\n۳. دکمه همگام‌سازی فوری را لمس کنید."
+                            else
+                                "1. Connect phone and PC to same Wi-Fi (or turn on phone Hotspot).\n2. In Chrome extension click 'Auto Scan' or enter the URL above.\n3. Click Start Sync.",
+                            style = MaterialTheme.typography.bodySmall,
+                            lineHeight = 18.sp
+                        )
+                    }
+                }
+
+                // VPN Notice
+                Surface(
+                    color = MaterialTheme.colorScheme.errorContainer.copy(alpha = 0.4f),
+                    shape = RoundedCornerShape(8.dp),
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Row(
+                        modifier = Modifier.padding(8.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text(
+                            text = if (strings.isFa)
+                                "⚠️ نکته فیلترشکن لپ‌تاپ: اگر VPN روی رایانه روشن است، اتصال محلی مسدود می‌شود. موقع همگام‌سازی چند ثانیه فیلترشکن را قطع کنید یا در تنظیمات آن گزینه Allow LAN Traffic را فعال کنید."
+                            else
+                                "⚠️ PC VPN Tip: If VPN is ON on PC, disconnect it for 3 seconds or enable 'Allow LAN Traffic' in VPN settings.",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.onErrorContainer,
+                            lineHeight = 16.sp
+                        )
+                    }
+                }
             }
         },
         confirmButton = {

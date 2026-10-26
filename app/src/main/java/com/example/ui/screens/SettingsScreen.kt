@@ -193,7 +193,7 @@ fun SettingsScreen(
                             modifier = Modifier
                                 .size(10.dp)
                                 .clip(CircleShape)
-                                .background(if (isServerRunning) Color(0xFF10B981) else Color(0xFFEF4444))
+                                .background(if (isServerRunning) Color(0xFF10B981) else Color(0xFF94A3B8))
                         )
                         Spacer(modifier = Modifier.width(8.dp))
                         Column {
@@ -769,38 +769,40 @@ fun SettingsScreen(
                     ) {
                         dbLogs.take(25).forEach { log ->
                             Surface(
-                                color = if (log.isSuccess) MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f) else MaterialTheme.colorScheme.errorContainer.copy(alpha = 0.4f),
-                                shape = RoundedCornerShape(8.dp),
+                                color = if (log.isSuccess) MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.35f) else MaterialTheme.colorScheme.errorContainer.copy(alpha = 0.3f),
+                                shape = RoundedCornerShape(10.dp),
                                 modifier = Modifier.fillMaxWidth()
                             ) {
                                 Row(
-                                    modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp),
+                                    modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
                                     verticalAlignment = Alignment.CenterVertically
                                 ) {
                                     Surface(
-                                        color = if (log.isSuccess) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.error,
-                                        shape = RoundedCornerShape(4.dp)
+                                        color = if (log.isSuccess) Color(0xFFE0F2FE) else Color(0xFFFEE2E2),
+                                        shape = RoundedCornerShape(6.dp)
                                     ) {
                                         Text(
                                             text = log.source,
-                                            fontSize = 9.sp,
+                                            fontSize = 11.sp,
                                             fontWeight = FontWeight.Bold,
-                                            color = if (log.isSuccess) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onError,
-                                            modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
+                                            color = if (log.isSuccess) Color(0xFF0369A1) else Color(0xFFDC2626),
+                                            modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp)
                                         )
                                     }
-                                    Spacer(modifier = Modifier.width(8.dp))
+                                    Spacer(modifier = Modifier.width(10.dp))
                                     Column(modifier = Modifier.weight(1f)) {
                                         Text(
                                             text = log.details,
-                                            fontSize = 11.sp,
+                                            fontSize = 12.sp,
+                                            fontWeight = FontWeight.Medium,
                                             color = MaterialTheme.colorScheme.onSurface,
-                                            lineHeight = 16.sp
+                                            lineHeight = 18.sp
                                         )
+                                        Spacer(modifier = Modifier.height(2.dp))
                                         Text(
                                             text = formatLogTime(log.timestamp),
-                                            fontSize = 9.sp,
-                                            color = MaterialTheme.colorScheme.outline
+                                            fontSize = 11.sp,
+                                            color = MaterialTheme.colorScheme.onSurfaceVariant
                                         )
                                     }
                                 }
@@ -808,17 +810,18 @@ fun SettingsScreen(
                         }
                     }
                 } else {
-                    Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                    Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
                         logs.take(10).forEach { log ->
                             Surface(
-                                color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
-                                shape = RoundedCornerShape(6.dp),
+                                color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.35f),
+                                shape = RoundedCornerShape(8.dp),
                                 modifier = Modifier.fillMaxWidth()
                             ) {
                                 Text(
                                     text = log,
-                                    fontSize = 11.sp,
-                                    modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
+                                    fontSize = 12.sp,
+                                    fontWeight = FontWeight.Medium,
+                                    modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp),
                                     color = MaterialTheme.colorScheme.onSurface
                                 )
                             }
@@ -1088,8 +1091,18 @@ fun SettingsScreen(
 }
 
 private fun formatLogTime(timestamp: Long): String {
-    val date = java.util.Date(timestamp)
-    val sdf = java.text.SimpleDateFormat("yyyy/MM/dd HH:mm:ss", java.util.Locale.getDefault())
-    return PersianCalendarHelper.toPersianDigits(sdf.format(date))
+    val cal = java.util.Calendar.getInstance().apply { timeInMillis = timestamp }
+    val jDate = PersianCalendarHelper.gregorianToJalali(
+        cal.get(java.util.Calendar.YEAR),
+        cal.get(java.util.Calendar.MONTH) + 1,
+        cal.get(java.util.Calendar.DAY_OF_MONTH)
+    )
+    val hour = cal.get(java.util.Calendar.HOUR_OF_DAY)
+    val minute = cal.get(java.util.Calendar.MINUTE)
+    val second = cal.get(java.util.Calendar.SECOND)
+    val timeFormatted = PersianCalendarHelper.toPersianDigits(
+        String.format(java.util.Locale.US, "%02d:%02d:%02d", hour, minute, second)
+    )
+    return "${jDate.formattedPersian} $timeFormatted"
 }
 

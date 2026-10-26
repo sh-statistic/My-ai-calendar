@@ -40,6 +40,25 @@ class FajrAlarmReceiver : BroadcastReceiver() {
                 "زمان بیدارباش فرارسید (شهر: $cityName). ارسال درخواست اجرای سرویس زنگ ممتد..."
             )
 
+            // Open full-screen alarm activity on lock screen immediately
+            try {
+                val fullScreenIntent = Intent(context, FajrAlarmActivity::class.java).apply {
+                    flags = Intent.FLAG_ACTIVITY_NEW_TASK or
+                            Intent.FLAG_ACTIVITY_CLEAR_TOP or
+                            Intent.FLAG_ACTIVITY_EXCLUDE_FROM_RECENTS
+                    putExtra("cityName", cityName)
+                    putExtra("offsetMinutes", offsetMinutes)
+                }
+                context.startActivity(fullScreenIntent)
+            } catch (e: Exception) {
+                com.example.data.AppLogger.log(
+                    context,
+                    "اذان صبح",
+                    "خطا در باز کردن صفحه بیدارباش: ${e.message}",
+                    isSuccess = false
+                )
+            }
+
             // Start foreground continuous alarm service with looping ringtone
             val serviceIntent = Intent(context, FajrAlarmService::class.java).apply {
                 this.action = FajrAlarmService.ACTION_START_ALARM
@@ -97,13 +116,15 @@ class FajrAlarmReceiver : BroadcastReceiver() {
             notificationManager.createNotificationChannel(channel)
         }
 
-        val openAppIntent = Intent(context, MainActivity::class.java).apply {
+        val openAlarmIntent = Intent(context, FajrAlarmActivity::class.java).apply {
             flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP
+            putExtra("cityName", cityName)
+            putExtra("offsetMinutes", offsetMinutes)
         }
         val pendingIntent = PendingIntent.getActivity(
             context,
             0,
-            openAppIntent,
+            openAlarmIntent,
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
         )
 

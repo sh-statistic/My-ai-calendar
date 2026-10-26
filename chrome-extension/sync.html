@@ -299,10 +299,13 @@
       </div>
 
       <div class="actions-row">
+        <button id="btnUsbConnect" class="btn btn-secondary" style="border-color: #3b82f6; color: #1d4ed8;" title="اتصال مستقیم و سریع از طریق کابل USB">
+          <span>🔌</span> اتصال با کابل (USB)
+        </button>
         <button id="btnTestPing" class="btn btn-secondary">
           <span>🔍</span> تست اتصال (Ping)
         </button>
-        <button id="btnAutoScan" class="btn btn-secondary" title="جستجوی خودکار آی‌پی گوشی در شبکه محلی">
+        <button id="btnAutoScan" class="btn btn-secondary" title="جستجوی خودکار آی‌پی گوشی در شبکه محلی و کابل">
           <span>⚡</span> جستجوی خودکار گوشی
         </button>
         <button id="btnStartSync" class="btn btn-primary">
@@ -313,12 +316,26 @@
 
     <!-- Instructions Guide -->
     <div class="steps-box">
-      <strong>📋 مراحل اتصال (فقط ۳ مرحله ساده):</strong>
-      <ol>
-        <li>اپلیکیشن <strong>«همگام»</strong> را روی گوشی باز کنید و وارد بخش <strong>همگام‌سازی</strong> شوید.</li>
-        <li>آدرس آی‌پی نمایش داده شده در گوشی (مثلاً <code>http://192.168.1.105:8080</code>) را در کادر بالا بنویسید.</li>
-        <li>دکمه <strong>«شروع همگام‌سازی فوری»</strong> را بزنید؛ تمام اطلاعات در ۱ ثانیه جابه‌جا و یکی می‌شوند!</li>
-      </ol>
+      <strong>📋 راهنمای آسان نحوه اتصال (یکی از ۲ روش زیر را انتخاب کنید):</strong>
+      <div style="margin-top: 6px; display: flex; flex-direction: column; gap: 8px;">
+        <div style="background: #ffffff; padding: 10px; border-radius: 8px; border: 1px solid #e2e8f0;">
+          <strong style="color: #2563eb;">روش ۱: با کابل USB (سریع‌ترین و بدون نیاز به اینترنت یا مودم)</strong>
+          <ol style="margin: 6px 18px 0 0; padding: 0;">
+            <li>گوشی را با کابل به لپ‌تاپ متصل کنید.</li>
+            <li>در تنظیمات گوشی وارد بخش <strong>اتصالات (Connections)</strong> شده و گزینه <strong>«اتصال با کابل (USB Tethering)»</strong> را روشن کنید.</li>
+            <li>دکمه آبی <strong>«🔌 اتصال با کابل (USB)»</strong> در بالا را بزنید و سپس <strong>«شروع همگام‌سازی فوری»</strong> را لمس کنید!</li>
+          </ol>
+        </div>
+
+        <div style="background: #ffffff; padding: 10px; border-radius: 8px; border: 1px solid #e2e8f0;">
+          <strong style="color: #059669;">روش ۲: بی‌سیم با Wi-Fi یا هات‌اسپات (بدون کابل)</strong>
+          <ol style="margin: 6px 18px 0 0; padding: 0;">
+            <li>گوشی و لپ‌تاپ را به یک مودم Wi-Fi متصل کنید (یا هات‌اسپات گوشی را روشن کنید).</li>
+            <li>در اپلیکیشن گوشی وارد صفحه <strong>همگام‌سازی</strong> شده و دکمه <strong>«⚡ جستجوی خودکار گوشی»</strong> را در بالا بزنید.</li>
+            <li>دکمه <strong>«شروع همگام‌سازی فوری»</strong> را بزنید تا اطلاعات در ۱ ثانیه جابه‌جا شوند.</li>
+          </ol>
+        </div>
+      </div>
     </div>
 
     <!-- Windscribe / VPN Tip -->
@@ -347,6 +364,7 @@
   <script>
     const logConsole = document.getElementById("logConsole");
     const serverUrlInput = document.getElementById("serverUrlInput");
+    const btnUsbConnect = document.getElementById("btnUsbConnect");
     const btnTestPing = document.getElementById("btnTestPing");
     const btnAutoScan = document.getElementById("btnAutoScan");
     const btnStartSync = document.getElementById("btnStartSync");
@@ -401,6 +419,29 @@
         }
       } catch (_) {}
     })();
+
+    // ۰. بررسی و اتصال سریع با کابل (USB / Localhost / Tethering)
+    if (btnUsbConnect) {
+      btnUsbConnect.addEventListener("click", async () => {
+        btnUsbConnect.disabled = true;
+        setStatus("busy", "در حال بررسی اتصال با کابل USB...");
+        log("بررسی اتصال مستقیم با کابل (USB / Localhost / Tethering)...", "info");
+
+        const result = await SyncClient.checkUsbConnection();
+        if (result.success) {
+          serverUrlInput.value = result.url;
+          setStatus("online", `گوشی از طریق کابل متصل است! (${result.url})`);
+          log(`اتصال کابل با موفقیت برقرار شد (${result.url}) ✓`, "success");
+          log(`پاسخ سرور: اپلیکیشن «${result.status.app || 'همگام'}» آماده همگام‌سازی است.`, "success");
+        } else {
+          setStatus("warn", "کابل یا تترینگ شناسایی نشد");
+          log("اتصال کابل پیدا نشد! راهنمای ساده اتصال:", "warn");
+          log("روش ۱: کابل USB را متصل کنید و در تنظیمات گوشی گزینه «اتصال با کابل (USB Tethering)» را روشن نمایید.", "warn");
+          log("روش ۲: اگر برنامه‌نویس هستید یا ADB دارید، دستور adb forward tcp:8080 tcp:8080 را اجرا کنید.", "warn");
+        }
+        btnUsbConnect.disabled = false;
+      });
+    }
 
     // ۱. تست پینگ و بررسی ارتباط با گوشی
     btnTestPing.addEventListener("click", async () => {

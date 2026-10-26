@@ -136,7 +136,7 @@ fun SyncScreen(
                 Spacer(modifier = Modifier.height(10.dp))
 
                 Text(
-                    text = "ارتباط مستقیم با افزونه کروم بدون اینترنت از طریق شبکه محلی Wi-Fi یا هات‌اسپات (Hotspot)",
+                    text = "ارتباط مستقیم و بدون اینترنت با افزونه کروم از طریق کابل USB، شبکه Wi-Fi یا هات‌اسپات (Hotspot)",
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
@@ -182,6 +182,18 @@ fun SyncScreen(
                             }
                         }
                     }
+                }
+
+                Spacer(modifier = Modifier.height(8.dp))
+
+                OutlinedButton(
+                    onClick = { showPairingDialog = true },
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(10.dp)
+                ) {
+                    Icon(Icons.Default.Info, contentDescription = null, modifier = Modifier.size(16.dp))
+                    Spacer(modifier = Modifier.width(6.dp))
+                    Text("راهنمای گام‌به‌گام اتصال (کابل USB و Wi-Fi)", fontSize = 12.sp)
                 }
             }
         }

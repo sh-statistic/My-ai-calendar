@@ -86,23 +86,48 @@ const SyncClient = {
   },
 
   /**
-   * Smart auto-discovery of Android server across open tabs, Hotspot and Wi-Fi subnets
+   * Smart auto-discovery of Android server across Cable (USB/ADB), Hotspot, USB Tethering and Wi-Fi subnets
    */
   async findActiveServerUrl() {
-    // ۰. بررسی تب‌های باز شده در مرورگر
+    // ۰. اولویت اول: بررسی اتصال با کابل (Localhost / ADB Port Forwarding)
+    const localCableUrls = ["http://localhost:8080", "http://127.0.0.1:8080"];
+    for (const localUrl of localCableUrls) {
+      const ping = await this.pingServer(localUrl, 800);
+      if (ping && ping.status === "online") {
+        await this.setServerUrl(localUrl);
+        return localUrl;
+      }
+    }
+
+    // ۱. بررسی تب‌های باز شده در مرورگر کروم
     const tabUrl = await this.detectServerUrlFromOpenTabs();
     if (tabUrl) {
       const ping = await this.pingServer(tabUrl, 1500);
       if (ping && ping.status === "online") return tabUrl;
     }
 
+    // ۲. بررسی آخرین آدرس موفق ذخیره‌شده
     const saved = await this.getServerUrl();
-    if (saved) {
+    if (saved && !localCableUrls.includes(saved)) {
       const ping = await this.pingServer(saved, 1500);
       if (ping && ping.status === "online") return saved;
     }
 
-    // ۱. تست هات‌اسپات پیش‌فرض اندروید (192.168.43.1)
+    // ۳. اولویت سوم: تست اتصال با کابل از طریق تترینگ اندروید (USB Tethering)
+    const usbTetheringUrls = [
+      "http://192.168.42.129:8080",
+      "http://192.168.42.1:8080",
+      "http://192.168.42.2:8080"
+    ];
+    for (const tetherUrl of usbTetheringUrls) {
+      const pingTether = await this.pingServer(tetherUrl, 1000);
+      if (pingTether && pingTether.status === "online") {
+        await this.setServerUrl(tetherUrl);
+        return tetherUrl;
+      }
+    }
+
+    // ۴. تست هات‌اسپات نقطه اتصال پیش‌فرض اندروید (192.168.43.1)
     const hotspotUrl = "http://192.168.43.1:8080";
     if (saved !== hotspotUrl) {
       const pingHotspot = await this.pingServer(hotspotUrl, 1500);
@@ -112,19 +137,15 @@ const SyncClient = {
       }
     }
 
-    // ۲. اسکن موازی سایر آدرس‌های متداول در شبکه
+    // ۵. اسکن موازی آدرس‌های متداول وای‌فای (مودم‌های خانگی و سیم‌کارتی متداول در ایران)
     const candidateIps = [
-      "http://192.168.1.100:8080",
-      "http://192.168.1.101:8080",
-      "http://192.168.1.102:8080",
-      "http://192.168.1.103:8080",
-      "http://192.168.1.104:8080",
-      "http://192.168.1.105:8080",
-      "http://192.168.0.100:8080",
-      "http://192.168.0.101:8080",
-      "http://192.168.0.102:8080",
-      "http://192.168.0.105:8080",
-      "http://192.168.43.1:8080"
+      "http://192.168.1.100:8080", "http://192.168.1.101:8080", "http://192.168.1.102:8080",
+      "http://192.168.1.103:8080", "http://192.168.1.104:8080", "http://192.168.1.105:8080",
+      "http://192.168.1.2:8080", "http://192.168.1.3:8080", "http://192.168.1.4:8080", "http://192.168.1.5:8080",
+      "http://192.168.0.100:8080", "http://192.168.0.101:8080", "http://192.168.0.102:8080", "http://192.168.0.105:8080",
+      "http://192.168.0.2:8080", "http://192.168.0.3:8080",
+      "http://192.168.8.100:8080", "http://192.168.8.101:8080", "http://192.168.8.2:8080", // مودم‌های ایرانسل و همراه اول
+      "http://192.168.31.100:8080", "http://192.168.31.2:8080" // روترهای شیائومی
     ];
 
     let found = null;
@@ -142,7 +163,28 @@ const SyncClient = {
       return found;
     }
 
-    return saved || this.DEFAULT_SERVER_URL;
+    return saved || "http://localhost:8080";
+  },
+
+  /**
+   * بررسی اختصاصی اتصال با کابل (USB)
+   */
+  async checkUsbConnection() {
+    const cableCandidates = [
+      "http://localhost:8080",
+      "http://127.0.0.1:8080",
+      "http://192.168.42.129:8080",
+      "http://192.168.42.1:8080"
+    ];
+
+    for (const url of cableCandidates) {
+      const res = await this.pingServer(url, 1200);
+      if (res && res.status === "online") {
+        await this.setServerUrl(url);
+        return { success: true, url, status: res };
+      }
+    }
+    return { success: false };
   },
 
   async getLocalData() {
