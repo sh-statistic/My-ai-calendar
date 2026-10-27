@@ -1,5 +1,7 @@
 package com.example.ui.components
 
+import android.graphics.BitmapFactory
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -63,6 +65,13 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.asImageBitmap
+import androidx.compose.ui.graphics.luminance
+import androidx.compose.ui.layout.ContentScale
+import java.io.File
+import com.example.ui.screens.getAdaptiveNoteColor
+import com.example.ui.screens.getAdaptiveNoteBorder
+import com.example.ui.screens.getNoteAccentColor
 import androidx.compose.ui.platform.ClipboardManager
 import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.platform.testTag
@@ -1081,12 +1090,14 @@ fun AddNoteDialog(
                         .testTag("note_content_input")
                 )
 
+                val isDark = MaterialTheme.colorScheme.background.luminance() < 0.5f
+
                 Text(if (strings.isFa) "رنگ یادداشت:" else "Note Color:", style = MaterialTheme.typography.bodySmall, fontWeight = FontWeight.SemiBold)
                 Row(
                     horizontalArrangement = Arrangement.spacedBy(10.dp)
                 ) {
                     noteColors.forEach { hex ->
-                        val col = parseColor(hex)
+                        val col = if (isDark) getNoteAccentColor(hex) else parseColor(hex)
                         Box(
                             modifier = Modifier
                                 .size(34.dp)
@@ -1095,13 +1106,13 @@ fun AddNoteDialog(
                                 .clickable { selectedColor = hex }
                                 .then(
                                     if (selectedColor == hex) {
-                                        Modifier.border(2.dp, MaterialTheme.colorScheme.onSurface, CircleShape)
-                                    } else Modifier.border(1.dp, Color.Gray.copy(alpha = 0.3f), CircleShape)
+                                        Modifier.border(2.5.dp, MaterialTheme.colorScheme.primary, CircleShape)
+                                    } else Modifier.border(1.dp, Color.Gray.copy(alpha = 0.35f), CircleShape)
                                 ),
                             contentAlignment = Alignment.Center
                         ) {
                             if (selectedColor == hex) {
-                                Icon(Icons.Default.Check, contentDescription = null, tint = Color(0xFF1E293B), modifier = Modifier.size(16.dp))
+                                Icon(Icons.Default.Check, contentDescription = null, tint = Color.White, modifier = Modifier.size(16.dp))
                             }
                         }
                     }
@@ -1131,13 +1142,15 @@ fun AddNoteDialog(
 fun EditNoteDialog(
     initialNote: NoteEntity,
     onDismiss: () -> Unit,
-    onConfirm: (title: String, content: String, colorHex: String, isPinned: Boolean) -> Unit
+    onOpenDrawingFullScreen: ((NoteEntity) -> Unit)? = null,
+    onConfirm: (title: String, content: String, colorHex: String, isPinned: Boolean, drawingPath: String?) -> Unit
 ) {
     val strings = rememberAppStrings()
     var title by remember { mutableStateOf(initialNote.title) }
     var content by remember { mutableStateOf(initialNote.content) }
     var selectedColor by remember { mutableStateOf(initialNote.colorHex) }
     var isPinned by remember { mutableStateOf(initialNote.isPinned) }
+    var currentDrawingPath by remember { mutableStateOf(initialNote.drawingPath) }
 
     val noteColors = listOf("#FEF3C7", "#DCFCE7", "#E0F2FE", "#FCE7F3", "#F3E8FF", "#F1F5F9")
 
@@ -1162,11 +1175,77 @@ fun EditNoteDialog(
                 OutlinedTextField(
                     value = content,
                     onValueChange = { content = it },
-                    label = { Text(if (strings.isFa) "متن یادداشت *" else "Note Content *") },
-                    minLines = 4,
-                    maxLines = 8,
+                    label = { Text(if (strings.isFa) "متن یادداشت" else "Note Content") },
+                    minLines = 3,
+                    maxLines = 6,
                     modifier = Modifier.fillMaxWidth()
                 )
+
+                // نمایش طرح وایت‌برد در صورت وجود با قابلیت کلیک جهت باز شدن تمام‌صفحه
+                if (!currentDrawingPath.isNullOrBlank()) {
+                    val drawingBitmap = remember(currentDrawingPath, initialNote.updatedAt) {
+                        val file = File(currentDrawingPath!!)
+                        if (file.exists()) BitmapFactory.decodeFile(currentDrawingPath)?.asImageBitmap() else null
+                    }
+                    if (drawingBitmap != null) {
+                        Column(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f), RoundedCornerShape(12.dp))
+                                .padding(8.dp)
+                        ) {
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Text(
+                                    text = if (strings.isFa) "طرح وایت‌برد (برای مشاهده/ویرایش لمس کنید):" else "Drawing (Tap to view/edit):",
+                                    fontSize = 11.sp,
+                                    fontWeight = FontWeight.SemiBold,
+                                    color = MaterialTheme.colorScheme.primary
+                                )
+                                TextButton(
+                                    onClick = { currentDrawingPath = null },
+                                    colors = androidx.compose.material3.ButtonDefaults.textButtonColors(
+                                        contentColor = MaterialTheme.colorScheme.error
+                                    )
+                                ) {
+                                    Icon(Icons.Default.Delete, contentDescription = null, modifier = Modifier.size(16.dp))
+                                    Spacer(modifier = Modifier.width(4.dp))
+                                    Text(if (strings.isFa) "حذف طرح" else "Remove", fontSize = 11.sp)
+                                }
+                            }
+                            Spacer(modifier = Modifier.height(4.dp))
+                            Box(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .clip(RoundedCornerShape(8.dp))
+                                    .border(1.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.3f), RoundedCornerShape(8.dp))
+                                    .clickable {
+                                        onOpenDrawingFullScreen?.invoke(
+                                            initialNote.copy(
+                                                title = title,
+                                                content = content,
+                                                colorHex = selectedColor,
+                                                isPinned = isPinned,
+                                                drawingPath = currentDrawingPath
+                                            )
+                                        )
+                                    }
+                            ) {
+                                Image(
+                                    bitmap = drawingBitmap,
+                                    contentDescription = "طرح دستی",
+                                    contentScale = ContentScale.Fit,
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .height(180.dp)
+                                )
+                            }
+                        }
+                    }
+                }
 
                 Row(
                     modifier = Modifier.fillMaxWidth(),
@@ -1177,12 +1256,14 @@ fun EditNoteDialog(
                     Switch(checked = isPinned, onCheckedChange = { isPinned = it })
                 }
 
+                val isDark = MaterialTheme.colorScheme.background.luminance() < 0.5f
+
                 Text(if (strings.isFa) "رنگ یادداشت:" else "Note Color:", style = MaterialTheme.typography.bodySmall, fontWeight = FontWeight.SemiBold)
                 Row(
                     horizontalArrangement = Arrangement.spacedBy(10.dp)
                 ) {
                     noteColors.forEach { hex ->
-                        val col = parseColor(hex)
+                        val col = if (isDark) getNoteAccentColor(hex) else parseColor(hex)
                         Box(
                             modifier = Modifier
                                 .size(34.dp)
@@ -1191,13 +1272,13 @@ fun EditNoteDialog(
                                 .clickable { selectedColor = hex }
                                 .then(
                                     if (selectedColor == hex) {
-                                        Modifier.border(2.dp, MaterialTheme.colorScheme.onSurface, CircleShape)
-                                    } else Modifier.border(1.dp, Color.Gray.copy(alpha = 0.3f), CircleShape)
+                                        Modifier.border(2.5.dp, MaterialTheme.colorScheme.primary, CircleShape)
+                                    } else Modifier.border(1.dp, Color.Gray.copy(alpha = 0.35f), CircleShape)
                                 ),
                             contentAlignment = Alignment.Center
                         ) {
                             if (selectedColor == hex) {
-                                Icon(Icons.Default.Check, contentDescription = null, tint = Color(0xFF1E293B), modifier = Modifier.size(16.dp))
+                                Icon(Icons.Default.Check, contentDescription = null, tint = Color.White, modifier = Modifier.size(16.dp))
                             }
                         }
                     }
@@ -1205,13 +1286,14 @@ fun EditNoteDialog(
             }
         },
         confirmButton = {
+            val canSave = content.isNotBlank() || !currentDrawingPath.isNullOrBlank() || title.isNotBlank()
             Button(
                 onClick = {
-                    if (content.isNotBlank()) {
-                        onConfirm(title.trim(), content.trim(), selectedColor, isPinned)
+                    if (canSave) {
+                        onConfirm(title.trim(), content.trim(), selectedColor, isPinned, currentDrawingPath)
                     }
                 },
-                enabled = content.isNotBlank()
+                enabled = canSave
             ) {
                 Text(strings.saveChanges)
             }

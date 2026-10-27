@@ -204,10 +204,14 @@ fun FajrAlarmScreen(
 
                 Spacer(modifier = Modifier.height(10.dp))
 
-                val subText = if (offsetMinutes > 0) {
-                    "$offsetMinutes دقیقه مانده به اذان صبح به افق $cityName"
-                } else {
-                    "زمان اذان صبح به افق $cityName فرارسیده است"
+                val subText = when {
+                    offsetMinutes > 0 -> "$offsetMinutes دقیقه مانده به اذان صبح به افق $cityName"
+                    offsetMinutes < 0 -> {
+                        val after = -offsetMinutes
+                        if (after == 60) "۱ ساعت پس از اذان صبح به افق $cityName"
+                        else "$after دقیقه پس از اذان صبح به افق $cityName"
+                    }
+                    else -> "زمان اذان صبح به افق $cityName فرارسیده است"
                 }
 
                 Text(

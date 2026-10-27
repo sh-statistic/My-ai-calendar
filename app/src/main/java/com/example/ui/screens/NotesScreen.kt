@@ -1,6 +1,8 @@
 package com.example.ui.screens
 
+import android.graphics.BitmapFactory
 import android.widget.Toast
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -19,6 +21,7 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.staggeredgrid.LazyVerticalStaggeredGrid
 import androidx.compose.foundation.lazy.staggeredgrid.StaggeredGridCells
 import androidx.compose.foundation.lazy.staggeredgrid.items
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.Note
@@ -28,6 +31,7 @@ import androidx.compose.material.icons.filled.CloudSync
 import androidx.compose.material.icons.filled.ContentCopy
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Description
+import androidx.compose.material.icons.filled.Draw
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.PushPin
@@ -45,6 +49,7 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.SmallFloatingActionButton
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
@@ -54,7 +59,11 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.asImageBitmap
+import androidx.compose.ui.graphics.luminance
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.SpanStyle
@@ -69,8 +78,10 @@ import com.example.ui.MainViewModel
 import com.example.ui.components.AddNoteDialog
 import com.example.ui.components.AddToCalendarFromNoteDialog
 import com.example.ui.components.EditNoteDialog
+import com.example.ui.components.WhiteboardDrawingDialog
 import com.example.ui.components.parseColor
 import com.example.ui.rememberAppStrings
+import java.io.File
 
 @Composable
 fun NotesScreen(
@@ -82,6 +93,8 @@ fun NotesScreen(
     val strings = rememberAppStrings()
     var searchQuery by remember { mutableStateOf("") }
     var showAddNoteDialog by remember { mutableStateOf(false) }
+    var showWhiteboardDialog by remember { mutableStateOf(false) }
+    var drawingNoteToViewOrEdit by remember { mutableStateOf<NoteEntity?>(null) }
     var noteToEdit by remember { mutableStateOf<NoteEntity?>(null) }
     var noteToAddToCalendar by remember { mutableStateOf<NoteEntity?>(null) }
 
@@ -147,7 +160,13 @@ fun NotesScreen(
                         NoteCard(
                             note = note,
                             searchQuery = searchQuery,
-                            onClick = { noteToEdit = note },
+                            onClick = {
+                                if (!note.drawingPath.isNullOrBlank()) {
+                                    drawingNoteToViewOrEdit = note
+                                } else {
+                                    noteToEdit = note
+                                }
+                            },
                             onEdit = { noteToEdit = note },
                             onAddToCalendar = { noteToAddToCalendar = note },
                             onSyncToGoogleCalendar = {
@@ -162,16 +181,35 @@ fun NotesScreen(
             }
         }
 
-        FloatingActionButton(
-            onClick = { showAddNoteDialog = true },
-            containerColor = MaterialTheme.colorScheme.primary,
-            contentColor = MaterialTheme.colorScheme.onPrimary,
+        Column(
             modifier = Modifier
                 .align(Alignment.BottomEnd)
-                .padding(16.dp)
-                .testTag("fab_add_note")
+                .padding(16.dp),
+            horizontalAlignment = Alignment.End,
+            verticalArrangement = Arrangement.spacedBy(10.dp)
         ) {
-            Icon(Icons.Default.Add, contentDescription = strings.addNote)
+            // Whiteboard Drawing FAB
+            SmallFloatingActionButton(
+                onClick = { showWhiteboardDialog = true },
+                containerColor = MaterialTheme.colorScheme.secondaryContainer,
+                contentColor = MaterialTheme.colorScheme.onSecondaryContainer,
+                modifier = Modifier.testTag("fab_whiteboard_note")
+            ) {
+                Icon(
+                    Icons.Default.Draw,
+                    contentDescription = if (strings.isFa) "تخته وایت‌برد و نقاشی" else "Whiteboard Drawing"
+                )
+            }
+
+            // Standard Add Note FAB
+            FloatingActionButton(
+                onClick = { showAddNoteDialog = true },
+                containerColor = MaterialTheme.colorScheme.primary,
+                contentColor = MaterialTheme.colorScheme.onPrimary,
+                modifier = Modifier.testTag("fab_add_note")
+            ) {
+                Icon(Icons.Default.Add, contentDescription = strings.addNote)
+            }
         }
     }
 
@@ -185,17 +223,58 @@ fun NotesScreen(
         )
     }
 
+    if (showWhiteboardDialog) {
+        WhiteboardDrawingDialog(
+            onDismiss = { showWhiteboardDialog = false },
+            onSaveDrawing = { title, imagePath, colorHex ->
+                viewModel.addNote(
+                    title = title,
+                    content = "",
+                    colorHex = colorHex,
+                    drawingPath = imagePath
+                )
+                showWhiteboardDialog = false
+                Toast.makeText(context, if (strings.isFa) "طرح وایت‌برد با موفقیت ذخیره شد ✓" else "Drawing saved ✓", Toast.LENGTH_SHORT).show()
+            }
+        )
+    }
+
+    drawingNoteToViewOrEdit?.let { note ->
+        WhiteboardDrawingDialog(
+            initialTitle = note.title,
+            initialDrawingPath = note.drawingPath,
+            onDismiss = { drawingNoteToViewOrEdit = null },
+            onSaveDrawing = { title, imagePath, colorHex ->
+                viewModel.updateNote(
+                    note.copy(
+                        title = title,
+                        drawingPath = imagePath,
+                        colorHex = colorHex,
+                        updatedAt = System.currentTimeMillis()
+                    )
+                )
+                drawingNoteToViewOrEdit = null
+                Toast.makeText(context, if (strings.isFa) "طرح با موفقیت به‌روزرسانی شد ✓" else "Drawing updated ✓", Toast.LENGTH_SHORT).show()
+            }
+        )
+    }
+
     noteToEdit?.let { note ->
         EditNoteDialog(
             initialNote = note,
             onDismiss = { noteToEdit = null },
-            onConfirm = { title, content, colorHex, isPinned ->
+            onOpenDrawingFullScreen = { noteWithDrawing ->
+                noteToEdit = null
+                drawingNoteToViewOrEdit = noteWithDrawing
+            },
+            onConfirm = { title, content, colorHex, isPinned, drawingPath ->
                 viewModel.updateNote(
                     note.copy(
                         title = title,
                         content = content,
                         colorHex = colorHex,
                         isPinned = isPinned,
+                        drawingPath = drawingPath,
                         updatedAt = System.currentTimeMillis()
                     )
                 )
@@ -240,6 +319,31 @@ fun buildHighlightedString(text: String, query: String): androidx.compose.ui.tex
     }
 }
 
+fun getNoteAccentColor(hex: String): Color {
+    return when (hex.uppercase()) {
+        "#FEF3C7" -> Color(0xFFF59E0B) // Radiant Amber
+        "#DCFCE7" -> Color(0xFF10B981) // Emerald Green
+        "#E0F2FE" -> Color(0xFF38BDF8) // Sky Blue
+        "#FCE7F3" -> Color(0xFFF43F5E) // Rose Pink
+        "#F3E8FF" -> Color(0xFFA855F7) // Purple
+        "#F1F5F9" -> Color(0xFF94A3B8) // Slate Gray
+        else -> parseColor(hex)
+    }
+}
+
+fun getAdaptiveNoteColor(hex: String, isDark: Boolean): Color {
+    if (!isDark) return parseColor(hex)
+    // کریستالی تیره: سطح کاملاً خنثی، لوکس و تمیز بدون رنگ‌های کدر و قهوه‌ای
+    return Color(0xFF18181C)
+}
+
+fun getAdaptiveNoteBorder(hex: String, isDark: Boolean): Color {
+    if (!isDark) return Color.Black.copy(alpha = 0.08f)
+    // حاشیه کریستالی ظریف با ته‌رنگ درخشان و ملایم از رنگ نوت
+    val accent = getNoteAccentColor(hex)
+    return accent.copy(alpha = 0.35f)
+}
+
 @Composable
 fun NoteCard(
     note: NoteEntity,
@@ -252,7 +356,10 @@ fun NoteCard(
 ) {
     val context = LocalContext.current
     val strings = rememberAppStrings()
-    val cardColor = parseColor(note.colorHex)
+    val isDark = MaterialTheme.colorScheme.background.luminance() < 0.5f
+    val cardColor = getAdaptiveNoteColor(note.colorHex, isDark)
+    val cardBorderColor = getAdaptiveNoteBorder(note.colorHex, isDark)
+    val accentColor = getNoteAccentColor(note.colorHex)
     var showDropdownMenu by remember { mutableStateOf(false) }
 
     Card(
@@ -261,7 +368,7 @@ fun NoteCard(
         elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
         modifier = Modifier
             .fillMaxWidth()
-            .border(0.5.dp, Color.Black.copy(alpha = 0.08f), RoundedCornerShape(14.dp))
+            .border(0.8.dp, cardBorderColor, RoundedCornerShape(14.dp))
             .clickable { onClick() }
             .testTag("note_card_${note.id}")
     ) {
@@ -271,19 +378,32 @@ fun NoteCard(
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                Text(
-                    text = buildHighlightedString(note.title, searchQuery),
-                    style = MaterialTheme.typography.titleSmall,
-                    fontWeight = FontWeight.Bold,
-                    color = Color(0xFF1E293B),
-                    modifier = Modifier.weight(1f)
-                )
+                Row(
+                    modifier = Modifier.weight(1f),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    if (isDark) {
+                        Box(
+                            modifier = Modifier
+                                .size(7.dp)
+                                .clip(CircleShape)
+                                .background(accentColor)
+                        )
+                        Spacer(modifier = Modifier.width(6.dp))
+                    }
+                    Text(
+                        text = buildHighlightedString(note.title, searchQuery),
+                        style = MaterialTheme.typography.titleSmall,
+                        fontWeight = FontWeight.Bold,
+                        color = if (isDark) Color(0xFFFFFFFF) else Color(0xFF1E293B)
+                    )
+                }
 
                 if (note.isPinned) {
                     Icon(
                         Icons.Default.PushPin,
                         contentDescription = null,
-                        tint = Color(0xFF475569),
+                        tint = if (isDark) Color(0xFFF59E0B) else Color(0xFF475569),
                         modifier = Modifier.size(16.dp)
                     )
                 }
@@ -291,12 +411,56 @@ fun NoteCard(
 
             Spacer(modifier = Modifier.height(6.dp))
 
-            Text(
-                text = buildHighlightedString(note.content, searchQuery),
-                style = MaterialTheme.typography.bodySmall,
-                color = Color(0xFF334155),
-                lineHeight = 18.sp
-            )
+            // Whiteboard Drawing Thumbnail (if exists)
+            if (!note.drawingPath.isNullOrBlank()) {
+                val drawingBitmap = remember(note.drawingPath, note.updatedAt) {
+                    val file = File(note.drawingPath)
+                    if (file.exists()) BitmapFactory.decodeFile(note.drawingPath)?.asImageBitmap() else null
+                }
+                if (drawingBitmap != null) {
+                    Image(
+                        bitmap = drawingBitmap,
+                        contentDescription = "طرح وایت‌برد",
+                        contentScale = ContentScale.Crop,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(120.dp)
+                            .clip(RoundedCornerShape(10.dp))
+                            .border(0.6.dp, if (isDark) Color(0xFF2A2A32) else Color.Black.copy(alpha = 0.08f), RoundedCornerShape(10.dp))
+                    )
+                    Spacer(modifier = Modifier.height(6.dp))
+                }
+            }
+
+            if (note.content.isNotBlank()) {
+                Text(
+                    text = buildHighlightedString(note.content, searchQuery),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = if (isDark) Color(0xFFD4D4D8) else Color(0xFF334155),
+                    lineHeight = 18.sp
+                )
+            } else if (!note.drawingPath.isNullOrBlank()) {
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    modifier = Modifier
+                        .background(if (isDark) Color(0xFF222228) else Color.Black.copy(alpha = 0.05f), RoundedCornerShape(6.dp))
+                        .padding(horizontal = 6.dp, vertical = 2.dp)
+                ) {
+                    Icon(
+                        Icons.Default.Draw,
+                        contentDescription = null,
+                        tint = if (isDark) Color(0xFFA1A1AA) else Color(0xFF64748B),
+                        modifier = Modifier.size(12.dp)
+                    )
+                    Spacer(modifier = Modifier.width(4.dp))
+                    Text(
+                        text = if (strings.isFa) "طرح وایت‌برد" else "Whiteboard Drawing",
+                        fontSize = 10.sp,
+                        color = if (isDark) Color(0xFFA1A1AA) else Color(0xFF64748B),
+                        fontWeight = FontWeight.Medium
+                    )
+                }
+            }
 
             Spacer(modifier = Modifier.height(10.dp))
 
@@ -308,7 +472,7 @@ fun NoteCard(
                 Text(
                     text = strings.formatDigits(note.persianDate),
                     fontSize = 10.sp,
-                    color = Color(0xFF64748B)
+                    color = if (isDark) Color(0xFF71717A) else Color(0xFF64748B)
                 )
 
                 Row(verticalAlignment = Alignment.CenterVertically) {
@@ -320,7 +484,7 @@ fun NoteCard(
                         Icon(
                             Icons.Default.ContentCopy,
                             contentDescription = if (strings.isFa) "کپی یادداشت در حافظه" else "Copy note",
-                            tint = Color(0xFF475569),
+                            tint = if (isDark) Color(0xFFA1A1AA) else Color(0xFF475569),
                             modifier = Modifier.size(15.dp)
                         )
                     }
@@ -333,7 +497,7 @@ fun NoteCard(
                         Icon(
                             Icons.Default.Edit,
                             contentDescription = strings.edit,
-                            tint = Color(0xFF475569),
+                            tint = if (isDark) Color(0xFFA1A1AA) else Color(0xFF475569),
                             modifier = Modifier.size(15.dp)
                         )
                     }

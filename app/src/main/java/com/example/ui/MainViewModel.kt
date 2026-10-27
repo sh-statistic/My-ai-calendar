@@ -78,6 +78,21 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         _appLanguage.value = lang
     }
 
+    // Dark Mode Theme State
+    private val _isDarkMode = MutableStateFlow(AppPreferences.isDarkMode(application))
+    val isDarkMode: StateFlow<Boolean> = _isDarkMode.asStateFlow()
+
+    fun toggleDarkMode() {
+        val next = !_isDarkMode.value
+        _isDarkMode.value = next
+        AppPreferences.setDarkMode(getApplication(), next)
+    }
+
+    fun setDarkMode(enabled: Boolean) {
+        _isDarkMode.value = enabled
+        AppPreferences.setDarkMode(getApplication(), enabled)
+    }
+
     // Calendar State
     private val todayJalali = PersianCalendarHelper.getCurrentJalaliDate()
     private val _selectedDate = MutableStateFlow(todayJalali)
@@ -205,7 +220,14 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         _fajrAlarmSettings.value = current
         FajrAlarmManager.saveSettings(getApplication(), current)
         if (isEnabled) {
-            val offsetText = if (offsetMinutes > 0) "$offsetMinutes دقیقه قبل از اذان" else "همزمان با اذان"
+            val offsetText = when {
+                offsetMinutes > 0 -> "$offsetMinutes دقیقه قبل از اذان"
+                offsetMinutes < 0 -> {
+                    val after = -offsetMinutes
+                    if (after == 60) "۱ ساعت بعد از اذان" else "$after دقیقه بعد از اذان"
+                }
+                else -> "همزمان با اذان"
+            }
             logMessage("هشدار هوشمند اذان صبح فعال شد ($offsetText).")
         } else {
             logMessage("هشدار هوشمند اذان صبح غیرفعال شد.")
@@ -250,6 +272,13 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             _currentViewYear.value += 1
         } else {
             _currentViewMonth.value += 1
+        }
+    }
+
+    fun setViewYearMonth(year: Int, month: Int) {
+        if (_currentViewYear.value != year || _currentViewMonth.value != month) {
+            _currentViewYear.value = year
+            _currentViewMonth.value = month
         }
     }
 
@@ -976,13 +1005,14 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     // Note Actions
-    fun addNote(title: String, content: String, colorHex: String, isPinned: Boolean = false) {
+    fun addNote(title: String, content: String, colorHex: String, isPinned: Boolean = false, drawingPath: String? = null) {
         val note = NoteEntity(
-            title = title.ifBlank { "یادداشت جدید" },
+            title = title.ifBlank { if (drawingPath != null) "طرح وایت‌برد" else "یادداشت جدید" },
             content = content,
             persianDate = PersianCalendarHelper.getCurrentJalaliDate().formattedPersian,
             colorHex = colorHex,
-            isPinned = isPinned
+            isPinned = isPinned,
+            drawingPath = drawingPath
         )
         viewModelScope.launch {
             repository.insertNote(note)
@@ -998,6 +1028,15 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
 
     fun deleteNote(id: String) {
         viewModelScope.launch {
+            val existing = repository.allActiveNotes.first().find { it.id == id }
+            existing?.drawingPath?.let { path ->
+                try {
+                    val file = File(path)
+                    if (file.exists()) file.delete()
+                    val jsonFile = File(path.replace(".png", ".json"))
+                    if (jsonFile.exists()) jsonFile.delete()
+                } catch (_: Exception) {}
+            }
             repository.deleteNote(id)
         }
     }

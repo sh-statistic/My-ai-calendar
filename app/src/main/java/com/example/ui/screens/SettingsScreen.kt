@@ -7,10 +7,16 @@ import android.widget.Toast
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.core.content.ContextCompat
+import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.gestures.detectHorizontalDragGestures
+import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.FlowRow
@@ -19,6 +25,7 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -29,17 +36,21 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Alarm
 import androidx.compose.material.icons.filled.AutoAwesome
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.CloudOff
 import androidx.compose.material.icons.filled.CloudQueue
 import androidx.compose.material.icons.filled.ContentCopy
+import androidx.compose.material.icons.filled.DarkMode
 import androidx.compose.material.icons.filled.Download
 import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.Key
 import androidx.compose.material.icons.filled.Language
+import androidx.compose.material.icons.filled.LightMode
 import androidx.compose.material.icons.filled.Refresh
+import androidx.compose.material.icons.filled.Remove
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.Sync
 import androidx.compose.material.icons.filled.Upload
@@ -60,34 +71,50 @@ import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.FilterChip
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.Slider
+import androidx.compose.material3.SliderDefaults
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableFloatStateOf
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import kotlin.math.roundToInt
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.geometry.CornerRadius
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.ClipboardManager
 import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.platform.LocalUriHandler
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextDirection
+import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.prayer.PrayerTimesCalculator
@@ -583,34 +610,344 @@ fun SettingsScreen(
                 }
 
                 if (fajrSettings.isEnabled) {
-                    Spacer(modifier = Modifier.height(6.dp))
+                    Spacer(modifier = Modifier.height(18.dp))
 
-                    Text(strings.alarmTimingBeforeFajr, style = MaterialTheme.typography.labelSmall)
-                    Spacer(modifier = Modifier.height(4.dp))
-                    @OptIn(ExperimentalLayoutApi::class)
-                    FlowRow(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.spacedBy(6.dp),
-                        verticalArrangement = Arrangement.spacedBy(4.dp)
-                    ) {
-                        listOf(
-                            0 to strings.simultaneous,
-                            5 to if (strings.isFa) "۵ دقیقه قبل" else "5 min before",
-                            10 to if (strings.isFa) "۱۰ دقیقه قبل" else "10 min before",
-                            15 to if (strings.isFa) "۱۵ دقیقه قبل" else "15 min before"
-                        ).forEach { (min, label) ->
-                            FilterChip(
-                                selected = fajrSettings.offsetMinutesBefore == min,
-                                onClick = { viewModel.updateFajrAlarm(true, min) },
-                                label = {
-                                    Text(
-                                        text = label,
-                                        fontSize = 10.sp,
-                                        maxLines = 1,
-                                        softWrap = false
+                    var previewOffsetMinutes by remember(fajrSettings.offsetMinutesBefore) {
+                        mutableIntStateOf(fajrSettings.offsetMinutesBefore)
+                    }
+
+                    // تابع تبدیل آفست به موقعیت فرکشن اسلایدر (0.0f تا 1.0f)
+                    // بازه متقارن: 0.0f = 15 دقیقه قبل، 0.5f = همزمان، 1.0f = 60 دقیقه بعد
+                    fun offsetToFraction(offset: Int): Float {
+                        return when {
+                            offset > 0 -> {
+                                val progress = (15 - offset).coerceIn(0, 15) / 15f
+                                0.5f * progress
+                            }
+                            offset < 0 -> {
+                                val progress = (-offset).coerceIn(0, 60) / 60f
+                                0.5f + 0.5f * progress
+                            }
+                            else -> 0.5f
+                        }.coerceIn(0f, 1f)
+                    }
+
+                    fun fractionToOffset(fraction: Float): Int {
+                        val f = fraction.coerceIn(0f, 1f)
+                        return if (f <= 0.5f) {
+                            val progress = f / 0.5f
+                            (15f * (1f - progress)).roundToInt().coerceIn(0, 15)
+                        } else {
+                            val progress = (f - 0.5f) / 0.5f
+                            -((60f * progress).roundToInt().coerceIn(0, 60))
+                        }
+                    }
+
+                    var sliderFraction by remember(fajrSettings.offsetMinutesBefore) {
+                        mutableFloatStateOf(offsetToFraction(fajrSettings.offsetMinutesBefore))
+                    }
+
+                    // عنوان متنی بالای اسلایدر با نگارش تمیز فارسی بدون دو نقطه اضافی
+                    val labelText = when {
+                        previewOffsetMinutes > 0 -> {
+                            val digits = if (strings.isFa) PersianCalendarHelper.toPersianDigits(previewOffsetMinutes.toString()) else previewOffsetMinutes.toString()
+                            if (strings.isFa) "$digits دقیقه قبل از اذان" else "$digits min before Fajr"
+                        }
+                        previewOffsetMinutes < 0 -> {
+                            val after = -previewOffsetMinutes
+                            val digits = if (strings.isFa) PersianCalendarHelper.toPersianDigits(after.toString()) else after.toString()
+                            if (strings.isFa) "$digits دقیقه بعد از اذان" else "$digits min after Fajr"
+                        }
+                        else -> {
+                            if (strings.isFa) "همزمان با اذان" else "At Fajr"
+                        }
+                    }
+
+                    Text(
+                        text = labelText,
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.Medium,
+                        textAlign = TextAlign.Center,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(bottom = 8.dp)
+                    )
+
+                    // کل بخش کنترل زمان (دکمه‌های منفی/مثبت، اسلایدر و دکمه‌های میانبر) در جهت استاندارد LTR
+                    CompositionLocalProvider(LocalLayoutDirection provides LayoutDirection.Ltr) {
+                        // رنگ‌های هماهنگ با تم کهربایی و گرم اپلیکیشن
+                        val primaryColor = MaterialTheme.colorScheme.primary
+                        val trackInactiveColor = MaterialTheme.colorScheme.surfaceVariant
+                        val trackActiveColor = primaryColor
+
+                        // ردیف اسلایدر و دکمه‌های (-) و (+)
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(horizontal = 4.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.Center
+                        ) {
+                            // دکمه (-) در سمت چپ: حرکت به سمت زودتر (قبل از اذان / چپ)
+                            val canDecrease = previewOffsetMinutes < 15
+                            Box(
+                                modifier = Modifier
+                                    .size(34.dp)
+                                    .border(
+                                        width = 1.2.dp,
+                                        color = if (canDecrease) primaryColor.copy(alpha = 0.5f) else MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f),
+                                        shape = CircleShape
+                                    )
+                                    .clip(CircleShape)
+                                    .clickable(enabled = canDecrease) {
+                                        val newOffset = (previewOffsetMinutes + 1).coerceAtMost(15)
+                                        previewOffsetMinutes = newOffset
+                                        sliderFraction = offsetToFraction(newOffset)
+                                        viewModel.updateFajrAlarm(true, newOffset)
+                                    },
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Default.Remove,
+                                    contentDescription = "کاهش زمان",
+                                    tint = if (canDecrease) primaryColor else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.25f),
+                                    modifier = Modifier.size(17.dp)
+                                )
+                            }
+
+                            // اسلایدر سفارشی با پالت هماهنگ تم گرم اپلیکیشن
+                            val density = LocalDensity.current
+                            val thumbRadiusDp = 9.dp
+
+                            Box(
+                                modifier = Modifier
+                                    .weight(1f)
+                                    .height(36.dp)
+                                    .padding(horizontal = 10.dp)
+                                    .pointerInput(Unit) {
+                                        val thumbRadiusPx = with(density) { thumbRadiusDp.toPx() }
+                                        detectTapGestures { offset ->
+                                            val availableWidth = (size.width - thumbRadiusPx * 2).coerceAtLeast(1f)
+                                            val touchX = (offset.x - thumbRadiusPx).coerceIn(0f, availableWidth)
+                                            val fraction = touchX / availableWidth
+                                            sliderFraction = fraction
+                                            val newOffset = fractionToOffset(fraction)
+                                            previewOffsetMinutes = newOffset
+                                            viewModel.updateFajrAlarm(true, newOffset)
+                                        }
+                                    }
+                                    .pointerInput(Unit) {
+                                        val thumbRadiusPx = with(density) { thumbRadiusDp.toPx() }
+                                        detectHorizontalDragGestures(
+                                            onDragEnd = {
+                                                val newOffset = fractionToOffset(sliderFraction)
+                                                previewOffsetMinutes = newOffset
+                                                viewModel.updateFajrAlarm(true, newOffset)
+                                            },
+                                            onDragCancel = {
+                                                val newOffset = fractionToOffset(sliderFraction)
+                                                previewOffsetMinutes = newOffset
+                                                viewModel.updateFajrAlarm(true, newOffset)
+                                            }
+                                        ) { change, _ ->
+                                            change.consume()
+                                            val availableWidth = (size.width - thumbRadiusPx * 2).coerceAtLeast(1f)
+                                            val touchX = (change.position.x - thumbRadiusPx).coerceIn(0f, availableWidth)
+                                            val fraction = touchX / availableWidth
+                                            sliderFraction = fraction
+                                            previewOffsetMinutes = fractionToOffset(fraction)
+                                        }
+                                    },
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Canvas(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .height(36.dp)
+                                ) {
+                                    val trackH = 6.dp.toPx()
+                                    val trackY = (size.height - trackH) / 2f
+                                    val radius = trackH / 2f
+                                    val thumbRadiusPx = thumbRadiusDp.toPx()
+                                    val availableWidth = size.width - thumbRadiusPx * 2
+                                    val thumbCenterXPx = thumbRadiusPx + (availableWidth * sliderFraction.coerceIn(0f, 1f))
+
+                                    // ترک غیرفعال (رنگ ملایم سرفیس گرم)
+                                    drawRoundRect(
+                                        color = trackInactiveColor,
+                                        topLeft = Offset(0f, trackY),
+                                        size = Size(size.width, trackH),
+                                        cornerRadius = CornerRadius(radius, radius)
+                                    )
+
+                                    // ترک فعال (رنگ تم اصلی کهربایی)
+                                    if (thumbCenterXPx > 0f) {
+                                        drawRoundRect(
+                                            color = trackActiveColor,
+                                            topLeft = Offset(0f, trackY),
+                                            size = Size(thumbCenterXPx.coerceAtMost(size.width), trackH),
+                                            cornerRadius = CornerRadius(radius, radius)
+                                        )
+                                    }
+
+                                    // دایره نشانگر کهربایی با مرکز سفید شیک
+                                    drawCircle(
+                                        color = primaryColor,
+                                        radius = thumbRadiusPx,
+                                        center = Offset(thumbCenterXPx, size.height / 2f)
+                                    )
+                                    drawCircle(
+                                        color = Color.White,
+                                        radius = thumbRadiusPx * 0.38f,
+                                        center = Offset(thumbCenterXPx, size.height / 2f)
                                     )
                                 }
-                            )
+                            }
+
+                            // دکمه (+) در سمت راست: حرکت به سمت دیرتر (بعد از اذان / راست)
+                            val canIncrease = previewOffsetMinutes > -60
+                            Box(
+                                modifier = Modifier
+                                    .size(34.dp)
+                                    .border(
+                                        width = 1.2.dp,
+                                        color = if (canIncrease) primaryColor.copy(alpha = 0.5f) else MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f),
+                                        shape = CircleShape
+                                    )
+                                    .clip(CircleShape)
+                                    .clickable(enabled = canIncrease) {
+                                        val newOffset = (previewOffsetMinutes - 1).coerceAtLeast(-60)
+                                        previewOffsetMinutes = newOffset
+                                        sliderFraction = offsetToFraction(newOffset)
+                                        viewModel.updateFajrAlarm(true, newOffset)
+                                    },
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Default.Add,
+                                    contentDescription = "افزایش زمان",
+                                    tint = if (canIncrease) primaryColor else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.25f),
+                                    modifier = Modifier.size(17.dp)
+                                )
+                            }
+                        }
+
+                        Spacer(modifier = Modifier.height(14.dp))
+
+                        // ۳ دکمه میانبر زمانی بدون عناوین زائد ابتدا/انتها
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(horizontal = 4.dp),
+                            horizontalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
+                            // ۱. دکمه ۱۵ دقیقه قبل (سمت چپ)
+                            val isStartSelected = previewOffsetMinutes == 15
+                            Surface(
+                                onClick = {
+                                    previewOffsetMinutes = 15
+                                    sliderFraction = 0f
+                                    viewModel.updateFajrAlarm(true, 15)
+                                },
+                                shape = RoundedCornerShape(10.dp),
+                                color = if (isStartSelected) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.45f),
+                                border = BorderStroke(
+                                    1.2.dp,
+                                    if (isStartSelected) primaryColor else MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.6f)
+                                ),
+                                modifier = Modifier.weight(1f)
+                            ) {
+                                Box(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .padding(vertical = 10.dp, horizontal = 2.dp),
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    CompositionLocalProvider(LocalLayoutDirection provides if (strings.isFa) LayoutDirection.Rtl else LayoutDirection.Ltr) {
+                                        Text(
+                                            text = if (strings.isFa) "۱۵ دقیقه قبل" else "15m before",
+                                            style = MaterialTheme.typography.labelMedium.copy(
+                                                textDirection = if (strings.isFa) TextDirection.Rtl else TextDirection.Ltr
+                                            ),
+                                            fontWeight = if (isStartSelected) FontWeight.Bold else FontWeight.Medium,
+                                            color = if (isStartSelected) primaryColor else MaterialTheme.colorScheme.onSurface,
+                                            textAlign = TextAlign.Center
+                                        )
+                                    }
+                                }
+                            }
+
+                            // ۲. دکمه همزمان با اذان (وسط)
+                            val isSimultaneousSelected = previewOffsetMinutes == 0
+                            Surface(
+                                onClick = {
+                                    previewOffsetMinutes = 0
+                                    sliderFraction = 0.5f
+                                    viewModel.updateFajrAlarm(true, 0)
+                                },
+                                shape = RoundedCornerShape(10.dp),
+                                color = if (isSimultaneousSelected) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.45f),
+                                border = BorderStroke(
+                                    1.2.dp,
+                                    if (isSimultaneousSelected) primaryColor else MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.6f)
+                                ),
+                                modifier = Modifier.weight(1f)
+                            ) {
+                                Box(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .padding(vertical = 10.dp, horizontal = 2.dp),
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    CompositionLocalProvider(LocalLayoutDirection provides if (strings.isFa) LayoutDirection.Rtl else LayoutDirection.Ltr) {
+                                        Text(
+                                            text = if (strings.isFa) "همزمان با اذان" else "At Fajr",
+                                            style = MaterialTheme.typography.labelMedium.copy(
+                                                textDirection = if (strings.isFa) TextDirection.Rtl else TextDirection.Ltr
+                                            ),
+                                            fontWeight = if (isSimultaneousSelected) FontWeight.Bold else FontWeight.Medium,
+                                            color = if (isSimultaneousSelected) primaryColor else MaterialTheme.colorScheme.onSurface,
+                                            textAlign = TextAlign.Center
+                                        )
+                                    }
+                                }
+                            }
+
+                            // ۳. دکمه ۱ ساعت بعد (سمت راست)
+                            val isEndSelected = previewOffsetMinutes == -60
+                            Surface(
+                                onClick = {
+                                    previewOffsetMinutes = -60
+                                    sliderFraction = 1f
+                                    viewModel.updateFajrAlarm(true, -60)
+                                },
+                                shape = RoundedCornerShape(10.dp),
+                                color = if (isEndSelected) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.45f),
+                                border = BorderStroke(
+                                    1.2.dp,
+                                    if (isEndSelected) primaryColor else MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.6f)
+                                ),
+                                modifier = Modifier.weight(1f)
+                            ) {
+                                Box(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .padding(vertical = 10.dp, horizontal = 2.dp),
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    CompositionLocalProvider(LocalLayoutDirection provides if (strings.isFa) LayoutDirection.Rtl else LayoutDirection.Ltr) {
+                                        Text(
+                                            text = if (strings.isFa) "۱ ساعت بعد" else "1h after",
+                                            style = MaterialTheme.typography.labelMedium.copy(
+                                                textDirection = if (strings.isFa) TextDirection.Rtl else TextDirection.Ltr
+                                            ),
+                                            fontWeight = if (isEndSelected) FontWeight.Bold else FontWeight.Medium,
+                                            color = if (isEndSelected) primaryColor else MaterialTheme.colorScheme.onSurface,
+                                            textAlign = TextAlign.Center
+                                        )
+                                    }
+                                }
+                            }
                         }
                     }
                 }
@@ -840,12 +1177,48 @@ fun SettingsScreen(
             elevation = CardDefaults.cardElevation(defaultElevation = 1.dp),
             modifier = Modifier.fillMaxWidth()
         ) {
-            Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+            Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Icon(Icons.Default.Language, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
                     Spacer(modifier = Modifier.width(8.dp))
-                    Text(strings.languageAndWizard, fontWeight = FontWeight.Bold)
+                    Text(if (strings.isFa) "ظاهر و زبان برنامه" else "Appearance & Language", fontWeight = FontWeight.Bold)
                 }
+
+                // Dark / Night Mode Toggle
+                val isDarkMode by viewModel.isDarkMode.collectAsState()
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Icon(
+                            imageVector = if (isDarkMode) Icons.Default.DarkMode else Icons.Default.LightMode,
+                            contentDescription = null,
+                            tint = if (isDarkMode) Color(0xFFFBBF24) else MaterialTheme.colorScheme.primary,
+                            modifier = Modifier.size(20.dp)
+                        )
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Column {
+                            Text(
+                                text = if (strings.isFa) "حالت شب (تم تاریک)" else "Night / Dark Mode",
+                                style = MaterialTheme.typography.bodyMedium,
+                                fontWeight = FontWeight.Bold
+                            )
+                            Text(
+                                text = if (strings.isFa) "کاهش خستگی چشم و صرفه‌جویی در باتری" else "Reduces eye strain in low-light environments",
+                                style = MaterialTheme.typography.labelSmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+                    }
+                    Switch(
+                        checked = isDarkMode,
+                        onCheckedChange = { viewModel.setDarkMode(it) }
+                    )
+                }
+
+                HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f))
 
                 val currentAppLang by viewModel.appLanguage.collectAsState()
 

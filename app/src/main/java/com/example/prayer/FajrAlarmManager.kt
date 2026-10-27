@@ -131,10 +131,18 @@ object FajrAlarmManager {
             }
             Log.d("FajrAlarmManager", "Fajr alarm scheduled for ${alarmCal.time}")
             val timeFormat = java.text.SimpleDateFormat("yyyy/MM/dd HH:mm", java.util.Locale.getDefault()).format(alarmCal.time)
+            val offsetDesc = when {
+                settings.offsetMinutesBefore > 0 -> "${settings.offsetMinutesBefore} دقیقه قبل از اذان"
+                settings.offsetMinutesBefore < 0 -> {
+                    val after = -settings.offsetMinutesBefore
+                    if (after == 60) "۱ ساعت بعد از اذان" else "$after دقیقه بعد از اذان"
+                }
+                else -> "همزمان با اذان"
+            }
             com.example.data.AppLogger.log(
                 context,
                 "اذان صبح",
-                "تنظیم زنگ بیدارباش برای ساعت ${com.example.calendar.PersianCalendarHelper.toPersianDigits(timeFormat)} به افق ${settings.cityName}"
+                "تنظیم زنگ بیدارباش برای ساعت ${com.example.calendar.PersianCalendarHelper.toPersianDigits(timeFormat)} ($offsetDesc) به افق ${settings.cityName}"
             )
         } catch (e: Exception) {
             Log.e("FajrAlarmManager", "Failed to schedule exact alarm: ${e.message}")

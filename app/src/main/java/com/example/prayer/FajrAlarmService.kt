@@ -260,10 +260,14 @@ class FajrAlarmService : Service() {
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
         )
 
-        val message = if (offsetMinutes > 0) {
-            "$offsetMinutes دقیقه تا اذان صبح به افق $cityName باقی مانده است. وقت بیداری و مناجات سحرگاهی!"
-        } else {
-            "وقت اذان صبح به افق $cityName فرارسیده است. التماس دعا!"
+        val message = when {
+            offsetMinutes > 0 -> "$offsetMinutes دقیقه تا اذان صبح به افق $cityName باقی مانده است. وقت بیداری و مناجات سحرگاهی!"
+            offsetMinutes < 0 -> {
+                val after = -offsetMinutes
+                if (after == 60) "۱ ساعت از اذان صبح به افق $cityName گذشته است. وقت بیداری و شروع روز!"
+                else "$after دقیقه از اذان صبح به افق $cityName گذشته است. وقت بیداری و شروع روز!"
+            }
+            else -> "وقت اذان صبح به افق $cityName فرارسیده است. التماس دعا!"
         }
 
         return NotificationCompat.Builder(this, CHANNEL_ID)

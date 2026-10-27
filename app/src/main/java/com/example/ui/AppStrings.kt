@@ -198,6 +198,7 @@ interface AppStrings {
     val changeCity: String
     val alarmTimingBeforeFajr: String
     val simultaneous: String
+    fun formatFajrAlarmOffset(offsetMinutesBefore: Int): String
     val userCustomOccasions: String
     val noCustomOccasionsYet: String
     val holidayBadge: String
@@ -396,8 +397,19 @@ object FaStrings : AppStrings {
     override val smartFajrAlarm: String = "بیدارباش هوشمند اذان صبح"
     override val calendarPrayerHorizonCity: String = "شهر افق شرعی تقویم:"
     override val changeCity: String = "تغییر شهر"
-    override val alarmTimingBeforeFajr: String = "زمان زنگ هشدار قبل از اذان:"
-    override val simultaneous: String = "همزمان"
+    override val alarmTimingBeforeFajr: String = "زمان زنگ هشدار نسبت به اذان صبح:"
+    override val simultaneous: String = "همزمان با اذان"
+    override fun formatFajrAlarmOffset(offsetMinutesBefore: Int): String {
+        return when {
+            offsetMinutesBefore > 0 -> "${com.example.calendar.PersianCalendarHelper.toPersianDigits(offsetMinutesBefore.toString())} دقیقه قبل از اذان صبح"
+            offsetMinutesBefore < 0 -> {
+                val after = -offsetMinutesBefore
+                if (after == 60) "۱ ساعت بعد از اذان صبح"
+                else "${com.example.calendar.PersianCalendarHelper.toPersianDigits(after.toString())} دقیقه بعد از اذان صبح"
+            }
+            else -> "همزمان با اذان صبح"
+        }
+    }
     override val userCustomOccasions: String = "مناسبت‌های ثبت‌شده توسط کاربر"
     override val noCustomOccasionsYet: String = "هنوز مناسبتی ثبت نشده. برای ثبت مناسبت، در تقویم یک روز را انتخاب کنید و دکمه «ثبت مناسبت» را بزنید."
     override val holidayBadge: String = "(تعطیل)"
@@ -631,8 +643,19 @@ object EnStrings : AppStrings {
     override val smartFajrAlarm: String = "Smart Fajr Alarm"
     override val calendarPrayerHorizonCity: String = "Calendar Prayer City:"
     override val changeCity: String = "Change City"
-    override val alarmTimingBeforeFajr: String = "Alarm timing before Fajr:"
+    override val alarmTimingBeforeFajr: String = "Alarm timing relative to Fajr prayer:"
     override val simultaneous: String = "At Fajr"
+    override fun formatFajrAlarmOffset(offsetMinutesBefore: Int): String {
+        return when {
+            offsetMinutesBefore > 0 -> "$offsetMinutesBefore min before Fajr"
+            offsetMinutesBefore < 0 -> {
+                val after = -offsetMinutesBefore
+                if (after == 60) "1 hour after Fajr"
+                else "$after min after Fajr"
+            }
+            else -> "At Fajr prayer"
+        }
+    }
     override val userCustomOccasions: String = "Custom Occasions"
     override val noCustomOccasionsYet: String = "No custom occasions yet. Select a date on calendar and tap 'Add Occasion'."
     override val holidayBadge: String = "(Holiday)"

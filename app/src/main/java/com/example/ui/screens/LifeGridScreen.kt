@@ -48,6 +48,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.layout.onGloballyPositioned
@@ -64,20 +65,73 @@ import com.example.memento.MementoMoriManager
 import com.example.ui.MainViewModel
 import com.example.ui.rememberAppStrings
 
-// Color palette
-private val BgScreen        = Color(0xFFFDF9F3)
-private val CardBg          = Color(0xFFFFFFFF)
-private val CardBorder      = Color(0xFFEADFCD)
-private val TextMain        = Color(0xFF3A2F1F)
-private val OrangeAccent    = Color(0xFFF59E0B)
-private val NavyElapsed     = Color(0xFF111111) // Black for elapsed life
-private val FutureBlue      = Color(0xFFD5DCEA)
-private val CurrentYearBg   = Color(0xFFFDE7B0)
-private val ElapsedCardBg   = Color(0xFFFFF3C4)
-private val RemainingCardBg = Color(0xFFEAF0FB)
-private val ProgressTrack   = Color(0xFFE5E7EB)
-private val GrayText        = Color(0xFF9CA3AF)
-private val SubtleGray      = Color(0xFF6B7280)
+// Adaptive Color Palette for Light and Dark Modes
+data class LifeGridColors(
+    val bgScreen: Color,
+    val cardBg: Color,
+    val cardBorder: Color,
+    val textMain: Color,
+    val subtleGray: Color,
+    val grayText: Color,
+    val orangeAccent: Color,
+    val elapsedDot: Color,
+    val currentMonthDot: Color,
+    val futureDot: Color,
+    val currentYearBg: Color,
+    val elapsedCardBg: Color,
+    val elapsedCardTitle: Color,
+    val remainingCardBg: Color,
+    val remainingCardTitle: Color,
+    val progressTrack: Color,
+    val progressFill: Color
+)
+
+@Composable
+fun rememberLifeGridColors(): LifeGridColors {
+    val isDark = MaterialTheme.colorScheme.background.luminance() < 0.5f
+
+    return if (isDark) {
+        LifeGridColors(
+            bgScreen = Color(0xFF0F0F12), // Deep neutral crystal dark
+            cardBg = Color(0xFF18181C), // Elevated crystal card
+            cardBorder = Color(0xFF282830), // Crisp glass border
+            textMain = Color(0xFFFFFFFF), // Pure crisp white
+            subtleGray = Color(0xFFA1A1AA), // Clean light neutral gray
+            grayText = Color(0xFF71717A), // Subtle gray
+            orangeAccent = Color(0xFFF59E0B), // Vibrant amber
+            elapsedDot = Color(0xFFD4D4D8), // Crisp silver crystal dots
+            currentMonthDot = Color(0xFFF59E0B), // Radiant amber jewel
+            futureDot = Color(0xFF27272A), // Clean deep graphite for future dots
+            currentYearBg = Color(0xFF261D12), // Subtle crystal amber glow
+            elapsedCardBg = Color(0xFF222228), // Sleek neutral card surface (no muddy brown!)
+            elapsedCardTitle = Color(0xFFF59E0B),
+            remainingCardBg = Color(0xFF222228), // Sleek neutral card surface (no muddy blue!)
+            remainingCardTitle = Color(0xFF38BDF8),
+            progressTrack = Color(0xFF27272A),
+            progressFill = Color(0xFFF59E0B)
+        )
+    } else {
+        LifeGridColors(
+            bgScreen = Color(0xFFFDF9F3),
+            cardBg = Color(0xFFFFFFFF),
+            cardBorder = Color(0xFFEADFCD),
+            textMain = Color(0xFF3A2F1F),
+            subtleGray = Color(0xFF6B7280),
+            grayText = Color(0xFF9CA3AF),
+            orangeAccent = Color(0xFFF59E0B),
+            elapsedDot = Color(0xFF1E293B),
+            currentMonthDot = Color(0xFFF59E0B),
+            futureDot = Color(0xFFD5DCEA),
+            currentYearBg = Color(0xFFFDE7B0),
+            elapsedCardBg = Color(0xFFFFF3C4),
+            elapsedCardTitle = Color(0xFF92400E),
+            remainingCardBg = Color(0xFFEAF0FB),
+            remainingCardTitle = Color(0xFF1E40AF),
+            progressTrack = Color(0xFFE5E7EB),
+            progressFill = Color(0xFF1E293B)
+        )
+    }
+}
 
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
@@ -87,6 +141,7 @@ fun LifeGridScreen(
 ) {
     val context  = LocalContext.current
     val strings  = rememberAppStrings()
+    val colors   = rememberLifeGridColors()
     val manager  = remember { MementoMoriManager(context) }
     var progress by remember { mutableStateOf(manager.calculateProgress()) }
 
@@ -124,7 +179,7 @@ fun LifeGridScreen(
                         reflectionNoteText = manager.getReflectionNote(justDrilledMonthIdx) ?: ""
                         showReflectionDialog = true
                     },
-                    colors = ButtonDefaults.buttonColors(containerColor = OrangeAccent)
+                    colors = ButtonDefaults.buttonColors(containerColor = colors.orangeAccent)
                 ) { Text(strings.writeNoteConfirm) }
             },
             dismissButton = {
@@ -136,16 +191,17 @@ fun LifeGridScreen(
     Column(
         modifier = modifier
             .fillMaxSize()
-            .background(BgScreen)
+            .background(colors.bgScreen)
             .verticalScroll(scrollState)
             .padding(horizontal = 12.dp, vertical = 8.dp)
     ) {
-        SummaryCard(progress = progress, onEditClick = { showBirthDialog = true })
+        SummaryCard(progress = progress, colors = colors, onEditClick = { showBirthDialog = true })
         Spacer(modifier = Modifier.height(10.dp))
-        LegendRow()
+        LegendRow(colors = colors)
         Spacer(modifier = Modifier.height(10.dp))
         WholeLifeCard(
             progress        = progress,
+            colors          = colors,
             totalYears      = totalYears,
             decades         = decades,
             selectedYearIdx = selectedYearIdx,
@@ -159,12 +215,13 @@ fun LifeGridScreen(
         AlertDialog(
             onDismissRequest = { selectedYearIdx = null },
             title = {
-                SelectedYearDialogHeader(progress = progress, selectedYearIdx = yearIdx)
+                SelectedYearDialogHeader(progress = progress, selectedYearIdx = yearIdx, colors = colors)
             },
             text = {
                 SelectedYearDialogContent(
                     progress        = progress,
                     selectedYearIdx = yearIdx,
+                    colors          = colors,
                     onMonthClick    = { clickedMonthIdx ->
                         justDrilledMonthIdx = clickedMonthIdx
                         if (clickedMonthIdx <= progress.currentMonthIndex) {
@@ -190,7 +247,7 @@ fun LifeGridScreen(
                 Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                     Text(
                         strings.howWasThisMonthMsg,
-                        fontSize = 13.sp, color = SubtleGray
+                        fontSize = 13.sp, color = colors.subtleGray
                     )
                     OutlinedTextField(
                         value         = reflectionNoteText,
@@ -209,7 +266,7 @@ fun LifeGridScreen(
                         }
                         showReflectionDialog = false
                     },
-                    colors = ButtonDefaults.buttonColors(containerColor = OrangeAccent)
+                    colors = ButtonDefaults.buttonColors(containerColor = colors.orangeAccent)
                 ) { Text(strings.saveNote) }
             },
             dismissButton = {
@@ -296,12 +353,12 @@ fun LifeGridScreen(
 
 // ─── Summary Card ─────────────────────────────────────────────────────────────
 @Composable
-private fun SummaryCard(progress: LifeProgress, onEditClick: () -> Unit) {
+private fun SummaryCard(progress: LifeProgress, colors: LifeGridColors, onEditClick: () -> Unit) {
     val strings = rememberAppStrings()
     Surface(
-        color    = CardBg,
+        color    = colors.cardBg,
         shape    = RoundedCornerShape(16.dp),
-        border   = androidx.compose.foundation.BorderStroke(1.dp, CardBorder),
+        border   = androidx.compose.foundation.BorderStroke(1.dp, colors.cardBorder),
         modifier = Modifier.fillMaxWidth()
     ) {
         if (!progress.isConfigured) {
@@ -315,16 +372,16 @@ private fun SummaryCard(progress: LifeProgress, onEditClick: () -> Unit) {
                     verticalAlignment     = Alignment.CenterVertically
                 ) {
                     Row(verticalAlignment = Alignment.CenterVertically) {
-                        Icon(Icons.Default.HourglassBottom, null, tint = OrangeAccent, modifier = Modifier.size(20.dp))
+                        Icon(Icons.Default.HourglassBottom, null, tint = colors.orangeAccent, modifier = Modifier.size(20.dp))
                         Spacer(modifier = Modifier.width(6.dp))
-                        Text(strings.lifeGridTitle, fontSize = 14.sp, fontWeight = FontWeight.Bold, color = TextMain)
+                        Text(strings.lifeGridTitle, fontSize = 14.sp, fontWeight = FontWeight.Bold, color = colors.textMain)
                     }
                 }
                 Spacer(modifier = Modifier.height(12.dp))
                 Icon(
                     Icons.Default.Cake,
                     contentDescription = null,
-                    tint = OrangeAccent,
+                    tint = colors.orangeAccent,
                     modifier = Modifier.size(36.dp)
                 )
                 Spacer(modifier = Modifier.height(8.dp))
@@ -332,20 +389,20 @@ private fun SummaryCard(progress: LifeProgress, onEditClick: () -> Unit) {
                     strings.birthDateNotSet,
                     fontSize = 13.sp,
                     fontWeight = FontWeight.Bold,
-                    color = TextMain
+                    color = colors.textMain
                 )
                 Spacer(modifier = Modifier.height(4.dp))
                 Text(
                     strings.birthDateDesc,
                     fontSize = 11.sp,
-                    color = SubtleGray,
+                    color = colors.subtleGray,
                     textAlign = TextAlign.Center
                 )
                 Spacer(modifier = Modifier.height(12.dp))
                 Button(
                     onClick = onEditClick,
                     shape = RoundedCornerShape(10.dp),
-                    colors = ButtonDefaults.buttonColors(containerColor = OrangeAccent)
+                    colors = ButtonDefaults.buttonColors(containerColor = colors.orangeAccent)
                 ) {
                     Icon(Icons.Default.Add, contentDescription = null, modifier = Modifier.size(16.dp))
                     Spacer(modifier = Modifier.width(6.dp))
@@ -360,25 +417,25 @@ private fun SummaryCard(progress: LifeProgress, onEditClick: () -> Unit) {
                     verticalAlignment     = Alignment.CenterVertically
                 ) {
                     Row(verticalAlignment = Alignment.CenterVertically) {
-                        Icon(Icons.Default.HourglassBottom, null, tint = OrangeAccent, modifier = Modifier.size(20.dp))
+                        Icon(Icons.Default.HourglassBottom, null, tint = colors.orangeAccent, modifier = Modifier.size(20.dp))
                         Spacer(modifier = Modifier.width(6.dp))
-                        Text(strings.currentAndExpectedLife, fontSize = 14.sp, fontWeight = FontWeight.Bold, color = TextMain)
+                        Text(strings.currentAndExpectedLife, fontSize = 14.sp, fontWeight = FontWeight.Bold, color = colors.textMain)
                     }
                     Surface(
-                        color    = Color(0xFFFEF9EC),
+                        color    = colors.elapsedCardBg,
                         shape    = RoundedCornerShape(20.dp),
-                        border   = androidx.compose.foundation.BorderStroke(1.dp, Color(0xFFFDE68A)),
+                        border   = androidx.compose.foundation.BorderStroke(1.dp, colors.orangeAccent.copy(alpha = 0.4f)),
                         modifier = Modifier.clickable { onEditClick() }
                     ) {
                         Row(
                             modifier          = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
                             verticalAlignment = Alignment.CenterVertically
                         ) {
-                            Icon(Icons.Default.Edit, null, modifier = Modifier.size(11.dp), tint = OrangeAccent)
+                            Icon(Icons.Default.Edit, null, modifier = Modifier.size(11.dp), tint = colors.orangeAccent)
                             Spacer(modifier = Modifier.width(4.dp))
                             Text(
                                 strings.bornInfo(progress.birthYear.toString(), (progress.totalMonths / 12).toString()),
-                                fontSize = 11.sp, color = OrangeAccent, fontWeight = FontWeight.SemiBold
+                                fontSize = 11.sp, color = colors.orangeAccent, fontWeight = FontWeight.SemiBold
                             )
                         }
                     }
@@ -388,27 +445,27 @@ private fun SummaryCard(progress: LifeProgress, onEditClick: () -> Unit) {
                     modifier              = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
-                    Surface(color = ElapsedCardBg, shape = RoundedCornerShape(12.dp), modifier = Modifier.weight(1f)) {
+                    Surface(color = colors.elapsedCardBg, shape = RoundedCornerShape(12.dp), modifier = Modifier.weight(1f)) {
                         Column(modifier = Modifier.padding(10.dp)) {
-                            Text(strings.currentAge, fontSize = 11.sp, color = Color(0xFF92400E))
+                            Text(strings.currentAge, fontSize = 11.sp, color = colors.elapsedCardTitle, fontWeight = FontWeight.SemiBold)
                             Spacer(modifier = Modifier.height(4.dp))
                             Text(
                                 strings.ageSpan(progress.elapsedYears.toString(), progress.elapsedRemainingMonths.toString()),
-                                fontSize = 14.sp, fontWeight = FontWeight.Bold, color = TextMain
+                                fontSize = 14.sp, fontWeight = FontWeight.Bold, color = colors.textMain
                             )
-                            Text(strings.monthsCount(progress.elapsedMonths.toString()), fontSize = 11.sp, color = SubtleGray)
+                            Text(strings.monthsCount(progress.elapsedMonths.toString()), fontSize = 11.sp, color = colors.subtleGray)
                         }
                     }
-                    Surface(color = RemainingCardBg, shape = RoundedCornerShape(12.dp), modifier = Modifier.weight(1f)) {
+                    Surface(color = colors.remainingCardBg, shape = RoundedCornerShape(12.dp), modifier = Modifier.weight(1f)) {
                         Column(modifier = Modifier.padding(10.dp)) {
-                            Text(strings.remainingLife, fontSize = 11.sp, color = Color(0xFF1E40AF))
+                            Text(strings.remainingLife, fontSize = 11.sp, color = colors.remainingCardTitle, fontWeight = FontWeight.SemiBold)
                             Spacer(modifier = Modifier.height(4.dp))
                             val remMonths = progress.totalMonths - progress.elapsedMonths
                             Text(
                                 strings.ageSpan(progress.remainingYears.toString(), progress.remainingMonths.toString()),
-                                fontSize = 14.sp, fontWeight = FontWeight.Bold, color = TextMain
+                                fontSize = 14.sp, fontWeight = FontWeight.Bold, color = colors.textMain
                             )
-                            Text(strings.monthsCount(remMonths.toString()), fontSize = 11.sp, color = SubtleGray)
+                            Text(strings.monthsCount(remMonths.toString()), fontSize = 11.sp, color = colors.subtleGray)
                         }
                     }
                 }
@@ -421,18 +478,18 @@ private fun SummaryCard(progress: LifeProgress, onEditClick: () -> Unit) {
                             .weight(1f)
                             .height(7.dp)
                             .clip(RoundedCornerShape(4.dp))
-                            .background(ProgressTrack)
+                            .background(colors.progressTrack)
                     ) {
                         Box(
                             modifier = Modifier
                                 .fillMaxWidth(pct)
                                 .height(7.dp)
                                 .clip(RoundedCornerShape(4.dp))
-                                .background(NavyElapsed)
+                                .background(colors.progressFill)
                         )
                     }
                     Spacer(modifier = Modifier.width(8.dp))
-                    Text(pctText, fontSize = 11.sp, color = NavyElapsed, fontWeight = FontWeight.Bold)
+                    Text(pctText, fontSize = 11.sp, color = colors.textMain, fontWeight = FontWeight.Bold)
                 }
             }
         }
@@ -441,25 +498,25 @@ private fun SummaryCard(progress: LifeProgress, onEditClick: () -> Unit) {
 
 // ─── Legend Row ───────────────────────────────────────────────────────────────
 @Composable
-private fun LegendRow() {
+private fun LegendRow(colors: LifeGridColors) {
     val strings = rememberAppStrings()
     Row(
         modifier              = Modifier.fillMaxWidth(),
         horizontalArrangement = Arrangement.spacedBy(12.dp, Alignment.CenterHorizontally),
         verticalAlignment     = Alignment.CenterVertically
     ) {
-        LegendDot(NavyElapsed,  strings.elapsedLegend)
-        LegendDot(OrangeAccent, strings.currentMonthLegend)
-        LegendDot(FutureBlue,   strings.futureLegend)
+        LegendDot(colors.elapsedDot,  strings.elapsedLegend, colors.subtleGray)
+        LegendDot(colors.orangeAccent, strings.currentMonthLegend, colors.subtleGray)
+        LegendDot(colors.futureDot,   strings.futureLegend, colors.subtleGray)
     }
 }
 
 @Composable
-private fun LegendDot(color: Color, label: String) {
+private fun LegendDot(color: Color, label: String, textColor: Color) {
     Row(verticalAlignment = Alignment.CenterVertically) {
         Box(modifier = Modifier.size(10.dp).clip(CircleShape).background(color))
         Spacer(modifier = Modifier.width(4.dp))
-        Text(label, fontSize = 11.sp, color = SubtleGray)
+        Text(label, fontSize = 11.sp, color = textColor)
     }
 }
 
@@ -467,6 +524,7 @@ private fun LegendDot(color: Color, label: String) {
 @Composable
 private fun WholeLifeCard(
     progress: LifeProgress,
+    colors: LifeGridColors,
     totalYears: Int,
     decades: Int,
     selectedYearIdx: Int?,
@@ -474,9 +532,9 @@ private fun WholeLifeCard(
 ) {
     val strings = rememberAppStrings()
     Surface(
-        color    = CardBg,
+        color    = colors.cardBg,
         shape    = RoundedCornerShape(16.dp),
-        border   = androidx.compose.foundation.BorderStroke(1.dp, CardBorder),
+        border   = androidx.compose.foundation.BorderStroke(1.dp, colors.cardBorder),
         modifier = Modifier.fillMaxWidth()
     ) {
         Column(modifier = Modifier.padding(12.dp)) {
@@ -485,8 +543,8 @@ private fun WholeLifeCard(
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment     = Alignment.CenterVertically
             ) {
-                Text(strings.wholeLifeHeader, fontSize = 14.sp, fontWeight = FontWeight.Bold, color = TextMain)
-                Text(strings.tapYearHint, fontSize = 11.sp, color = GrayText)
+                Text(strings.wholeLifeHeader, fontSize = 14.sp, fontWeight = FontWeight.Bold, color = colors.textMain)
+                Text(strings.tapYearHint, fontSize = 11.sp, color = colors.grayText)
             }
             Spacer(modifier = Modifier.height(10.dp))
 
@@ -523,7 +581,7 @@ private fun WholeLifeCard(
 
                             Text(
                                 strings.ageRange(displayStart.toString(), displayEnd.toString()),
-                                fontSize  = 10.sp, color = GrayText,
+                                fontSize  = 10.sp, color = colors.grayText,
                                 modifier  = Modifier.fillMaxWidth(),
                                 textAlign = TextAlign.Start
                             )
@@ -540,8 +598,8 @@ private fun WholeLifeCard(
                                     }
                                     val isSelected    = absYear == selectedYearIdx
                                     val isCurrentYear = absYear == (progress.currentMonthIndex / 12)
-                                    val yearBg        = if (isCurrentYear) CurrentYearBg else Color.Transparent
-                                    val borderColor   = if (isSelected) NavyElapsed else Color.Transparent
+                                    val yearBg        = if (isCurrentYear) colors.currentYearBg else Color.Transparent
+                                    val borderColor   = if (isSelected) colors.orangeAccent else Color.Transparent
                                     val borderWidth   = if (isSelected) 1.5.dp else 0.dp
 
                                     Canvas(
@@ -556,6 +614,7 @@ private fun WholeLifeCard(
                                         drawYearBlock(
                                             absYear       = absYear,
                                             progress      = progress,
+                                            colors        = colors,
                                             dotSizePx     = dotSizePx,
                                             dotPadPx      = dotPadPx,
                                             dotCols       = dotCols,
@@ -577,6 +636,7 @@ private fun WholeLifeCard(
 private fun DrawScope.drawYearBlock(
     absYear: Int,
     progress: LifeProgress,
+    colors: LifeGridColors,
     dotSizePx: Float,
     dotPadPx: Float,
     dotCols: Int,
@@ -593,7 +653,7 @@ private fun DrawScope.drawYearBlock(
     val oy = (blockHeightPx - totalDotH) / 2f
 
     val totalGridSlots = progress.totalMonths + (progress.birthMonth - 1)
-    
+
     for (row in 0 until dotRows) {
         for (col in 0 until dotCols) {
             val monthInYear    = row * dotCols + col
@@ -606,17 +666,17 @@ private fun DrawScope.drawYearBlock(
             val radius = dotSizePx / 2f
 
             when {
-                !progress.isConfigured -> drawCircle(FutureBlue, radius, center)
+                !progress.isConfigured -> drawCircle(colors.futureDot, radius, center)
                 absYear == 0 && monthInYear < (progress.birthMonth - 1) -> {
-                    // Draw gray dots for months before birth instead of hiding them
-                    drawCircle(Color.Gray.copy(alpha = 0.4f), radius, center)
+                    // Draw muted dots for months before birth
+                    drawCircle(colors.futureDot.copy(alpha = 0.25f), radius, center)
                 }
-                absMonthIdx < currentMonthIdx -> drawCircle(NavyElapsed, radius, center)
+                absMonthIdx < currentMonthIdx -> drawCircle(colors.elapsedDot, radius, center)
                 absMonthIdx == currentMonthIdx -> {
-                    drawCircle(OrangeAccent, radius, center)
-                    drawCircle(OrangeAccent.copy(alpha = 0.3f), radius + 1.5f, center, style = Stroke(1.5f))
+                    drawCircle(colors.currentMonthDot, radius, center)
+                    drawCircle(colors.currentMonthDot.copy(alpha = 0.35f), radius + 1.5f, center, style = Stroke(1.5f))
                 }
-                else -> drawCircle(FutureBlue, radius, center)
+                else -> drawCircle(colors.futureDot, radius, center)
             }
         }
     }
@@ -624,7 +684,7 @@ private fun DrawScope.drawYearBlock(
 
 // ─── Selected Year Dialog Components ──────────────────────────────────────────
 @Composable
-private fun SelectedYearDialogHeader(progress: LifeProgress, selectedYearIdx: Int) {
+private fun SelectedYearDialogHeader(progress: LifeProgress, selectedYearIdx: Int, colors: LifeGridColors) {
     val strings = rememberAppStrings()
     val persianCalYear = progress.birthYear + selectedYearIdx
     Row(
@@ -634,10 +694,10 @@ private fun SelectedYearDialogHeader(progress: LifeProgress, selectedYearIdx: In
     ) {
         Text(
             strings.ageRange(selectedYearIdx.toString(), (selectedYearIdx + 1).toString()),
-            fontSize = 14.sp, fontWeight = FontWeight.Bold, color = TextMain
+            fontSize = 14.sp, fontWeight = FontWeight.Bold, color = colors.textMain
         )
         if (progress.isConfigured) {
-            Text(strings.yearLabel(persianCalYear.toString()), fontSize = 12.sp, color = SubtleGray)
+            Text(strings.yearLabel(persianCalYear.toString()), fontSize = 12.sp, color = colors.subtleGray)
         }
     }
 }
@@ -646,12 +706,14 @@ private fun SelectedYearDialogHeader(progress: LifeProgress, selectedYearIdx: In
 private fun SelectedYearDialogContent(
     progress: LifeProgress,
     selectedYearIdx: Int,
+    colors: LifeGridColors,
     onMonthClick: (Int) -> Unit
 ) {
     val strings         = rememberAppStrings()
     val monthNames      = strings.jalaliMonths
     val startMonthIdx   = selectedYearIdx * 12
     val currentMonthIdx = progress.currentMonthIndex
+    val isDark          = MaterialTheme.colorScheme.background.luminance() < 0.5f
 
     Column {
         for (row in 0 until 3) {
@@ -678,8 +740,12 @@ private fun SelectedYearDialogContent(
                     val isElapsed = absMonthIdx < currentMonthIdx
                     val isCurrent = absMonthIdx == currentMonthIdx
                     val isClickable = isElapsed || isCurrent
-                    val chipBg    = when { isElapsed -> Color(0xFF1B2A4A); isCurrent -> OrangeAccent; else -> Color(0xFFF0EDE8) }
-                    val chipText  = if (isClickable) Color.White else GrayText
+                    val chipBg    = when {
+                        isElapsed -> if (isDark) Color(0xFF1E3A8A).copy(alpha = 0.8f) else Color(0xFF1B2A4A)
+                        isCurrent -> colors.orangeAccent
+                        else -> if (isDark) Color(0xFF334155).copy(alpha = 0.6f) else Color(0xFFF0EDE8)
+                    }
+                    val chipText  = if (isClickable) Color.White else (if (isDark) Color(0xFF94A3B8) else colors.grayText)
                     val subtitle  = when { isElapsed -> strings.viewOrAddNote; isCurrent -> strings.tapToAddNote; else -> "—" }
 
                     Surface(

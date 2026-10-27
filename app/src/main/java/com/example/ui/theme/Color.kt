@@ -29,3 +29,21 @@ val SoftError = Color(0xFFDC2626)
 val SoftErrorContainer = Color(0xFFFEE2E2)
 val SoftSuccess = Color(0xFF16A34A)
 val SoftSuccessContainer = Color(0xFFDCFCE7)
+
+// Minimalist Crystal Dark / Night Mode Palette (iOS & Telegram Inspired)
+// Pure, deep neutral darks with crystal-clear contrast (No muddy or murky tints)
+val CrystalDarkBg = Color(0xFF0F0F12) // Deep pure neutral dark
+val CrystalDarkSurface = Color(0xFF18181C) // Elevated sleek surface
+val CrystalDarkSurfaceVariant = Color(0xFF222228) // Crystal card highlight
+val CrystalDarkBorder = Color(0xFF2A2A32) // Subtle crisp glass outline
+
+val CrystalPureWhite = Color(0xFFFFFFFF) // Crisp primary text
+val CrystalMutedText = Color(0xFFA1A1AA) // Clean neutral gray text
+val CrystalSubtleText = Color(0xFF71717A) // Subtle hints / metadata
+
+val SolarAmberCrystalPrimary = Color(0xFFF59E0B) // Radiant clean amber
+val SolarAmberCrystalContainer = Color(0xFF261D12) // Subtle crystal amber glow
+val SolarAmberCrystalText = Color(0xFFFDE68A)
+
+val PersianTealCrystalAccent = Color(0xFF2DD4BF)
+val PersianBlueCrystalAccent = Color(0xFF38BDF8)

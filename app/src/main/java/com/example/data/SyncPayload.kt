@@ -60,6 +60,9 @@ data class SyncData(
             obj.put("persianDate", n.persianDate)
             obj.put("colorHex", n.colorHex)
             obj.put("isPinned", n.isPinned)
+            if (n.drawingPath != null) {
+                obj.put("drawingPath", n.drawingPath)
+            }
             obj.put("updatedAt", n.updatedAt)
             obj.put("isDeleted", n.isDeleted)
             notesArray.put(obj)
@@ -134,6 +137,7 @@ data class SyncData(
                             persianDate = obj.optString("persianDate", ""),
                             colorHex = obj.optString("colorHex", "#FEF3C7"),
                             isPinned = obj.optBoolean("isPinned", false),
+                            drawingPath = if (obj.isNull("drawingPath")) null else obj.optString("drawingPath").takeIf { it.isNotBlank() },
                             updatedAt = obj.optLong("updatedAt", System.currentTimeMillis()),
                             isDeleted = obj.optBoolean("isDeleted", false)
                         )

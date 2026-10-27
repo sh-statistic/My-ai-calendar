@@ -33,7 +33,9 @@ import androidx.compose.material.icons.filled.AutoAwesome
 import androidx.compose.material.icons.filled.CalendarMonth
 import androidx.compose.material.icons.filled.CalendarToday
 import androidx.compose.material.icons.filled.Checklist
+import androidx.compose.material.icons.filled.DarkMode
 import androidx.compose.material.icons.filled.HourglassBottom
+import androidx.compose.material.icons.filled.LightMode
 import androidx.compose.material.icons.filled.NoteAlt
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.Sync
@@ -50,6 +52,7 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
@@ -100,7 +103,29 @@ class MainActivity : ComponentActivity() {
         )
 
         setContent {
-            MyApplicationTheme {
+            val isDarkMode by viewModel.isDarkMode.collectAsState()
+
+            LaunchedEffect(isDarkMode) {
+                if (isDarkMode) {
+                    enableEdgeToEdge(
+                        statusBarStyle = SystemBarStyle.dark(android.graphics.Color.TRANSPARENT),
+                        navigationBarStyle = SystemBarStyle.dark(android.graphics.Color.TRANSPARENT)
+                    )
+                } else {
+                    enableEdgeToEdge(
+                        statusBarStyle = SystemBarStyle.light(
+                            android.graphics.Color.TRANSPARENT,
+                            android.graphics.Color.TRANSPARENT
+                        ),
+                        navigationBarStyle = SystemBarStyle.light(
+                            android.graphics.Color.TRANSPARENT,
+                            android.graphics.Color.TRANSPARENT
+                        )
+                    )
+                }
+            }
+
+            MyApplicationTheme(darkTheme = isDarkMode) {
                 val context = LocalContext.current
                 var isOnboardingCompleted by remember {
                     mutableStateOf(AppPreferences.isOnboardingCompleted(context))
@@ -197,62 +222,57 @@ class MainActivity : ComponentActivity() {
                                             horizontalArrangement = Arrangement.SpaceBetween,
                                             verticalAlignment = Alignment.CenterVertically
                                         ) {
-                                            // Right side: AI Sparkle Button
-                                            IconButton(
-                                                onClick = { selectedTab = 5 },
-                                                modifier = Modifier
-                                                    .size(34.dp)
-                                                    .testTag("top_bar_ai_chat_btn")
-                                            ) {
-                                                Icon(
-                                                    Icons.Default.AutoAwesome,
-                                                    contentDescription = strings.navAiChat,
-                                                    tint = MaterialTheme.colorScheme.primary,
-                                                    modifier = Modifier.size(20.dp)
-                                                )
-                                            }
-
-                                            // Center: Month Navigator with Arrow Buttons
+                                            // Right side: AI Sparkle & Dark Mode Toggle Buttons
                                             Row(
                                                 verticalAlignment = Alignment.CenterVertically,
-                                                horizontalArrangement = Arrangement.Center
+                                                horizontalArrangement = Arrangement.spacedBy(2.dp)
                                             ) {
                                                 IconButton(
-                                                    onClick = { viewModel.nextMonth() },
-                                                    modifier = Modifier.size(32.dp)
+                                                    onClick = { selectedTab = 5 },
+                                                    modifier = Modifier
+                                                        .size(34.dp)
+                                                        .testTag("top_bar_ai_chat_btn")
                                                 ) {
                                                     Icon(
-                                                        Icons.AutoMirrored.Filled.ArrowBack,
-                                                        contentDescription = strings.nextMonth,
-                                                        modifier = Modifier.size(18.dp)
-                                                    )
-                                                }
-
-                                                Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                                                    Text(
-                                                        text = "${strings.jalaliMonths[viewMonth - 1]} ${strings.formatDigits(viewYear.toString())}",
-                                                        style = MaterialTheme.typography.titleMedium,
-                                                        fontWeight = FontWeight.Bold,
-                                                        color = MaterialTheme.colorScheme.primary
-                                                    )
-                                                    Text(
-                                                        text = "${firstGDate.monthName} ${firstGDate.day} - ${lastGDate.monthName} ${lastGDate.day}, ${firstGDate.year}",
-                                                        style = MaterialTheme.typography.bodySmall,
-                                                        fontSize = 10.sp,
-                                                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                                                        Icons.Default.AutoAwesome,
+                                                        contentDescription = strings.navAiChat,
+                                                        tint = MaterialTheme.colorScheme.primary,
+                                                        modifier = Modifier.size(20.dp)
                                                     )
                                                 }
 
                                                 IconButton(
-                                                    onClick = { viewModel.previousMonth() },
-                                                    modifier = Modifier.size(32.dp)
+                                                    onClick = { viewModel.toggleDarkMode() },
+                                                    modifier = Modifier
+                                                        .size(34.dp)
+                                                        .testTag("top_bar_dark_mode_btn")
                                                 ) {
                                                     Icon(
-                                                        Icons.AutoMirrored.Filled.ArrowForward,
-                                                        contentDescription = strings.prevMonth,
-                                                        modifier = Modifier.size(18.dp)
+                                                        imageVector = if (isDarkMode) Icons.Default.LightMode else Icons.Default.DarkMode,
+                                                        contentDescription = if (isDarkMode) "تغییر به حالت روز" else "تغییر به حالت شب",
+                                                        tint = if (isDarkMode) Color(0xFFFBBF24) else MaterialTheme.colorScheme.primary,
+                                                        modifier = Modifier.size(20.dp)
                                                     )
                                                 }
+                                            }
+
+                                            // Center: Clean Month Title & Gregorian Subtitle (Swiped via touch gesture)
+                                            Column(
+                                                horizontalAlignment = Alignment.CenterHorizontally,
+                                                modifier = Modifier.padding(horizontal = 4.dp)
+                                            ) {
+                                                Text(
+                                                    text = "${strings.jalaliMonths[viewMonth - 1]} ${strings.formatDigits(viewYear.toString())}",
+                                                    style = MaterialTheme.typography.titleMedium,
+                                                    fontWeight = FontWeight.Bold,
+                                                    color = MaterialTheme.colorScheme.primary
+                                                )
+                                                Text(
+                                                    text = "${firstGDate.monthName} ${firstGDate.day} - ${lastGDate.monthName} ${lastGDate.day}, ${firstGDate.year}",
+                                                    style = MaterialTheme.typography.bodySmall,
+                                                    fontSize = 10.sp,
+                                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                                )
                                             }
 
                                             // Left side: Quick jump to Today
