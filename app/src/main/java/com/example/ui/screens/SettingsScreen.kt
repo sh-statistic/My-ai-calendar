@@ -612,10 +612,6 @@ fun SettingsScreen(
                 if (fajrSettings.isEnabled) {
                     Spacer(modifier = Modifier.height(18.dp))
 
-                    var previewOffsetMinutes by remember(fajrSettings.offsetMinutesBefore) {
-                        mutableIntStateOf(fajrSettings.offsetMinutesBefore)
-                    }
-
                     // تابع تبدیل آفست به موقعیت فرکشن اسلایدر (0.0f تا 1.0f)
                     // بازه متقارن: 0.0f = 15 دقیقه قبل، 0.5f = همزمان، 1.0f = 60 دقیقه بعد
                     fun offsetToFraction(offset: Int): Float {
@@ -643,8 +639,19 @@ fun SettingsScreen(
                         }
                     }
 
-                    var sliderFraction by remember(fajrSettings.offsetMinutesBefore) {
+                    var isDragging by remember { mutableStateOf(false) }
+                    var previewOffsetMinutes by remember {
+                        mutableIntStateOf(fajrSettings.offsetMinutesBefore)
+                    }
+                    var sliderFraction by remember {
                         mutableFloatStateOf(offsetToFraction(fajrSettings.offsetMinutesBefore))
+                    }
+
+                    LaunchedEffect(fajrSettings.offsetMinutesBefore) {
+                        if (!isDragging) {
+                            previewOffsetMinutes = fajrSettings.offsetMinutesBefore
+                            sliderFraction = offsetToFraction(fajrSettings.offsetMinutesBefore)
+                        }
                     }
 
                     // عنوان متنی بالای اسلایدر با نگارش تمیز فارسی بدون دو نقطه اضافی
@@ -701,9 +708,11 @@ fun SettingsScreen(
                                     .clip(CircleShape)
                                     .clickable(enabled = canDecrease) {
                                         val newOffset = (previewOffsetMinutes + 1).coerceAtMost(15)
-                                        previewOffsetMinutes = newOffset
-                                        sliderFraction = offsetToFraction(newOffset)
-                                        viewModel.updateFajrAlarm(true, newOffset)
+                                        if (newOffset != fajrSettings.offsetMinutesBefore) {
+                                            previewOffsetMinutes = newOffset
+                                            sliderFraction = offsetToFraction(newOffset)
+                                            viewModel.updateFajrAlarm(true, newOffset)
+                                        }
                                     },
                                 contentAlignment = Alignment.Center
                             ) {
@@ -733,21 +742,32 @@ fun SettingsScreen(
                                             sliderFraction = fraction
                                             val newOffset = fractionToOffset(fraction)
                                             previewOffsetMinutes = newOffset
-                                            viewModel.updateFajrAlarm(true, newOffset)
+                                            if (newOffset != fajrSettings.offsetMinutesBefore) {
+                                                viewModel.updateFajrAlarm(true, newOffset)
+                                            }
                                         }
                                     }
                                     .pointerInput(Unit) {
                                         val thumbRadiusPx = with(density) { thumbRadiusDp.toPx() }
                                         detectHorizontalDragGestures(
+                                            onDragStart = {
+                                                isDragging = true
+                                            },
                                             onDragEnd = {
+                                                isDragging = false
                                                 val newOffset = fractionToOffset(sliderFraction)
                                                 previewOffsetMinutes = newOffset
-                                                viewModel.updateFajrAlarm(true, newOffset)
+                                                if (newOffset != fajrSettings.offsetMinutesBefore) {
+                                                    viewModel.updateFajrAlarm(true, newOffset)
+                                                }
                                             },
                                             onDragCancel = {
+                                                isDragging = false
                                                 val newOffset = fractionToOffset(sliderFraction)
                                                 previewOffsetMinutes = newOffset
-                                                viewModel.updateFajrAlarm(true, newOffset)
+                                                if (newOffset != fajrSettings.offsetMinutesBefore) {
+                                                    viewModel.updateFajrAlarm(true, newOffset)
+                                                }
                                             }
                                         ) { change, _ ->
                                             change.consume()
@@ -817,9 +837,11 @@ fun SettingsScreen(
                                     .clip(CircleShape)
                                     .clickable(enabled = canIncrease) {
                                         val newOffset = (previewOffsetMinutes - 1).coerceAtLeast(-60)
-                                        previewOffsetMinutes = newOffset
-                                        sliderFraction = offsetToFraction(newOffset)
-                                        viewModel.updateFajrAlarm(true, newOffset)
+                                        if (newOffset != fajrSettings.offsetMinutesBefore) {
+                                            previewOffsetMinutes = newOffset
+                                            sliderFraction = offsetToFraction(newOffset)
+                                            viewModel.updateFajrAlarm(true, newOffset)
+                                        }
                                     },
                                 contentAlignment = Alignment.Center
                             ) {
@@ -845,9 +867,11 @@ fun SettingsScreen(
                             val isStartSelected = previewOffsetMinutes == 15
                             Surface(
                                 onClick = {
-                                    previewOffsetMinutes = 15
-                                    sliderFraction = 0f
-                                    viewModel.updateFajrAlarm(true, 15)
+                                    if (previewOffsetMinutes != 15) {
+                                        previewOffsetMinutes = 15
+                                        sliderFraction = 0f
+                                        viewModel.updateFajrAlarm(true, 15)
+                                    }
                                 },
                                 shape = RoundedCornerShape(10.dp),
                                 color = if (isStartSelected) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.45f),
@@ -881,9 +905,11 @@ fun SettingsScreen(
                             val isSimultaneousSelected = previewOffsetMinutes == 0
                             Surface(
                                 onClick = {
-                                    previewOffsetMinutes = 0
-                                    sliderFraction = 0.5f
-                                    viewModel.updateFajrAlarm(true, 0)
+                                    if (previewOffsetMinutes != 0) {
+                                        previewOffsetMinutes = 0
+                                        sliderFraction = 0.5f
+                                        viewModel.updateFajrAlarm(true, 0)
+                                    }
                                 },
                                 shape = RoundedCornerShape(10.dp),
                                 color = if (isSimultaneousSelected) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.45f),
@@ -917,9 +943,11 @@ fun SettingsScreen(
                             val isEndSelected = previewOffsetMinutes == -60
                             Surface(
                                 onClick = {
-                                    previewOffsetMinutes = -60
-                                    sliderFraction = 1f
-                                    viewModel.updateFajrAlarm(true, -60)
+                                    if (previewOffsetMinutes != -60) {
+                                        previewOffsetMinutes = -60
+                                        sliderFraction = 1f
+                                        viewModel.updateFajrAlarm(true, -60)
+                                    }
                                 },
                                 shape = RoundedCornerShape(10.dp),
                                 color = if (isEndSelected) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.45f),

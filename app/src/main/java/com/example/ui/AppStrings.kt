@@ -213,6 +213,36 @@ interface AppStrings {
     val selectCityForPrayerTimes: String
     fun daysOffsetLabel(offset: Int): String
 
+    // In-App Update Dialog Strings
+    val updateDialogTitleDownloading: String
+    val updateDialogTitleReady: String
+    val updateDialogTitlePermission: String
+    val updateDialogTitleError: String
+    val updateDialogTitleAvailable: String
+    val downloadProgressLabel: String
+    val downloadProgressCalculating: String
+    fun downloadingVersionNote(version: String): String
+    val currentVersionBadge: String
+    val newVersionBadge: String
+    val whatsNewInUpdate: String
+    val safetyBackupNotice: String
+    val playProtectNotice: String
+    val apkReadyTitle: String
+    val apkReadyMessage: String
+    val permissionRequiredMessage: String
+    val permissionRequiredHint: String
+    fun updateErrorMessage(error: String): String
+    val updateErrorHint: String
+    val installNow: String
+    val enablePermission: String
+    val reinstall: String
+    val tryAgain: String
+    val autoUpdate: String
+    val downloadFromGithub: String
+    val updateLater: String
+    val cancelAction: String
+    fun fileSizeMegaBytes(size: String): String
+
     // Helpers
     fun formatDigits(text: String): String
     fun cityName(city: IranianCity): String
@@ -427,6 +457,36 @@ object FaStrings : AppStrings {
         offset < 0 -> "${formatDigits(offset.toString())} روز"
         else -> noChange
     }
+
+    // In-App Update Dialog Strings
+    override val updateDialogTitleDownloading: String = "در حال دریافت نسخه جدید"
+    override val updateDialogTitleReady: String = "نسخه جدید آماده نصب است"
+    override val updateDialogTitlePermission: String = "مجوز نصب برنامه‌ها مورد نیاز است"
+    override val updateDialogTitleError: String = "خطا در فرآیند به‌روزرسانی"
+    override val updateDialogTitleAvailable: String = "نسخه جدید برنامه موجود است"
+    override val downloadProgressLabel: String = "پیشرفت دانلود:"
+    override val downloadProgressCalculating: String = "در حال محاسبه..."
+    override fun downloadingVersionNote(version: String): String = "در حال دانلود فایل نسخه ${formatDigits(version)}... لطفاً برنامه را نبندید."
+    override val currentVersionBadge: String = "نسخه فعلی:"
+    override val newVersionBadge: String = "نسخه جدید:"
+    override val whatsNewInUpdate: String = "تغییرات نسخه جدید:"
+    override val safetyBackupNotice: String = "محض احتیاط، پیش از نصب یک نسخه پشتیبان خودکار از کلیه اطلاعات و رویدادهای شما تهیه می‌شود."
+    override val playProtectNotice: String = "توجه: چون این برنامه مستقیماً از گیت‌هاب دریافت شده و هنوز در فروشگاه‌هایی مانند گوگل‌پلی یا بازار منتشر نشده، ممکن است سپر ایمنی گوگل (Play Protect) برای چند ثانیه صفحه اسکن فایل را نشان دهد. این بررسی کاملاً طبیعی است؛ لطفاً تا پایان اسکن صبور باشید تا دکمه نصب فعال شود."
+    override val apkReadyTitle: String = "فایل با موفقیت دریافت شد"
+    override val apkReadyMessage: String = "نصاب اندروید باز شد. در صورت نمایش صفحه اسکن سپر ایمنی گوگل (Play Protect)، به دلیل نصب مستقیم خارج از استورها کاملاً طبیعی است؛ لطفاً تا اتمام چند ثانیه‌ای اسکن شکیبا باشید تا دکمه نصب ظاهر شود."
+    override val permissionRequiredMessage: String = "جهت نصب مستقیم نسخه جدید، لطفاً اجازه «نصب برنامه‌های ناشناخته» را در تنظیمات فعال کنید."
+    override val permissionRequiredHint: String = "پس از روشن کردن کلید دسترسی، دکمه بازگشت را بزنید و سپس روی «نصب نسخه جدید» کلیک کنید."
+    override fun updateErrorMessage(error: String): String = "پیام خطا: $error"
+    override val updateErrorHint: String = "می‌توانید مجدداً تلاش کنید یا فایل را مستقیماً از طریق مرورگر از گیت‌هاب دانلود نمایید."
+    override val installNow: String = "نصب نسخه جدید"
+    override val enablePermission: String = "فعال‌سازی مجوز نصب"
+    override val reinstall: String = "نصب مجدد"
+    override val tryAgain: String = "تلاش مجدد"
+    override val autoUpdate: String = "به‌روزرسانی به نسخه جدید"
+    override val downloadFromGithub: String = "دانلود از گیت‌هاب"
+    override val updateLater: String = "بعداً"
+    override val cancelAction: String = "انصراف"
+    override fun fileSizeMegaBytes(size: String): String = "${formatDigits(size)} مگابایت"
 
     override fun formatDigits(text: String): String = PersianCalendarHelper.toPersianDigits(text)
     override fun cityName(city: IranianCity): String = city.nameFa
@@ -673,6 +733,36 @@ object EnStrings : AppStrings {
         offset < 0 -> "$offset days"
         else -> noChange
     }
+
+    // In-App Update Dialog Strings
+    override val updateDialogTitleDownloading: String = "Downloading New Version"
+    override val updateDialogTitleReady: String = "Update Ready to Install"
+    override val updateDialogTitlePermission: String = "Install Permission Required"
+    override val updateDialogTitleError: String = "Update Error"
+    override val updateDialogTitleAvailable: String = "New Version Available"
+    override val downloadProgressLabel: String = "Download Progress:"
+    override val downloadProgressCalculating: String = "Calculating..."
+    override fun downloadingVersionNote(version: String): String = "Downloading version $version... Please do not close the app."
+    override val currentVersionBadge: String = "Current:"
+    override val newVersionBadge: String = "New:"
+    override val whatsNewInUpdate: String = "What's New in This Version:"
+    override val safetyBackupNotice: String = "As a safety precaution, an automatic backup of all your data is created before upgrading."
+    override val playProtectNotice: String = "Note: Because this app is downloaded directly from GitHub and not yet on Google Play, Google Play Protect may scan the file for a few seconds. This is completely normal; please wait until the scan finishes and the install button appears."
+    override val apkReadyTitle: String = "Download Complete"
+    override val apkReadyMessage: String = "Android installer opened. If Google Play Protect scanning screen appears, it is normal for direct downloads; please wait a few seconds for the scan to finish."
+    override val permissionRequiredMessage: String = "To install the update, please enable 'Install unknown apps' permission in Settings."
+    override val permissionRequiredHint: String = "After enabling the switch in Settings, return to the app and the update will install automatically."
+    override fun updateErrorMessage(error: String): String = "Error: $error"
+    override val updateErrorHint: String = "You can retry or download the APK directly from GitHub in your browser."
+    override val installNow: String = "Install Update Now"
+    override val enablePermission: String = "Grant Install Permission"
+    override val reinstall: String = "Install Again"
+    override val tryAgain: String = "Try Again"
+    override val autoUpdate: String = "Update to New Version"
+    override val downloadFromGithub: String = "GitHub Download"
+    override val updateLater: String = "Later"
+    override val cancelAction: String = "Cancel"
+    override fun fileSizeMegaBytes(size: String): String = "$size MB"
 
     override fun formatDigits(text: String): String = text
     override fun cityName(city: IranianCity): String = city.nameEn

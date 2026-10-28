@@ -1,5 +1,6 @@
 package com.example
 
+import android.content.Intent
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.BackHandler
@@ -101,6 +102,11 @@ class MainActivity : ComponentActivity() {
                 android.graphics.Color.TRANSPARENT
             )
         )
+
+        handleIntentForUpdate(intent)
+
+        // راه‌اندازی استعلام خودکار و دوره‌ای پس‌زمینه حتی در صورت بسته بودن برنامه
+        com.example.update.BackgroundUpdateCheckReceiver.schedulePeriodicCheck(this)
 
         setContent {
             val isDarkMode by viewModel.isDarkMode.collectAsState()
@@ -478,4 +484,22 @@ class MainActivity : ComponentActivity() {
         }
     }
 }
+
+    override fun onResume() {
+        super.onResume()
+        // الزام ۵: بررسی خودکار داشتن مجوز نصب در onResume و اجرای درجا و خودکار نصب بدون نیاز به کلیک مجدد
+        viewModel.checkAndResumePendingInstall(this)
+    }
+
+    override fun onNewIntent(intent: Intent) {
+        super.onNewIntent(intent)
+        setIntent(intent)
+        handleIntentForUpdate(intent)
+    }
+
+    private fun handleIntentForUpdate(intent: Intent?) {
+        if (intent?.getBooleanExtra(com.example.update.UpdateReminderReceiver.EXTRA_FROM_UPDATE_REMINDER, false) == true) {
+            viewModel.handleUpdateNotificationClick(this)
+        }
+    }
 }

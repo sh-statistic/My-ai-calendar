@@ -72,6 +72,26 @@
             </intent-filter>
         </receiver>
 
+        <receiver
+            android:name=".update.UpdateReminderReceiver"
+            android:enabled="true"
+            android:exported="false">
+            <intent-filter>
+                <action android:name="com.example.ACTION_UPDATE_REMINDER" />
+            </intent-filter>
+        </receiver>
+
+        <receiver
+            android:name=".update.BackgroundUpdateCheckReceiver"
+            android:enabled="true"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="com.example.ACTION_CHECK_BACKGROUND_UPDATE" />
+                <action android:name="android.intent.action.BOOT_COMPLETED" />
+                <action android:name="android.intent.action.MY_PACKAGE_REPLACED" />
+            </intent-filter>
+        </receiver>
+
         <service
             android:name=".prayer.FajrAlarmService"
             android:enabled="true"

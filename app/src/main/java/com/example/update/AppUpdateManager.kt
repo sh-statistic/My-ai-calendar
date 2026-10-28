@@ -25,17 +25,27 @@ import java.net.URL
 
 object AppUpdateManager {
     private const val TAG = "AppUpdateManager"
+    private const val GITHUB_RELEASES_URL = "https://api.github.com/repos/sh-statistic/My-ai-calendar/releases?per_page=30"
     private const val GITHUB_LATEST_RELEASE_URL = "https://api.github.com/repos/sh-statistic/My-ai-calendar/releases/latest"
     private const val PREFS_NAME = "app_update_prefs"
     private const val KEY_LAST_CHECK_TIME = "last_check_timestamp"
     private const val KEY_SAFETY_BACKUP_JSON = "safety_backup_json"
     private const val KEY_SAFETY_BACKUP_TIME = "safety_backup_timestamp"
-    
+
+    // Pending Update Keys
+    private const val KEY_PENDING_APK_PATH = "pending_install_apk_path"
+    private const val KEY_PENDING_VERSION = "pending_update_version"
+    private const val KEY_PENDING_NOTES = "pending_update_notes"
+    private const val KEY_PENDING_URL = "pending_update_url"
+    private const val KEY_PENDING_APK_NAME = "pending_update_apk_name"
+
     // Check interval: 7 days in milliseconds
     const val CHECK_INTERVAL_MILLIS = 30L * 24 * 60 * 60 * 1000
 
     /**
-     * Checks GitHub for the latest release.
+     * Checks GitHub for updates.
+     * Always targets the latest stable release directly (skipping any intermediate versions)
+     * and aggregates changelogs from the user's current version up to the latest release.
      * @param isManual true if triggered by user click (bypasses 7-day interval check)
      */
     suspend fun checkForUpdates(
@@ -47,10 +57,151 @@ object AppUpdateManager {
         val now = System.currentTimeMillis()
 
         if (!isManual && (now - lastCheck) < CHECK_INTERVAL_MILLIS) {
-            Log.d(TAG, "Update check skipped (checked within last 7 days)")
+            Log.d(TAG, "Update check skipped (checked within interval)")
             return@withContext null
         }
 
+        val currentVersion = BuildConfig.VERSION_NAME.removePrefix("v").removePrefix("V").trim()
+
+        // 1. Try fetching full releases list to aggregate all changelogs from current to latest
+        var updateInfo = fetchFromReleasesList(currentVersion)
+
+        // 2. Fallback to latest release endpoint if full list fails
+        if (updateInfo == null) {
+            Log.d(TAG, "Releases list fetch failed, falling back to latest release endpoint")
+            updateInfo = fetchFromLatestEndpoint(currentVersion)
+        }
+
+        if (updateInfo != null) {
+            prefs.edit().putLong(KEY_LAST_CHECK_TIME, now).apply()
+            if (updateInfo.isAvailable) {
+                savePendingUpdateInfo(context, updateInfo)
+            }
+        }
+
+        updateInfo
+    }
+
+    /**
+     * Fetches all releases to skip intermediate versions and aggregate full changelogs.
+     */
+    private fun fetchFromReleasesList(currentVersion: String): UpdateInfo? {
+        var connection: HttpURLConnection? = null
+        try {
+            val url = URL(GITHUB_RELEASES_URL)
+            connection = (url.openConnection() as HttpURLConnection).apply {
+                requestMethod = "GET"
+                connectTimeout = 10000
+                readTimeout = 10000
+                setRequestProperty("Accept", "application/vnd.github.v3+json")
+                setRequestProperty("User-Agent", "My-AI-Calendar-Android-App")
+            }
+
+            if (connection.responseCode != HttpURLConnection.HTTP_OK) {
+                return null
+            }
+
+            val reader = BufferedReader(InputStreamReader(connection.inputStream))
+            val response = reader.readText()
+            reader.close()
+
+            val releasesArray = org.json.JSONArray(response)
+            if (releasesArray.length() == 0) return null
+
+            // Filter stable releases (non-draft and non-prerelease)
+            val stableReleases = mutableListOf<JSONObject>()
+            for (i in 0 until releasesArray.length()) {
+                val rel = releasesArray.getJSONObject(i)
+                val isDraft = rel.optBoolean("draft", false)
+                val isPrerelease = rel.optBoolean("prerelease", false)
+                if (!isDraft && !isPrerelease) {
+                    stableReleases.add(rel)
+                }
+            }
+
+            if (stableReleases.isEmpty()) return null
+
+            // The first stable release is the latest available release
+            val latestRelease = stableReleases[0]
+            val latestTagName = latestRelease.optString("tag_name", "").removePrefix("v").removePrefix("V").trim()
+            if (latestTagName.isBlank()) return null
+
+            val hasUpdate = isNewerVersion(latestTagName, currentVersion)
+            if (!hasUpdate) {
+                return UpdateInfo(
+                    isAvailable = false,
+                    latestVersion = latestTagName,
+                    currentVersion = currentVersion,
+                    releaseNotes = "",
+                    downloadUrl = "",
+                    apkName = ""
+                )
+            }
+
+            // Find APK in assets of the latest release
+            var downloadUrl = ""
+            var apkName = "MyCalendar-v$latestTagName.apk"
+            val assets = latestRelease.optJSONArray("assets")
+            if (assets != null) {
+                for (i in 0 until assets.length()) {
+                    val asset = assets.getJSONObject(i)
+                    val name = asset.optString("name", "")
+                    if (name.endsWith(".apk", ignoreCase = true)) {
+                        downloadUrl = asset.optString("browser_download_url", "")
+                        apkName = name
+                        break
+                    }
+                }
+            }
+            if (downloadUrl.isBlank()) {
+                downloadUrl = latestRelease.optString("html_url", "")
+            }
+
+            // Aggregate changelog for all versions newer than currentVersion
+            val newerReleases = mutableListOf<Pair<String, String>>()
+            for (rel in stableReleases) {
+                val tag = rel.optString("tag_name", "").removePrefix("v").removePrefix("V").trim()
+                if (isNewerVersion(tag, currentVersion)) {
+                    val body = rel.optString("body", "").trim()
+                    newerReleases.add(Pair(tag, body))
+                }
+            }
+
+            val aggregatedNotes = when {
+                newerReleases.size <= 1 -> {
+                    latestRelease.optString("body", "تغییرات و بهبودهای جدید").trim()
+                }
+                else -> {
+                    buildString {
+                        newerReleases.forEachIndexed { index, (tag, body) ->
+                            if (index > 0) append("\n\n───────────────\n\n")
+                            append("✨ تغییرات نسخه ${com.example.calendar.PersianCalendarHelper.toPersianDigits(tag)}:\n")
+                            append(if (body.isNotBlank()) body else "تغییرات و بهبودهای جدید")
+                        }
+                    }
+                }
+            }
+
+            return UpdateInfo(
+                isAvailable = true,
+                latestVersion = latestTagName,
+                currentVersion = currentVersion,
+                releaseNotes = aggregatedNotes,
+                downloadUrl = downloadUrl,
+                apkName = apkName
+            )
+        } catch (e: Exception) {
+            Log.e(TAG, "Error in fetchFromReleasesList: ${e.message}", e)
+            return null
+        } finally {
+            connection?.disconnect()
+        }
+    }
+
+    /**
+     * Fallback to GitHub latest release endpoint if listing fails.
+     */
+    private fun fetchFromLatestEndpoint(currentVersion: String): UpdateInfo? {
         var connection: HttpURLConnection? = null
         try {
             val url = URL(GITHUB_LATEST_RELEASE_URL)
@@ -62,61 +213,111 @@ object AppUpdateManager {
                 setRequestProperty("User-Agent", "My-AI-Calendar-Android-App")
             }
 
-            val responseCode = connection.responseCode
-            if (responseCode == HttpURLConnection.HTTP_OK) {
-                val reader = BufferedReader(InputStreamReader(connection.inputStream))
-                val response = reader.readText()
-                reader.close()
+            if (connection.responseCode != HttpURLConnection.HTTP_OK) {
+                return null
+            }
 
-                val json = JSONObject(response)
-                val tagName = json.optString("tag_name", "").removePrefix("v").removePrefix("V").trim()
-                val releaseNotes = json.optString("body", "تغییرات و بهبودهای جدید").trim()
-                val currentVersion = BuildConfig.VERSION_NAME.removePrefix("v").removePrefix("V").trim()
+            val reader = BufferedReader(InputStreamReader(connection.inputStream))
+            val response = reader.readText()
+            reader.close()
 
-                // Find APK in assets
-                var downloadUrl = ""
-                var apkName = "MyCalendar-v$tagName.apk"
-                val assets = json.optJSONArray("assets")
-                if (assets != null) {
-                    for (i in 0 until assets.length()) {
-                        val asset = assets.getJSONObject(i)
-                        val name = asset.optString("name", "")
-                        if (name.endsWith(".apk", ignoreCase = true)) {
-                            downloadUrl = asset.optString("browser_download_url", "")
-                            apkName = name
-                            break
-                        }
+            val json = JSONObject(response)
+            val tagName = json.optString("tag_name", "").removePrefix("v").removePrefix("V").trim()
+            val releaseNotes = json.optString("body", "تغییرات و بهبودهای جدید").trim()
+
+            var downloadUrl = ""
+            var apkName = "MyCalendar-v$tagName.apk"
+            val assets = json.optJSONArray("assets")
+            if (assets != null) {
+                for (i in 0 until assets.length()) {
+                    val asset = assets.getJSONObject(i)
+                    val name = asset.optString("name", "")
+                    if (name.endsWith(".apk", ignoreCase = true)) {
+                        downloadUrl = asset.optString("browser_download_url", "")
+                        apkName = name
+                        break
                     }
                 }
-
-                // If no asset is attached, fallback to html_url
-                if (downloadUrl.isBlank()) {
-                    downloadUrl = json.optString("html_url", "")
-                }
-
-                val hasUpdate = isNewerVersion(tagName, currentVersion)
-
-                // Update last checked timestamp
-                prefs.edit().putLong(KEY_LAST_CHECK_TIME, now).apply()
-
-                UpdateInfo(
-                    isAvailable = hasUpdate,
-                    latestVersion = tagName,
-                    currentVersion = currentVersion,
-                    releaseNotes = releaseNotes,
-                    downloadUrl = downloadUrl,
-                    apkName = apkName
-                )
-            } else {
-                Log.w(TAG, "GitHub API returned code: $responseCode")
-                null
             }
+
+            if (downloadUrl.isBlank()) {
+                downloadUrl = json.optString("html_url", "")
+            }
+
+            val hasUpdate = isNewerVersion(tagName, currentVersion)
+
+            return UpdateInfo(
+                isAvailable = hasUpdate,
+                latestVersion = tagName,
+                currentVersion = currentVersion,
+                releaseNotes = releaseNotes,
+                downloadUrl = downloadUrl,
+                apkName = apkName
+            )
         } catch (e: Exception) {
-            Log.e(TAG, "Error checking for update: ${e.message}", e)
-            null
+            Log.e(TAG, "Error in fetchFromLatestEndpoint: ${e.message}", e)
+            return null
         } finally {
             connection?.disconnect()
         }
+    }
+
+    /**
+     * Pending install APK file state tracking.
+     */
+    fun setPendingInstallApkPath(context: Context, path: String?) {
+        val prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+        prefs.edit().putString(KEY_PENDING_APK_PATH, path).apply()
+    }
+
+    fun getPendingInstallApk(context: Context): File? {
+        val prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+        val path = prefs.getString(KEY_PENDING_APK_PATH, null) ?: return null
+        val file = File(path)
+        return if (file.exists() && file.length() > 500_000) file else null
+    }
+
+    fun clearPendingInstallApk(context: Context) {
+        val prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+        prefs.edit().remove(KEY_PENDING_APK_PATH).apply()
+    }
+
+    /**
+     * Pending update information persistence for smart 18:00 reminder.
+     */
+    fun savePendingUpdateInfo(context: Context, updateInfo: UpdateInfo) {
+        val prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+        prefs.edit()
+            .putString(KEY_PENDING_VERSION, updateInfo.latestVersion)
+            .putString(KEY_PENDING_NOTES, updateInfo.releaseNotes)
+            .putString(KEY_PENDING_URL, updateInfo.downloadUrl)
+            .putString(KEY_PENDING_APK_NAME, updateInfo.apkName)
+            .apply()
+    }
+
+    fun getPendingUpdateInfo(context: Context): UpdateInfo? {
+        val prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+        val version = prefs.getString(KEY_PENDING_VERSION, null) ?: return null
+        val currentVersion = BuildConfig.VERSION_NAME.removePrefix("v").removePrefix("V").trim()
+        val hasUpdate = isNewerVersion(version, currentVersion)
+        return UpdateInfo(
+            isAvailable = hasUpdate,
+            latestVersion = version,
+            currentVersion = currentVersion,
+            releaseNotes = prefs.getString(KEY_PENDING_NOTES, "") ?: "",
+            downloadUrl = prefs.getString(KEY_PENDING_URL, "") ?: "",
+            apkName = prefs.getString(KEY_PENDING_APK_NAME, "MyCalendar-v$version.apk") ?: "MyCalendar-v$version.apk"
+        )
+    }
+
+    fun clearPendingUpdateInfo(context: Context) {
+        val prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+        prefs.edit()
+            .remove(KEY_PENDING_VERSION)
+            .remove(KEY_PENDING_NOTES)
+            .remove(KEY_PENDING_URL)
+            .remove(KEY_PENDING_APK_NAME)
+            .apply()
     }
 
     /**

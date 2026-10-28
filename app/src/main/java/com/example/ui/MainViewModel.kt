@@ -212,25 +212,33 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     fun updateFajrAlarm(isEnabled: Boolean, offsetMinutes: Int) {
-        val current = _fajrAlarmSettings.value.copy(
+        val prev = _fajrAlarmSettings.value
+        if (prev.isEnabled == isEnabled && prev.offsetMinutesBefore == offsetMinutes) {
+            return
+        }
+
+        val current = prev.copy(
             isEnabled = isEnabled,
             offsetMinutesBefore = offsetMinutes,
             cityName = _selectedCity.value.nameFa
         )
         _fajrAlarmSettings.value = current
-        FajrAlarmManager.saveSettings(getApplication(), current)
-        if (isEnabled) {
-            val offsetText = when {
-                offsetMinutes > 0 -> "$offsetMinutes دقیقه قبل از اذان"
-                offsetMinutes < 0 -> {
-                    val after = -offsetMinutes
-                    if (after == 60) "۱ ساعت بعد از اذان" else "$after دقیقه بعد از اذان"
+
+        viewModelScope.launch(Dispatchers.IO) {
+            FajrAlarmManager.saveSettings(getApplication(), current)
+            if (isEnabled) {
+                val offsetText = when {
+                    offsetMinutes > 0 -> "$offsetMinutes دقیقه قبل از اذان"
+                    offsetMinutes < 0 -> {
+                        val after = -offsetMinutes
+                        if (after == 60) "۱ ساعت بعد از اذان" else "$after دقیقه بعد از اذان"
+                    }
+                    else -> "همزمان با اذان"
                 }
-                else -> "همزمان با اذان"
+                logMessage("هشدار هوشمند اذان صبح فعال شد ($offsetText).")
+            } else {
+                logMessage("هشدار هوشمند اذان صبح غیرفعال شد.")
             }
-            logMessage("هشدار هوشمند اذان صبح فعال شد ($offsetText).")
-        } else {
-            logMessage("هشدار هوشمند اذان صبح غیرفعال شد.")
         }
     }
 
@@ -1105,6 +1113,8 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 val update = AppUpdateManager.checkForUpdates(getApplication(), isManual)
                 if (update != null && update.isAvailable) {
                     _availableUpdate.value = update
+                    // تنظیم یادآوری هوشمند ساعت ۱۸:۰۰ عصر در صورت عدم نصب
+                    com.example.update.UpdateReminderReceiver.scheduleReminder(getApplication(), update)
                 } else if (isManual) {
                     _updateStatusMessage.value = "برنامه شما به‌روز است (نسخه فعلی: ${com.example.BuildConfig.VERSION_NAME})"
                 }
@@ -1119,6 +1129,11 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     fun dismissUpdateDialog() {
+        val pending = _availableUpdate.value ?: AppUpdateManager.getPendingUpdateInfo(getApplication())
+        if (pending != null && pending.isAvailable) {
+            // در صورت رد کردن یا بستن دیالوگ توسط کاربر، یادآوری ساعت ۱۸ فعال می‌ماند
+            com.example.update.UpdateReminderReceiver.scheduleReminder(getApplication(), pending)
+        }
         _availableUpdate.value = null
         _updateDownloadState.value = UpdateDownloadState.Idle
     }
@@ -1167,19 +1182,72 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
 
     fun installDownloadedUpdate(context: android.content.Context, apkFile: File) {
         if (AppUpdateManager.canInstallPackages(context)) {
-            _updateDownloadState.value = UpdateDownloadState.ReadyToInstall(apkFile)
             val success = AppUpdateManager.installApk(context, apkFile)
-            if (!success) {
+            if (success) {
+                // الزام ۴: بلافاصله تمام مودال‌ها و دیالوگ‌های اپلیکیشن dismiss می‌شوند تا زیر دیالوگ سیستمی نمانند
+                _availableUpdate.value = null
+                _updateDownloadState.value = UpdateDownloadState.Idle
+                AppUpdateManager.clearPendingInstallApk(context)
+                com.example.update.UpdateReminderReceiver.cancelReminder(context)
+                logMessage("اینتنت نصب اندروید با موفقیت فراخوانی شد.")
+            } else {
                 _updateStatusMessage.value = "امکان باز کردن نصاب اندروید میسر نشد."
+                _updateDownloadState.value = UpdateDownloadState.ReadyToInstall(apkFile)
             }
         } else {
+            // الزام ۵: ذخیره فایل جهت نصب خودکار پس از دریافت مجوز در onResume
+            AppUpdateManager.setPendingInstallApkPath(context, apkFile.absolutePath)
             _updateDownloadState.value = UpdateDownloadState.PermissionRequired(apkFile)
-            AppUpdateManager.openInstallPermissionSettings(context)
         }
     }
 
     fun requestInstallPermission(context: android.content.Context) {
+        val curState = _updateDownloadState.value
+        if (curState is UpdateDownloadState.PermissionRequired) {
+            AppUpdateManager.setPendingInstallApkPath(context, curState.apkFile.absolutePath)
+        }
         AppUpdateManager.openInstallPermissionSettings(context)
+    }
+
+    /**
+     * الزام ۵: در بازگشت به برنامه (onResume)، داشتن مجوز خودکار بررسی شده و فایل APK دانلودشده درجا نصب می‌شود.
+     */
+    fun checkAndResumePendingInstall(context: android.content.Context) {
+        val pendingApk = AppUpdateManager.getPendingInstallApk(context)
+        if (pendingApk != null && pendingApk.exists() && pendingApk.length() > 500_000) {
+            if (AppUpdateManager.canInstallPackages(context)) {
+                logMessage("مجوز نصب ناشناخته فعال شد. اجرای خودکار فرآیند نصب...")
+                installDownloadedUpdate(context, pendingApk)
+            }
+        }
+    }
+
+    /**
+     * الزام ۲: مدیریت کلیک روی نوتیفیکیشن یا دکمه «مشاهده و نصب» یادآوری ۱۸:۰۰
+     */
+    fun handleUpdateNotificationClick(context: android.content.Context) {
+        viewModelScope.launch {
+            val pendingInfo = AppUpdateManager.getPendingUpdateInfo(context)
+            if (pendingInfo != null && pendingInfo.isAvailable) {
+                val existingApk = AppUpdateManager.getDownloadedApkIfReady(context, pendingInfo.apkName)
+                if (existingApk != null && AppUpdateManager.canInstallPackages(context)) {
+                    installDownloadedUpdate(context, existingApk)
+                } else {
+                    _availableUpdate.value = pendingInfo
+                    if (existingApk != null) {
+                        _updateDownloadState.value = if (AppUpdateManager.canInstallPackages(context)) {
+                            UpdateDownloadState.ReadyToInstall(existingApk)
+                        } else {
+                            UpdateDownloadState.PermissionRequired(existingApk)
+                        }
+                    } else {
+                        _updateDownloadState.value = UpdateDownloadState.Idle
+                    }
+                }
+            } else {
+                checkForAppUpdate(isManual = true)
+            }
+        }
     }
 
     fun cancelUpdateDownload() {
