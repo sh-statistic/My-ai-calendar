@@ -107,8 +107,8 @@ fun rememberLifeGridColors(): LifeGridColors {
             elapsedCardTitle = Color(0xFFF59E0B),
             remainingCardBg = Color(0xFF222228), // Sleek neutral card surface (no muddy blue!)
             remainingCardTitle = Color(0xFF38BDF8),
-            progressTrack = Color(0xFF27272A),
-            progressFill = Color(0xFFF59E0B)
+            progressTrack = Color(0xFF33333A),
+            progressFill = Color(0xFFFFFFFF)
         )
     } else {
         LifeGridColors(

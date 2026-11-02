@@ -43,6 +43,32 @@ object AppUpdateManager {
     const val CHECK_INTERVAL_MILLIS = 30L * 24 * 60 * 60 * 1000
 
     /**
+     * Dynamically resolves the currently installed app version name from Android PackageManager.
+     * Fallbacks to BuildConfig.VERSION_NAME if PackageManager query fails.
+     */
+    fun getInstalledVersionName(context: Context): String {
+        return try {
+            val pInfo = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                context.packageManager.getPackageInfo(
+                    context.packageName,
+                    android.content.pm.PackageManager.PackageInfoFlags.of(0)
+                )
+            } else {
+                @Suppress("DEPRECATION")
+                context.packageManager.getPackageInfo(context.packageName, 0)
+            }
+            val vName = pInfo.versionName
+            if (!vName.isNullOrBlank()) {
+                vName.removePrefix("v").removePrefix("V").trim()
+            } else {
+                BuildConfig.VERSION_NAME.removePrefix("v").removePrefix("V").trim()
+            }
+        } catch (_: Exception) {
+            BuildConfig.VERSION_NAME.removePrefix("v").removePrefix("V").trim()
+        }
+    }
+
+    /**
      * Checks GitHub for updates.
      * Always targets the latest stable release directly (skipping any intermediate versions)
      * and aggregates changelogs from the user's current version up to the latest release.
@@ -61,7 +87,7 @@ object AppUpdateManager {
             return@withContext null
         }
 
-        val currentVersion = BuildConfig.VERSION_NAME.removePrefix("v").removePrefix("V").trim()
+        val currentVersion = getInstalledVersionName(context)
 
         // 1. Try fetching full releases list to aggregate all changelogs from current to latest
         var updateInfo = fetchFromReleasesList(currentVersion)
@@ -298,7 +324,7 @@ object AppUpdateManager {
     fun getPendingUpdateInfo(context: Context): UpdateInfo? {
         val prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
         val version = prefs.getString(KEY_PENDING_VERSION, null) ?: return null
-        val currentVersion = BuildConfig.VERSION_NAME.removePrefix("v").removePrefix("V").trim()
+        val currentVersion = getInstalledVersionName(context)
         val hasUpdate = isNewerVersion(version, currentVersion)
         return UpdateInfo(
             isAvailable = hasUpdate,

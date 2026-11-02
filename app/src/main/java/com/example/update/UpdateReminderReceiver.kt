@@ -114,7 +114,7 @@ class UpdateReminderReceiver : BroadcastReceiver() {
         if (intent?.action != ACTION_UPDATE_REMINDER) return
 
         val pendingInfo = AppUpdateManager.getPendingUpdateInfo(context)
-        val currentVer = BuildConfig.VERSION_NAME.removePrefix("v").removePrefix("V").trim()
+        val currentVer = AppUpdateManager.getInstalledVersionName(context)
         val targetVer = intent.getStringExtra(EXTRA_VERSION) ?: pendingInfo?.latestVersion
 
         // If app has already been updated to or past target version, abort reminder

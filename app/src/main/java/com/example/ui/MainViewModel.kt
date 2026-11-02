@@ -1116,7 +1116,8 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                     // تنظیم یادآوری هوشمند ساعت ۱۸:۰۰ عصر در صورت عدم نصب
                     com.example.update.UpdateReminderReceiver.scheduleReminder(getApplication(), update)
                 } else if (isManual) {
-                    _updateStatusMessage.value = "برنامه شما به‌روز است (نسخه فعلی: ${com.example.BuildConfig.VERSION_NAME})"
+                    val currentVersion = AppUpdateManager.getInstalledVersionName(getApplication())
+                    _updateStatusMessage.value = "برنامه شما به‌روز است (نسخه فعلی: $currentVersion)"
                 }
             } catch (e: Exception) {
                 if (isManual) {

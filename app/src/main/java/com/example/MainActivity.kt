@@ -105,8 +105,8 @@ class MainActivity : ComponentActivity() {
 
         handleIntentForUpdate(intent)
 
-        // راه‌اندازی استعلام خودکار و دوره‌ای پس‌زمینه حتی در صورت بسته بودن برنامه
-        com.example.update.BackgroundUpdateCheckReceiver.schedulePeriodicCheck(this)
+        // راه‌اندازی استعلام خودکار و دوره‌ای پس‌زمینه با WorkManager حتی در صورت بسته بودن برنامه
+        com.example.update.UpdateWorkScheduler.schedulePeriodicCheck(this)
 
         setContent {
             val isDarkMode by viewModel.isDarkMode.collectAsState()

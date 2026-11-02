@@ -1303,7 +1303,8 @@ fun SettingsScreen(
                     horizontalArrangement = Arrangement.SpaceBetween,
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    Text("${strings.appVersion} ${strings.formatDigits(com.example.BuildConfig.VERSION_NAME)}", style = MaterialTheme.typography.bodySmall, fontWeight = FontWeight.Bold)
+                    val currentVersion = remember(context) { com.example.update.AppUpdateManager.getInstalledVersionName(context) }
+                    Text("${strings.appVersion} ${strings.formatDigits(currentVersion)}", style = MaterialTheme.typography.bodySmall, fontWeight = FontWeight.Bold)
 
                     OutlinedButton(
                         onClick = { viewModel.checkForAppUpdate(isManual = true) },
