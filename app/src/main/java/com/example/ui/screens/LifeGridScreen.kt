@@ -1,5 +1,7 @@
 package com.example.ui.screens
 
+import android.widget.Toast
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -27,17 +29,20 @@ import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Cake
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.HourglassBottom
+import androidx.compose.material.icons.filled.NoteAlt
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
@@ -143,7 +148,8 @@ fun LifeGridScreen(
     val strings  = rememberAppStrings()
     val colors   = rememberLifeGridColors()
     val manager  = remember { MementoMoriManager(context) }
-    var progress by remember { mutableStateOf(manager.calculateProgress()) }
+    val mementoRevision by viewModel.mementoRevision.collectAsState()
+    var progress by remember(mementoRevision) { mutableStateOf(manager.calculateProgress()) }
 
     var selectedYearIdx by remember { mutableStateOf<Int?>(null) }
 
@@ -156,37 +162,7 @@ fun LifeGridScreen(
     val totalYears = (totalGridSlots + 11) / 12
     val decades    = (totalYears + 9) / 10
 
-    var showNewMonthPrompt by remember { mutableStateOf(false) }
-
-    androidx.compose.runtime.LaunchedEffect(progress.currentMonthIndex) {
-        if (progress.isConfigured && manager.checkNewMonthCompleted(progress.currentMonthIndex)) {
-            showNewMonthPrompt = true
-        }
-    }
-
     val scrollState = rememberScrollState()
-
-    if (showNewMonthPrompt) {
-        AlertDialog(
-            onDismissRequest = { showNewMonthPrompt = false },
-            title = { Text(strings.anotherMonthPassedTitle, fontWeight = FontWeight.Bold) },
-            text = { Text(strings.anotherMonthPassedMsg) },
-            confirmButton = {
-                Button(
-                    onClick = {
-                        showNewMonthPrompt = false
-                        justDrilledMonthIdx = progress.currentMonthIndex - 1
-                        reflectionNoteText = manager.getReflectionNote(justDrilledMonthIdx) ?: ""
-                        showReflectionDialog = true
-                    },
-                    colors = ButtonDefaults.buttonColors(containerColor = colors.orangeAccent)
-                ) { Text(strings.writeNoteConfirm) }
-            },
-            dismissButton = {
-                TextButton(onClick = { showNewMonthPrompt = false }) { Text(strings.later) }
-            }
-        )
-    }
 
     Column(
         modifier = modifier
@@ -222,12 +198,19 @@ fun LifeGridScreen(
                     progress        = progress,
                     selectedYearIdx = yearIdx,
                     colors          = colors,
+                    manager         = manager,
+                    mementoRevision = mementoRevision,
                     onMonthClick    = { clickedMonthIdx ->
                         justDrilledMonthIdx = clickedMonthIdx
                         if (clickedMonthIdx <= progress.currentMonthIndex) {
                             reflectionNoteText = manager.getReflectionNote(clickedMonthIdx) ?: ""
                             selectedYearIdx = null
                             showReflectionDialog = true
+                        }
+                    },
+                    onSyncYearToNotes = {
+                        viewModel.syncYearReflectionToNotes(yearIdx) { _, msg ->
+                            Toast.makeText(context, msg, Toast.LENGTH_SHORT).show()
                         }
                     }
                 )
@@ -240,9 +223,24 @@ fun LifeGridScreen(
 
     // Reflection Dialog
     if (showReflectionDialog) {
+        val monthYearLabel = remember(justDrilledMonthIdx, strings.isFa) {
+            manager.getMonthYearLabel(justDrilledMonthIdx, strings.isFa)
+        }
         AlertDialog(
             onDismissRequest = { showReflectionDialog = false },
-            title  = { Text(strings.howWasThisMonthTitle, fontWeight = FontWeight.Bold) },
+            title  = {
+                Column {
+                    Text(strings.howWasThisMonthTitle, fontWeight = FontWeight.Bold)
+                    if (monthYearLabel.isNotBlank()) {
+                        Text(
+                            text = monthYearLabel,
+                            fontSize = 12.sp,
+                            color = colors.orangeAccent,
+                            fontWeight = FontWeight.SemiBold
+                        )
+                    }
+                }
+            },
             text   = {
                 Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                     Text(
@@ -261,9 +259,7 @@ fun LifeGridScreen(
             confirmButton = {
                 Button(
                     onClick = {
-                        if (reflectionNoteText.isNotBlank()) {
-                            manager.saveReflectionNote(justDrilledMonthIdx, reflectionNoteText.trim())
-                        }
+                        viewModel.saveMonthlyReflection(justDrilledMonthIdx, reflectionNoteText.trim())
                         showReflectionDialog = false
                     },
                     colors = ButtonDefaults.buttonColors(containerColor = colors.orangeAccent)
@@ -328,6 +324,7 @@ fun LifeGridScreen(
                         manager.setBirthDate(y, tempMonth)
                         manager.setExpectedLifespan(ls)
                         progress = manager.calculateProgress()
+                        viewModel.checkMementoMonthAndYearStatus()
                         showBirthDialog = false
                     }
                 ) { Text(strings.saveAndUpdate) }
@@ -339,6 +336,7 @@ fun LifeGridScreen(
                             onClick = {
                                 manager.clearBirthDate()
                                 progress = manager.calculateProgress()
+                                viewModel.checkMementoMonthAndYearStatus()
                                 showBirthDialog = false
                             },
                             colors = ButtonDefaults.textButtonColors(contentColor = MaterialTheme.colorScheme.error)
@@ -707,13 +705,17 @@ private fun SelectedYearDialogContent(
     progress: LifeProgress,
     selectedYearIdx: Int,
     colors: LifeGridColors,
-    onMonthClick: (Int) -> Unit
+    manager: MementoMoriManager,
+    mementoRevision: Int,
+    onMonthClick: (Int) -> Unit,
+    onSyncYearToNotes: () -> Unit
 ) {
     val strings         = rememberAppStrings()
     val monthNames      = strings.jalaliMonths
     val startMonthIdx   = selectedYearIdx * 12
     val currentMonthIdx = progress.currentMonthIndex
     val isDark          = MaterialTheme.colorScheme.background.luminance() < 0.5f
+    val yearNotes       = remember(selectedYearIdx, mementoRevision) { manager.getNotesForYear(selectedYearIdx) }
 
     Column {
         for (row in 0 until 3) {
@@ -740,17 +742,24 @@ private fun SelectedYearDialogContent(
                     val isElapsed = absMonthIdx < currentMonthIdx
                     val isCurrent = absMonthIdx == currentMonthIdx
                     val isClickable = isElapsed || isCurrent
+                    val hasNote = yearNotes.containsKey(monthInYear)
                     val chipBg    = when {
                         isElapsed -> if (isDark) Color(0xFF1E3A8A).copy(alpha = 0.8f) else Color(0xFF1B2A4A)
                         isCurrent -> colors.orangeAccent
                         else -> if (isDark) Color(0xFF334155).copy(alpha = 0.6f) else Color(0xFFF0EDE8)
                     }
                     val chipText  = if (isClickable) Color.White else (if (isDark) Color(0xFF94A3B8) else colors.grayText)
-                    val subtitle  = when { isElapsed -> strings.viewOrAddNote; isCurrent -> strings.tapToAddNote; else -> "—" }
+                    val subtitle  = when {
+                        hasNote -> if (strings.isFa) "✓ ثبت‌شده" else "✓ Saved"
+                        isElapsed -> strings.viewOrAddNote
+                        isCurrent -> strings.tapToAddNote
+                        else -> "—"
+                    }
 
                     Surface(
                         color    = chipBg,
                         shape    = RoundedCornerShape(10.dp),
+                        border   = if (hasNote) BorderStroke(1.2.dp, colors.orangeAccent) else null,
                         modifier = Modifier
                             .weight(1f)
                             .clickable(enabled = isClickable) { if (isClickable) onMonthClick(absMonthIdx) }
@@ -761,12 +770,46 @@ private fun SelectedYearDialogContent(
                         ) {
                             Text(monthName, fontSize = 12.sp, fontWeight = FontWeight.SemiBold, color = chipText, textAlign = TextAlign.Center)
                             Spacer(modifier = Modifier.height(2.dp))
-                            Text(subtitle, fontSize = 9.sp, color = chipText.copy(alpha = 0.7f), textAlign = TextAlign.Center)
+                            Text(
+                                subtitle,
+                                fontSize = 9.sp,
+                                fontWeight = if (hasNote) FontWeight.Bold else FontWeight.Normal,
+                                color = if (hasNote && !isCurrent) colors.orangeAccent else chipText.copy(alpha = 0.7f),
+                                textAlign = TextAlign.Center
+                            )
                         }
                     }
                 }
             }
             if (row < 2) Spacer(modifier = Modifier.height(6.dp))
+        }
+
+        if (yearNotes.isNotEmpty()) {
+            Spacer(modifier = Modifier.height(12.dp))
+            OutlinedButton(
+                onClick = onSyncYearToNotes,
+                shape = RoundedCornerShape(10.dp),
+                border = BorderStroke(1.dp, colors.orangeAccent),
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Icon(
+                    Icons.Default.NoteAlt,
+                    contentDescription = null,
+                    tint = colors.orangeAccent,
+                    modifier = Modifier.size(16.dp)
+                )
+                Spacer(modifier = Modifier.width(6.dp))
+                Text(
+                    text = if (strings.isFa) {
+                        "ثبت کارنامه این سال در یادداشت‌ها (${strings.formatDigits(yearNotes.size.toString())} ماه)"
+                    } else {
+                        "Save Year Review to Notes (${yearNotes.size} months)"
+                    },
+                    fontSize = 11.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = colors.orangeAccent
+                )
+            }
         }
     }
 }

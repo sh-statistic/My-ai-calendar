@@ -7,6 +7,10 @@ import com.example.calendar.GregorianDate
 import com.example.calendar.JalaliDate
 import com.example.calendar.PersianCalendarHelper
 import com.example.calendar.PersianOccasionsHelper
+import com.example.calendar.EventRecurrenceConfig
+import com.example.calendar.EventRecurrenceHelper
+import com.example.calendar.RecurrenceFrequency
+import com.example.calendar.RecurrenceEndType
 import com.example.data.AppDatabase
 import com.example.data.AppRepository
 import com.example.data.EventEntity
@@ -34,6 +38,7 @@ import com.example.update.UpdateInfo
 import com.example.update.UpdateDownloadState
 import java.io.File
 import com.example.alarm.EventAlarmScheduler
+import com.example.memento.MementoMoriManager
 import com.example.settings.AppPreferences
 import java.util.Calendar
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -46,7 +51,12 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.isActive
+import kotlinx.coroutines.Job
 import java.util.UUID
+
+enum class CalendarViewMode {
+    MONTH, WEEK
+}
 
 class MainViewModel(application: Application) : AndroidViewModel(application) {
 
@@ -93,6 +103,23 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         AppPreferences.setDarkMode(getApplication(), enabled)
     }
 
+    // Calendar View Mode (MONTH vs WEEK)
+    private val _calendarViewMode = MutableStateFlow(
+        if (AppPreferences.getCalendarViewMode(application) == "WEEK") CalendarViewMode.WEEK else CalendarViewMode.MONTH
+    )
+    val calendarViewMode: StateFlow<CalendarViewMode> = _calendarViewMode.asStateFlow()
+
+    fun toggleCalendarViewMode() {
+        val next = if (_calendarViewMode.value == CalendarViewMode.MONTH) CalendarViewMode.WEEK else CalendarViewMode.MONTH
+        _calendarViewMode.value = next
+        AppPreferences.setCalendarViewMode(getApplication(), next.name)
+    }
+
+    fun setCalendarViewMode(mode: CalendarViewMode) {
+        _calendarViewMode.value = mode
+        AppPreferences.setCalendarViewMode(getApplication(), mode.name)
+    }
+
     // Calendar State
     private val todayJalali = PersianCalendarHelper.getCurrentJalaliDate()
     private val _selectedDate = MutableStateFlow(todayJalali)
@@ -109,6 +136,127 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
 
     fun refreshOccasions() {
         _occasionsVersion.value += 1
+    }
+
+    // Memento Mori (Life Grid) Monthly & Yearly Reflection State
+    val mementoManager = MementoMoriManager(application)
+
+    private val _pendingReflectionMonthIdx = MutableStateFlow<Int?>(null)
+    val pendingReflectionMonthIdx: StateFlow<Int?> = _pendingReflectionMonthIdx.asStateFlow()
+
+    private val _mementoRevision = MutableStateFlow(0)
+    val mementoRevision: StateFlow<Int> = _mementoRevision.asStateFlow()
+
+    fun checkMementoMonthAndYearStatus() {
+        val progress = mementoManager.calculateProgress()
+        if (progress.isConfigured && progress.currentMonthIndex >= 0) {
+            val pendingMonth = mementoManager.getPendingCompletedMonthIndex(progress.currentMonthIndex)
+            _pendingReflectionMonthIdx.value = pendingMonth
+            syncCompletedYearlyReflections()
+        } else {
+            _pendingReflectionMonthIdx.value = null
+        }
+        _mementoRevision.value += 1
+    }
+
+    fun saveMonthlyReflection(monthIdx: Int, noteText: String, markPromptHandled: Boolean = false) {
+        mementoManager.saveReflectionNote(monthIdx, noteText)
+        val progress = mementoManager.calculateProgress()
+        if (markPromptHandled || monthIdx == _pendingReflectionMonthIdx.value) {
+            mementoManager.acknowledgeMonthCompleted(progress.currentMonthIndex)
+            _pendingReflectionMonthIdx.value = null
+        }
+        _mementoRevision.value += 1
+
+        val yearIdx = monthIdx / 12
+        val currentYearIdx = if (progress.currentMonthIndex >= 0) progress.currentMonthIndex / 12 else -1
+        if (yearIdx < currentYearIdx) {
+            // اگر ماه مربوط به سالی است که به پایان رسیده، کارنامه آن سال در یادداشت‌ها به‌طور خودکار ایجاد یا آپدیت شود
+            syncYearReflectionToNotes(yearIdx, isAutomatic = true)
+        } else {
+            // اگر برای سال جاری هم قبلاً کارنامه‌ای در یادداشت‌ها ثبت شده بود، آن را به‌روز نگه دار
+            viewModelScope.launch(Dispatchers.IO) {
+                val persianYear = mementoManager.getBirthYear() + yearIdx
+                val noteId = "yearly_reflection_$persianYear"
+                val existing = repository.allActiveNotes.first().find { it.id == noteId }
+                if (existing != null) {
+                    syncYearReflectionToNotes(yearIdx, isAutomatic = true)
+                }
+            }
+        }
+    }
+
+    fun dismissMonthlyReflectionPrompt() {
+        val progress = mementoManager.calculateProgress()
+        mementoManager.acknowledgeMonthCompleted(progress.currentMonthIndex)
+        _pendingReflectionMonthIdx.value = null
+    }
+
+    fun syncCompletedYearlyReflections() {
+        viewModelScope.launch(Dispatchers.IO) {
+            val progress = mementoManager.calculateProgress()
+            if (!progress.isConfigured || progress.currentMonthIndex < 0) return@launch
+            val currentYearIdx = progress.currentMonthIndex / 12
+            if (currentYearIdx <= 0) return@launch
+
+            val isFa = _appLanguage.value == "fa"
+            val existingNotes = repository.allActiveNotes.first()
+
+            for (yearIdx in 0 until currentYearIdx) {
+                val builtNote = mementoManager.buildYearlyReflectionNote(yearIdx, isFa) ?: continue
+                val existing = existingNotes.find { it.id == builtNote.id }
+                if (existing == null) {
+                    repository.insertNote(builtNote)
+                    logMessage("کارنامه عملکرد سالانه به صورت خودکار در یادداشت‌ها ثبت شد: ${builtNote.title}")
+                } else if (existing.content != builtNote.content || existing.title != builtNote.title) {
+                    repository.insertNote(
+                        builtNote.copy(
+                            colorHex = existing.colorHex,
+                            isPinned = existing.isPinned,
+                            isDeleted = false,
+                            updatedAt = System.currentTimeMillis()
+                        )
+                    )
+                }
+            }
+        }
+    }
+
+    fun syncYearReflectionToNotes(
+        yearIdx: Int,
+        isAutomatic: Boolean = false,
+        onResult: (Boolean, String) -> Unit = { _, _ -> }
+    ) {
+        viewModelScope.launch {
+            val isFa = _appLanguage.value == "fa"
+            val builtNote = mementoManager.buildYearlyReflectionNote(yearIdx, isFa)
+            if (builtNote == null) {
+                val msg = if (isFa) "هنوز یادداشتی برای ماه‌های این سال ثبت نشده است." else "No monthly notes recorded for this year yet."
+                onResult(false, msg)
+                return@launch
+            }
+            val existing = repository.allActiveNotes.first().find { it.id == builtNote.id }
+            val finalNote = if (existing != null) {
+                builtNote.copy(
+                    colorHex = existing.colorHex,
+                    isPinned = existing.isPinned,
+                    isDeleted = false,
+                    updatedAt = System.currentTimeMillis()
+                )
+            } else {
+                builtNote
+            }
+            repository.insertNote(finalNote)
+            if (!isAutomatic) {
+                logMessage("کارنامه سالانه در یادداشت‌ها ثبت/به‌روزرسانی شد: ${finalNote.title}")
+            }
+            val msg = if (isFa) {
+                "کارنامه عملکرد سال در بخش «یادداشت‌ها» ثبت و به‌روزرسانی شد ✓"
+            } else {
+                "Yearly review saved to Notes ✓"
+            }
+            onResult(true, msg)
+        }
     }
 
     // Sync Server State
@@ -211,6 +359,8 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         logMessage("شهر اوقات شرعی به «${city.nameFa}» تغییر یافت.")
     }
 
+    private var fajrAlarmJob: Job? = null
+
     fun updateFajrAlarm(isEnabled: Boolean, offsetMinutes: Int) {
         val prev = _fajrAlarmSettings.value
         if (prev.isEnabled == isEnabled && prev.offsetMinutesBefore == offsetMinutes) {
@@ -224,7 +374,8 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         )
         _fajrAlarmSettings.value = current
 
-        viewModelScope.launch(Dispatchers.IO) {
+        fajrAlarmJob?.cancel()
+        fajrAlarmJob = viewModelScope.launch(Dispatchers.IO) {
             FajrAlarmManager.saveSettings(getApplication(), current)
             if (isEnabled) {
                 val offsetText = when {
@@ -651,6 +802,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         checkForAppUpdate(isManual = false)
         startPrayerCountdownTicker()
         refreshGoogleCalendars()
+        checkMementoMonthAndYearStatus()
     }
 
     private fun startPrayerCountdownTicker() {
@@ -664,6 +816,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 if (currentDay != lastRecordedDay) {
                     lastRecordedDay = currentDay
                     _prayerTimes.value = calculateCurrentPrayerTimes()
+                    checkMementoMonthAndYearStatus()
                 }
                 _nextPrayerInfo.value = calculateNextPrayerInfo()
             }
@@ -708,8 +861,10 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     fun stopServer() {
-        httpServer?.stop()
-        _isServerRunning.value = false
+        if (_isServerRunning.value) {
+            httpServer?.stop()
+            _isServerRunning.value = false
+        }
     }
 
     fun toggleGoogleCalendar(enabled: Boolean) {
@@ -853,12 +1008,23 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         time: String,
         category: String,
         colorHex: String,
-        isWeeklyRecurring: Boolean = false
+        isWeeklyRecurring: Boolean = false,
+        recurrenceConfig: EventRecurrenceConfig? = null
     ) {
         val normalizedDate = PersianCalendarHelper.normalizePersianDate(persianDate)
         val gDate = parsePersianToGregorian(normalizedDate)
 
-        if (!isWeeklyRecurring) {
+        val effectiveConfig = recurrenceConfig ?: if (isWeeklyRecurring) {
+            EventRecurrenceConfig(
+                frequency = RecurrenceFrequency.WEEKLY,
+                endType = RecurrenceEndType.AFTER_COUNT,
+                count = 52
+            )
+        } else {
+            EventRecurrenceConfig(frequency = RecurrenceFrequency.NONE)
+        }
+
+        if (effectiveConfig.frequency == RecurrenceFrequency.NONE) {
             val event = EventEntity(
                 title = title,
                 description = description,
@@ -877,71 +1043,27 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 logMessage("رویداد جدید افزوده و زنگ یادآور تنظیم شد: $title")
             }
         } else {
-            val recurrenceGroupId = java.util.UUID.randomUUID().toString()
-            val eventsList = mutableListOf<EventEntity>()
+            val baseEvent = EventEntity(
+                title = title,
+                description = description,
+                persianDate = normalizedDate,
+                gregorianDate = gDate?.formatted ?: "",
+                startTime = time,
+                endTime = "",
+                category = category,
+                colorHex = colorHex,
+                recurrenceId = java.util.UUID.randomUUID().toString(),
+                recurrenceRule = effectiveConfig.frequency.name
+            )
 
-            val parts = normalizedDate.split("/").mapNotNull { it.toIntOrNull() }
-            if (parts.size == 3) {
-                val jYear = parts[0]
-                val jMonth = parts[1]
-                val jDay = parts[2]
-                val initialGregorian = PersianCalendarHelper.jalaliToGregorian(jYear, jMonth, jDay)
-
-                for (week in 0 until 52) {
-                    val cal = java.util.Calendar.getInstance().apply {
-                        set(initialGregorian.year, initialGregorian.month - 1, initialGregorian.day)
-                        add(java.util.Calendar.DAY_OF_YEAR, week * 7)
-                    }
-                    val nextJalali = PersianCalendarHelper.gregorianToJalali(
-                        cal.get(java.util.Calendar.YEAR),
-                        cal.get(java.util.Calendar.MONTH) + 1,
-                        cal.get(java.util.Calendar.DAY_OF_MONTH)
-                    )
-                    val gDateFormatted = "%04d-%02d-%02d".format(
-                        cal.get(java.util.Calendar.YEAR),
-                        cal.get(java.util.Calendar.MONTH) + 1,
-                        cal.get(java.util.Calendar.DAY_OF_MONTH)
-                    )
-
-                    eventsList.add(
-                        EventEntity(
-                            id = java.util.UUID.randomUUID().toString(),
-                            title = title,
-                            description = description,
-                            persianDate = nextJalali.formatted,
-                            gregorianDate = gDateFormatted,
-                            startTime = time,
-                            endTime = "",
-                            category = category,
-                            colorHex = colorHex,
-                            recurrenceId = recurrenceGroupId,
-                            recurrenceRule = "WEEKLY"
-                        )
-                    )
-                }
-            } else {
-                eventsList.add(
-                    EventEntity(
-                        title = title,
-                        description = description,
-                        persianDate = normalizedDate,
-                        gregorianDate = gDate?.formatted ?: "",
-                        startTime = time,
-                        endTime = "",
-                        category = category,
-                        colorHex = colorHex,
-                        recurrenceId = recurrenceGroupId,
-                        recurrenceRule = "WEEKLY"
-                    )
-                )
-            }
+            val eventsList = EventRecurrenceHelper.generateRecurringEvents(baseEvent, effectiveConfig)
 
             viewModelScope.launch {
                 repository.insertEvents(eventsList)
                 eventsList.firstOrNull()?.let {
                     EventAlarmScheduler.scheduleEventAlarm(getApplication(), it)
                 }
-                logMessage("رویداد تکرارشونده هفتگی برای ۵۲ هفته ثبت شد: $title")
+                logMessage("رویداد تکرارشونده (${effectiveConfig.getSummaryText(true)}) با موفقیت ثبت شد (${eventsList.size} نوبت): $title")
             }
         }
     }
@@ -965,6 +1087,61 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         viewModelScope.launch {
             repository.deleteRecurringEventsFromDate(recurrenceId, fromPersianDate)
             logMessage("رویدادهای تکرارشونده از تاریخ $fromPersianDate به بعد حذف شدند")
+        }
+    }
+
+    fun deleteAllRecurringEvents(recurrenceId: String) {
+        viewModelScope.launch {
+            repository.deleteAllRecurringEvents(recurrenceId)
+            logMessage("تمام تکرارهای این رویداد حذف شدند")
+        }
+    }
+
+    fun updateRecurringEventsFromDate(
+        recurrenceId: String,
+        fromPersianDate: String,
+        title: String,
+        description: String,
+        startTime: String,
+        endTime: String,
+        category: String,
+        colorHex: String
+    ) {
+        viewModelScope.launch {
+            repository.updateRecurringEventsFromDate(
+                recurrenceId = recurrenceId,
+                fromPersianDate = fromPersianDate,
+                title = title,
+                description = description,
+                startTime = startTime,
+                endTime = endTime,
+                category = category,
+                colorHex = colorHex
+            )
+            logMessage("رویدادهای تکرارشونده از تاریخ $fromPersianDate به بعد به‌روزرسانی شدند")
+        }
+    }
+
+    fun updateAllRecurringEvents(
+        recurrenceId: String,
+        title: String,
+        description: String,
+        startTime: String,
+        endTime: String,
+        category: String,
+        colorHex: String
+    ) {
+        viewModelScope.launch {
+            repository.updateAllRecurringEvents(
+                recurrenceId = recurrenceId,
+                title = title,
+                description = description,
+                startTime = startTime,
+                endTime = endTime,
+                category = category,
+                colorHex = colorHex
+            )
+            logMessage("تمام تکرارهای این رویداد به‌روزرسانی شدند")
         }
     }
 
@@ -1013,14 +1190,22 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     // Note Actions
-    fun addNote(title: String, content: String, colorHex: String, isPinned: Boolean = false, drawingPath: String? = null) {
+    fun addNote(
+        title: String,
+        content: String,
+        colorHex: String,
+        isPinned: Boolean = false,
+        drawingPath: String? = null,
+        tag: String = ""
+    ) {
         val note = NoteEntity(
             title = title.ifBlank { if (drawingPath != null) "طرح وایت‌برد" else "یادداشت جدید" },
             content = content,
             persianDate = PersianCalendarHelper.getCurrentJalaliDate().formattedPersian,
             colorHex = colorHex,
             isPinned = isPinned,
-            drawingPath = drawingPath
+            drawingPath = drawingPath,
+            tag = tag
         )
         viewModelScope.launch {
             repository.insertNote(note)
@@ -1257,6 +1442,9 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
 
     override fun onCleared() {
         super.onCleared()
-        httpServer?.stop()
+        if (_isServerRunning.value) {
+            httpServer?.stop()
+            _isServerRunning.value = false
+        }
     }
 }

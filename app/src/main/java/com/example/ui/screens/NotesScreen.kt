@@ -2,6 +2,15 @@ package com.example.ui.screens
 
 import android.graphics.BitmapFactory
 import android.widget.Toast
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.core.Spring
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.spring
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.slideInVertically
+import androidx.compose.animation.slideOutVertically
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -18,6 +27,8 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.lazy.LazyRow
+import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.staggeredgrid.LazyVerticalStaggeredGrid
 import androidx.compose.foundation.lazy.staggeredgrid.StaggeredGridCells
 import androidx.compose.foundation.lazy.staggeredgrid.items
@@ -27,6 +38,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.Note
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.CalendarMonth
+import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.CloudSync
 import androidx.compose.material.icons.filled.ContentCopy
 import androidx.compose.material.icons.filled.Delete
@@ -43,13 +55,17 @@ import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.FilledTonalIconButton
+import androidx.compose.material3.FilterChip
+import androidx.compose.material3.FilterChipDefaults
 import androidx.compose.material3.FloatingActionButton
+import androidx.compose.material3.FloatingActionButtonDefaults
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.SmallFloatingActionButton
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
@@ -62,6 +78,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.asImageBitmap
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
@@ -92,18 +109,50 @@ fun NotesScreen(
     val notes by viewModel.activeNotes.collectAsState()
     val strings = rememberAppStrings()
     var searchQuery by remember { mutableStateOf("") }
+    var isFabExpanded by remember { mutableStateOf(false) }
+
+    val fabRotation by animateFloatAsState(
+        targetValue = if (isFabExpanded) 45f else 0f,
+        animationSpec = spring(stiffness = Spring.StiffnessMediumLow),
+        label = "fab_rotation"
+    )
+
     var showAddNoteDialog by remember { mutableStateOf(false) }
     var showWhiteboardDialog by remember { mutableStateOf(false) }
     var drawingNoteToViewOrEdit by remember { mutableStateOf<NoteEntity?>(null) }
     var noteToEdit by remember { mutableStateOf<NoteEntity?>(null) }
     var noteToAddToCalendar by remember { mutableStateOf<NoteEntity?>(null) }
 
+    // استخراج تمام تگ‌های یکتای موجود در یادداشت‌ها برای پیشنهاد داینامیک
+    val allExistingTags = remember(notes) {
+        notes.flatMap { it.tag.split(",").map { t -> t.trim() } }
+            .filter { it.isNotBlank() }
+            .distinct()
+    }
+
     val filteredNotes = if (searchQuery.isBlank()) {
         notes
     } else {
-        notes.filter {
-            it.title.contains(searchQuery, ignoreCase = true) ||
-            it.content.contains(searchQuery, ignoreCase = true)
+        // شناسایی جستجوی تگ: اگر با # شروع شود، فقط بر اساس تگ فیلتر شود
+        val tagSearch = searchQuery.trim().let { q ->
+            if (q.startsWith("#")) q.removePrefix("#").trim() else null
+        }
+        if (tagSearch != null) {
+            // فیلتر بر اساس تگ — جستجو در فیلد tag
+            notes.filter { note ->
+                note.tag.split(",").any { t ->
+                    t.trim().contains(tagSearch, ignoreCase = true)
+                }
+            }
+        } else {
+            // جستجوی عمومی: عنوان + محتوا + تگ‌ها
+            notes.filter {
+                it.title.contains(searchQuery, ignoreCase = true) ||
+                it.content.contains(searchQuery, ignoreCase = true) ||
+                it.tag.split(",").any { t ->
+                    t.trim().contains(searchQuery, ignoreCase = true)
+                }
+            }
         }
     }
 
@@ -115,13 +164,23 @@ fun NotesScreen(
             OutlinedTextField(
                 value = searchQuery,
                 onValueChange = { searchQuery = it },
-                placeholder = { Text(strings.searchNotes) },
+                placeholder = {
+                    Text(if (strings.isFa) "جستجو در یادداشت‌ها… (#برچسب)" else "Search notes… (#tag)")
+                },
                 leadingIcon = { Icon(Icons.Default.Search, contentDescription = null) },
+                trailingIcon = {
+                    if (searchQuery.isNotBlank()) {
+                        IconButton(onClick = { searchQuery = "" }) {
+                            Icon(Icons.Default.Close, contentDescription = if (strings.isFa) "پاک کردن" else "Clear")
+                        }
+                    }
+                },
                 singleLine = true,
                 shape = RoundedCornerShape(14.dp),
+                colors = com.example.ui.components.modernDialogTextFieldColors(),
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(horizontal = 14.dp, vertical = 8.dp)
+                    .padding(horizontal = 14.dp, vertical = 6.dp)
             )
 
             if (filteredNotes.isEmpty()) {
@@ -168,6 +227,7 @@ fun NotesScreen(
                                 }
                             },
                             onEdit = { noteToEdit = note },
+                            onTagClick = { tag -> searchQuery = "#$tag" },
                             onAddToCalendar = { noteToAddToCalendar = note },
                             onSyncToGoogleCalendar = {
                                 viewModel.syncSingleNoteToGoogleCalendar(note) { success, msg ->
@@ -181,34 +241,116 @@ fun NotesScreen(
             }
         }
 
+        // لایه تیره کم‌رنگ پس‌زمینه هنگام باز شدن منوی منبسط‌شونده
+        if (isFabExpanded) {
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .background(Color.Black.copy(alpha = 0.5f))
+                    .clickable { isFabExpanded = false }
+            )
+        }
+
+        // منوی منبسط‌شونده دکمه شناور (Speed Dial FAB)
         Column(
             modifier = Modifier
                 .align(Alignment.BottomEnd)
                 .padding(16.dp),
             horizontalAlignment = Alignment.End,
-            verticalArrangement = Arrangement.spacedBy(10.dp)
+            verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {
-            // Whiteboard Drawing FAB
-            SmallFloatingActionButton(
-                onClick = { showWhiteboardDialog = true },
-                containerColor = MaterialTheme.colorScheme.secondaryContainer,
-                contentColor = MaterialTheme.colorScheme.onSecondaryContainer,
-                modifier = Modifier.testTag("fab_whiteboard_note")
+            // گزینه‌های بازشونده بالای دکمه اصلی
+            AnimatedVisibility(
+                visible = isFabExpanded,
+                enter = fadeIn() + slideInVertically(initialOffsetY = { it / 2 }),
+                exit = fadeOut() + slideOutVertically(targetOffsetY = { it / 2 })
             ) {
-                Icon(
-                    Icons.Default.Draw,
-                    contentDescription = if (strings.isFa) "تخته وایت‌برد و نقاشی" else "Whiteboard Drawing"
-                )
+                Column(
+                    horizontalAlignment = Alignment.End,
+                    verticalArrangement = Arrangement.spacedBy(10.dp)
+                ) {
+                    // ۱. گزینه تخته وایت‌برد و نقاشی
+                    Surface(
+                        onClick = {
+                            isFabExpanded = false
+                            showWhiteboardDialog = true
+                        },
+                        shape = RoundedCornerShape(16.dp),
+                        color = MaterialTheme.colorScheme.surface,
+                        shadowElevation = 6.dp,
+                        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.6f)),
+                        modifier = Modifier.testTag("fab_whiteboard_note")
+                    ) {
+                        Row(
+                            modifier = Modifier.padding(horizontal = 14.dp, vertical = 10.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
+                            Icon(
+                                Icons.Default.Draw,
+                                contentDescription = null,
+                                tint = MaterialTheme.colorScheme.primary,
+                                modifier = Modifier.size(20.dp)
+                            )
+                            Text(
+                                text = if (strings.isFa) "بوم نقاشی" else "Drawing Canvas",
+                                fontSize = 13.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = MaterialTheme.colorScheme.onSurface
+                            )
+                        }
+                    }
+
+                    // ۲. گزینه یادداشت متنی
+                    Surface(
+                        onClick = {
+                            isFabExpanded = false
+                            showAddNoteDialog = true
+                        },
+                        shape = RoundedCornerShape(16.dp),
+                        color = MaterialTheme.colorScheme.surface,
+                        shadowElevation = 6.dp,
+                        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.6f)),
+                        modifier = Modifier.testTag("fab_add_text_note")
+                    ) {
+                        Row(
+                            modifier = Modifier.padding(horizontal = 14.dp, vertical = 10.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
+                            Icon(
+                                Icons.AutoMirrored.Filled.Note,
+                                contentDescription = null,
+                                tint = MaterialTheme.colorScheme.primary,
+                                modifier = Modifier.size(20.dp)
+                            )
+                            Text(
+                                text = if (strings.isFa) "یادداشت متنی" else "Text note",
+                                fontSize = 13.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = MaterialTheme.colorScheme.onSurface
+                            )
+                        }
+                    }
+                }
             }
 
-            // Standard Add Note FAB
+            // دکمه اصلی شناور با انیمیشن چرخش به ضربدر
             FloatingActionButton(
-                onClick = { showAddNoteDialog = true },
-                containerColor = MaterialTheme.colorScheme.primary,
-                contentColor = MaterialTheme.colorScheme.onPrimary,
+                onClick = { isFabExpanded = !isFabExpanded },
+                containerColor = if (isFabExpanded) MaterialTheme.colorScheme.surfaceVariant else MaterialTheme.colorScheme.primary,
+                contentColor = if (isFabExpanded) MaterialTheme.colorScheme.onSurfaceVariant else MaterialTheme.colorScheme.onPrimary,
+                shape = CircleShape,
+                elevation = FloatingActionButtonDefaults.elevation(defaultElevation = 6.dp),
                 modifier = Modifier.testTag("fab_add_note")
             ) {
-                Icon(Icons.Default.Add, contentDescription = strings.addNote)
+                Icon(
+                    imageVector = Icons.Default.Add,
+                    contentDescription = if (isFabExpanded) strings.cancel else strings.addNote,
+                    modifier = Modifier
+                        .size(26.dp)
+                        .graphicsLayer(rotationZ = fabRotation)
+                )
             }
         }
     }
@@ -216,10 +358,11 @@ fun NotesScreen(
     if (showAddNoteDialog) {
         AddNoteDialog(
             onDismiss = { showAddNoteDialog = false },
-            onConfirm = { title, content, colorHex ->
-                viewModel.addNote(title, content, colorHex)
+            onConfirm = { title, content, colorHex, tag ->
+                viewModel.addNote(title, content, colorHex, tag = tag)
                 showAddNoteDialog = false
-            }
+            },
+            existingTags = allExistingTags
         )
     }
 
@@ -231,7 +374,8 @@ fun NotesScreen(
                     title = title,
                     content = "",
                     colorHex = colorHex,
-                    drawingPath = imagePath
+                    drawingPath = imagePath,
+                    tag = ""
                 )
                 showWhiteboardDialog = false
                 Toast.makeText(context, if (strings.isFa) "طرح وایت‌برد با موفقیت ذخیره شد ✓" else "Drawing saved ✓", Toast.LENGTH_SHORT).show()
@@ -250,6 +394,7 @@ fun NotesScreen(
                         title = title,
                         drawingPath = imagePath,
                         colorHex = colorHex,
+                        tag = note.tag,
                         updatedAt = System.currentTimeMillis()
                     )
                 )
@@ -267,7 +412,7 @@ fun NotesScreen(
                 noteToEdit = null
                 drawingNoteToViewOrEdit = noteWithDrawing
             },
-            onConfirm = { title, content, colorHex, isPinned, drawingPath ->
+            onConfirm = { title, content, colorHex, isPinned, drawingPath, tag ->
                 viewModel.updateNote(
                     note.copy(
                         title = title,
@@ -275,11 +420,13 @@ fun NotesScreen(
                         colorHex = colorHex,
                         isPinned = isPinned,
                         drawingPath = drawingPath,
+                        tag = tag,
                         updatedAt = System.currentTimeMillis()
                     )
                 )
                 noteToEdit = null
-            }
+            },
+            existingTags = allExistingTags
         )
     }
 
@@ -350,6 +497,7 @@ fun NoteCard(
     searchQuery: String,
     onClick: () -> Unit,
     onEdit: () -> Unit,
+    onTagClick: (String) -> Unit,
     onAddToCalendar: () -> Unit,
     onSyncToGoogleCalendar: () -> Unit,
     onDelete: () -> Unit
@@ -469,11 +617,47 @@ fun NoteCard(
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                Text(
-                    text = strings.formatDigits(note.persianDate),
-                    fontSize = 10.sp,
-                    color = if (isDark) Color(0xFF71717A) else Color(0xFF64748B)
-                )
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(6.dp)
+                ) {
+                    val tags = note.tag.split(",").map { it.trim() }.filter { it.isNotBlank() }
+                    tags.forEach { tagItem ->
+                        val isIdea = tagItem == "ایده"
+                        Surface(
+                            onClick = { onTagClick(tagItem) },
+                            color = if (isIdea) {
+                                if (isDark) Color(0xFF3B2E1E) else Color(0xFFFEF3C7)
+                            } else {
+                                if (isDark) MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.6f) else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.7f)
+                            },
+                            shape = RoundedCornerShape(6.dp),
+                            border = BorderStroke(
+                                0.6.dp,
+                                if (isIdea) MaterialTheme.colorScheme.primary.copy(alpha = 0.6f)
+                                else MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.6f)
+                            )
+                        ) {
+                            Row(
+                                modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Text(
+                                    text = if (isIdea) "💡 $tagItem" else tagItem,
+                                    fontSize = 10.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    color = if (isIdea) MaterialTheme.colorScheme.primary else (if (isDark) Color(0xFFE4E4E7) else Color(0xFF334155))
+                                )
+                            }
+                        }
+                    }
+
+                    Text(
+                        text = strings.formatDigits(note.persianDate),
+                        fontSize = 10.sp,
+                        color = if (isDark) Color(0xFF71717A) else Color(0xFF64748B)
+                    )
+                }
 
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     // Quick Copy Icon (Manual save to clipboard)

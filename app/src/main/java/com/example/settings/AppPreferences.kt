@@ -8,6 +8,7 @@ object AppPreferences {
     private const val KEY_ONBOARDING_COMPLETED = "onboarding_completed"
     private const val KEY_APP_LANGUAGE = "app_language"
     private const val KEY_DARK_MODE = "is_dark_mode"
+    private const val KEY_CALENDAR_VIEW_MODE = "calendar_view_mode"
 
     private fun getPrefs(context: Context): SharedPreferences {
         return context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
@@ -35,5 +36,13 @@ object AppPreferences {
 
     fun setDarkMode(context: Context, isDark: Boolean) {
         getPrefs(context).edit().putBoolean(KEY_DARK_MODE, isDark).apply()
+    }
+
+    fun getCalendarViewMode(context: Context): String {
+        return getPrefs(context).getString(KEY_CALENDAR_VIEW_MODE, "MONTH") ?: "MONTH"
+    }
+
+    fun setCalendarViewMode(context: Context, mode: String) {
+        getPrefs(context).edit().putString(KEY_CALENDAR_VIEW_MODE, mode).apply()
     }
 }

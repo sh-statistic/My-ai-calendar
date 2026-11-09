@@ -41,6 +41,54 @@ class AppRepository(private val database: AppDatabase) {
         eventDao.softDeleteRecurringEventsFromDate(recurrenceId, fromPersianDate, System.currentTimeMillis())
     }
 
+    suspend fun deleteAllRecurringEvents(recurrenceId: String) = withContext(Dispatchers.IO) {
+        eventDao.softDeleteAllRecurringEvents(recurrenceId, System.currentTimeMillis())
+    }
+
+    suspend fun updateRecurringEventsFromDate(
+        recurrenceId: String,
+        fromPersianDate: String,
+        title: String,
+        description: String,
+        startTime: String,
+        endTime: String,
+        category: String,
+        colorHex: String
+    ) = withContext(Dispatchers.IO) {
+        eventDao.updateRecurringEventsFromDate(
+            recurrenceId = recurrenceId,
+            fromPersianDate = fromPersianDate,
+            title = title,
+            description = description,
+            startTime = startTime,
+            endTime = endTime,
+            category = category,
+            colorHex = colorHex,
+            updatedAt = System.currentTimeMillis()
+        )
+    }
+
+    suspend fun updateAllRecurringEvents(
+        recurrenceId: String,
+        title: String,
+        description: String,
+        startTime: String,
+        endTime: String,
+        category: String,
+        colorHex: String
+    ) = withContext(Dispatchers.IO) {
+        eventDao.updateAllRecurringEvents(
+            recurrenceId = recurrenceId,
+            title = title,
+            description = description,
+            startTime = startTime,
+            endTime = endTime,
+            category = category,
+            colorHex = colorHex,
+            updatedAt = System.currentTimeMillis()
+        )
+    }
+
     // Tasks
     suspend fun insertTask(task: TaskEntity) = withContext(Dispatchers.IO) {
         taskDao.insertTask(task.copy(updatedAt = System.currentTimeMillis()))

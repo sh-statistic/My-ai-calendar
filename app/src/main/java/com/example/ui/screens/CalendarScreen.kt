@@ -75,10 +75,13 @@ import com.example.calendar.HijriCalendarUtils
 import com.example.data.EventEntity
 import com.example.data.TaskEntity
 import com.example.ui.MainViewModel
+import com.example.ui.CalendarViewMode
+import com.example.ui.components.WeeklyNotebookCalendarView
 import com.example.ui.components.AddEventDialog
 import com.example.ui.components.AddTaskDialog
 import com.example.ui.components.DeleteRecurringEventDialog
 import com.example.ui.components.EditEventDialog
+import com.example.ui.components.EditRecurringEventScopeDialog
 import com.example.ui.components.EditTaskDialog
 import com.example.ui.components.EditOccasionDialog
 import com.example.ui.components.PrayerTimesCard
@@ -96,6 +99,16 @@ data class DayCellInfo(
     val hijriDay: String,
     val isFriday: Boolean,
     val isHoliday: Boolean
+)
+
+data class RecurringEditData(
+    val baseEvent: EventEntity,
+    val title: String,
+    val description: String,
+    val persianDate: String,
+    val startTime: String,
+    val category: String,
+    val colorHex: String
 )
 
 fun getMonthGridCells(year: Int, month: Int, occasionsVersion: Int): List<DayCellInfo?> {
@@ -154,12 +167,14 @@ fun CalendarScreen(
     val tasks by viewModel.activeTasks.collectAsState()
     val notes by viewModel.activeNotes.collectAsState()
     val strings = rememberAppStrings()
+    val calendarViewMode by viewModel.calendarViewMode.collectAsState()
 
     var showAddEventDialog by remember { mutableStateOf(false) }
     var showAddTaskDialog by remember { mutableStateOf(false) }
     var eventToEdit by remember { mutableStateOf<EventEntity?>(null) }
     var taskToEdit by remember { mutableStateOf<TaskEntity?>(null) }
     var recurringEventToDelete by remember { mutableStateOf<EventEntity?>(null) }
+    var pendingRecurringEdit by remember { mutableStateOf<RecurringEditData?>(null) }
 
     val today = PersianCalendarHelper.getCurrentJalaliDate()
     val occasionsVersion by viewModel.occasionsVersion.collectAsState()
@@ -203,7 +218,27 @@ fun CalendarScreen(
         PersianOccasionsHelper.isHoliday(selectedDate.month, selectedDate.day, selectedDate.year)
     }
 
-    Box(modifier = modifier.fillMaxSize()) {
+    if (calendarViewMode == CalendarViewMode.WEEK) {
+        WeeklyNotebookCalendarView(
+            viewModel = viewModel,
+            onAddEventClick = { date ->
+                viewModel.setSelectedDate(date)
+                showAddEventDialog = true
+            },
+            onAddTaskClick = { date ->
+                viewModel.setSelectedDate(date)
+                showAddTaskDialog = true
+            },
+            onEditEventClick = { event ->
+                eventToEdit = event
+            },
+            onEditTaskClick = { task ->
+                taskToEdit = task
+            },
+            modifier = modifier.fillMaxSize()
+        )
+    } else {
+        Box(modifier = modifier.fillMaxSize()) {
         // Single unified scrollable container so all details are visible on smaller Android 6 screens
         LazyColumn(
             modifier = Modifier
@@ -761,7 +796,7 @@ fun CalendarScreen(
                                 onClick = { eventToEdit = event },
                                 onEdit = { eventToEdit = event },
                                 onDelete = {
-                                    if (event.recurrenceRule == "WEEKLY" && !event.recurrenceId.isNullOrBlank()) {
+                                    if (!event.recurrenceId.isNullOrBlank()) {
                                         recurringEventToDelete = event
                                     } else {
                                         viewModel.deleteEvent(event.id)
@@ -809,13 +844,23 @@ fun CalendarScreen(
             Icon(Icons.Default.Add, contentDescription = strings.addEvent)
         }
     }
+    }
 
     if (showAddEventDialog) {
         AddEventDialog(
             initialDate = selectedDate,
             onDismiss = { showAddEventDialog = false },
-            onConfirm = { title, desc, pDate, time, cat, col, isRecurring ->
-                viewModel.addEvent(title, desc, pDate, time, cat, col, isRecurring)
+            onConfirm = { title, desc, pDate, time, cat, col, isRecurring, recurrenceConfig ->
+                viewModel.addEvent(
+                    title = title,
+                    description = desc,
+                    persianDate = pDate,
+                    time = time,
+                    category = cat,
+                    colorHex = col,
+                    isWeeklyRecurring = isRecurring,
+                    recurrenceConfig = recurrenceConfig
+                )
                 showAddEventDialog = false
             }
         )
@@ -860,28 +905,118 @@ fun CalendarScreen(
             initialEvent = event,
             onDismiss = { eventToEdit = null },
             onConfirm = { title, desc, pDate, time, cat, col ->
-                viewModel.updateEvent(
-                    event.copy(
+                if (!event.recurrenceId.isNullOrBlank()) {
+                    pendingRecurringEdit = RecurringEditData(
+                        baseEvent = event,
                         title = title,
                         description = desc,
                         persianDate = pDate,
                         startTime = time,
-                        endTime = "",
                         category = cat,
-                        colorHex = col,
-                        updatedAt = System.currentTimeMillis()
+                        colorHex = col
                     )
-                )
+                } else {
+                    viewModel.updateEvent(
+                        event.copy(
+                            title = title,
+                            description = desc,
+                            persianDate = pDate,
+                            startTime = time,
+                            endTime = "",
+                            category = cat,
+                            colorHex = col,
+                            updatedAt = System.currentTimeMillis()
+                        )
+                    )
+                }
                 eventToEdit = null
             },
             onDelete = {
                 val ev = event
                 eventToEdit = null
-                if (ev.recurrenceRule == "WEEKLY" && !ev.recurrenceId.isNullOrBlank()) {
+                if (!ev.recurrenceId.isNullOrBlank()) {
                     recurringEventToDelete = ev
                 } else {
                     viewModel.deleteEvent(ev.id)
                 }
+            }
+        )
+    }
+
+    pendingRecurringEdit?.let { pending ->
+        EditRecurringEventScopeDialog(
+            onDismiss = { pendingRecurringEdit = null },
+            onEditSingle = {
+                viewModel.updateEvent(
+                    pending.baseEvent.copy(
+                        title = pending.title,
+                        description = pending.description,
+                        persianDate = pending.persianDate,
+                        startTime = pending.startTime,
+                        endTime = "",
+                        category = pending.category,
+                        colorHex = pending.colorHex,
+                        updatedAt = System.currentTimeMillis()
+                    )
+                )
+                pendingRecurringEdit = null
+            },
+            onEditFuture = {
+                val recId = pending.baseEvent.recurrenceId
+                if (!recId.isNullOrBlank()) {
+                    viewModel.updateRecurringEventsFromDate(
+                        recurrenceId = recId,
+                        fromPersianDate = pending.baseEvent.persianDate,
+                        title = pending.title,
+                        description = pending.description,
+                        startTime = pending.startTime,
+                        endTime = "",
+                        category = pending.category,
+                        colorHex = pending.colorHex
+                    )
+                } else {
+                    viewModel.updateEvent(
+                        pending.baseEvent.copy(
+                            title = pending.title,
+                            description = pending.description,
+                            persianDate = pending.persianDate,
+                            startTime = pending.startTime,
+                            endTime = "",
+                            category = pending.category,
+                            colorHex = pending.colorHex,
+                            updatedAt = System.currentTimeMillis()
+                        )
+                    )
+                }
+                pendingRecurringEdit = null
+            },
+            onEditAll = {
+                val recId = pending.baseEvent.recurrenceId
+                if (!recId.isNullOrBlank()) {
+                    viewModel.updateAllRecurringEvents(
+                        recurrenceId = recId,
+                        title = pending.title,
+                        description = pending.description,
+                        startTime = pending.startTime,
+                        endTime = "",
+                        category = pending.category,
+                        colorHex = pending.colorHex
+                    )
+                } else {
+                    viewModel.updateEvent(
+                        pending.baseEvent.copy(
+                            title = pending.title,
+                            description = pending.description,
+                            persianDate = pending.persianDate,
+                            startTime = pending.startTime,
+                            endTime = "",
+                            category = pending.category,
+                            colorHex = pending.colorHex,
+                            updatedAt = System.currentTimeMillis()
+                        )
+                    )
+                }
+                pendingRecurringEdit = null
             }
         )
     }
@@ -897,6 +1032,15 @@ fun CalendarScreen(
                 val recId = event.recurrenceId
                 if (!recId.isNullOrBlank()) {
                     viewModel.deleteRecurringEventsFromDate(recId, event.persianDate)
+                } else {
+                    viewModel.deleteEvent(event.id)
+                }
+                recurringEventToDelete = null
+            },
+            onDeleteAll = {
+                val recId = event.recurrenceId
+                if (!recId.isNullOrBlank()) {
+                    viewModel.deleteAllRecurringEvents(recId)
                 } else {
                     viewModel.deleteEvent(event.id)
                 }

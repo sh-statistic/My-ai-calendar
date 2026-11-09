@@ -219,4 +219,49 @@ class ExampleUnitTest {
         assertEquals("", com.example.chat.ApiKeyManager.getApiKey(context, com.example.chat.AiProvider.OPENAI_COMPATIBLE))
         assertEquals("", com.example.chat.ApiKeyManager.getApiKey(context, com.example.chat.AiProvider.GEMINI))
     }
+
+    @Test
+    fun testMementoMoriMonthlyPromptAndYearlyCompilation() {
+        val context = org.robolectric.RuntimeEnvironment.getApplication()
+        val manager = com.example.memento.MementoMoriManager(context)
+        manager.clearBirthDate()
+
+        manager.setBirthDate(1375, 1)
+        val progress = manager.calculateProgress()
+        assertTrue(progress.isConfigured)
+        val curIdx = progress.currentMonthIndex
+        assertTrue(curIdx > 12)
+
+        // Immediately after setting birth date, no pending completed month prompt
+        assertEquals(null, manager.getPendingCompletedMonthIndex(curIdx))
+
+        // When next month arrives (curIdx + 1), pending completed month is curIdx
+        assertEquals(curIdx, manager.getPendingCompletedMonthIndex(curIdx + 1))
+
+        // Acknowledge completion of month
+        manager.acknowledgeMonthCompleted(curIdx + 1)
+        assertEquals(null, manager.getPendingCompletedMonthIndex(curIdx + 1))
+
+        // Save reflection notes for a completed year (e.g. yearIdx = 28 -> year 1403)
+        val testYearIdx = 28
+        val farvardinIdx = testYearIdx * 12 + 0
+        val ordibeheshtIdx = testYearIdx * 12 + 1
+        val esfandIdx = testYearIdx * 12 + 11
+
+        manager.saveReflectionNote(farvardinIdx, "شروع ورزش منظم و مطالعه کتاب")
+        manager.saveReflectionNote(ordibeheshtIdx, "یادگیری مهارت جدید برنامه‌نویسی")
+        manager.saveReflectionNote(esfandIdx, "جمع‌بندی پروژه‌های سال و سفر پایان سال")
+
+        val yearlyNote = manager.buildYearlyReflectionNote(testYearIdx, isFa = true)
+        assertNotNull(yearlyNote)
+        assertEquals("yearly_reflection_1403", yearlyNote!!.id)
+        assertTrue(yearlyNote.title.contains("۱۴۰۳"))
+        assertTrue(yearlyNote.content.contains("فروردین"))
+        assertTrue(yearlyNote.content.contains("شروع ورزش منظم و مطالعه کتاب"))
+        assertTrue(yearlyNote.content.contains("اردیبهشت"))
+        assertTrue(yearlyNote.content.contains("اسفند"))
+        assertTrue(yearlyNote.content.contains("۳ از ۱۲ ماه"))
+        assertTrue(yearlyNote.tag.contains("عمر من"))
+        assertTrue(yearlyNote.tag.contains("عملکرد سالانه"))
+    }
 }

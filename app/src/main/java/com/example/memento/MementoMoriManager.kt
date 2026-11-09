@@ -3,6 +3,7 @@ package com.example.memento
 import android.content.Context
 import android.content.SharedPreferences
 import com.example.calendar.PersianCalendarHelper
+import com.example.data.NoteEntity
 import org.json.JSONObject
 
 data class LifeProgress(
@@ -28,6 +29,15 @@ class MementoMoriManager(private val context: Context) {
         private const val KEY_EXPECTED_LIFESPAN = "expected_lifespan"
         private const val KEY_MANUAL_DRILLED_COUNT = "manual_drilled_count"
         private const val KEY_NOTES_JSON = "reflection_notes_json"
+        private const val KEY_LAST_SEEN_MONTH = "last_seen_month"
+        private const val KEY_LAST_COMPILED_YEAR_IDX = "last_compiled_year_idx"
+
+        private val EN_MONTH_NAMES = listOf(
+            "Farvardin", "Ordibehesht", "Khordad",
+            "Tir", "Mordad", "Shahrivar",
+            "Mehr", "Aban", "Azar",
+            "Dey", "Bahman", "Esfand"
+        )
     }
 
     private val prefs: SharedPreferences =
@@ -53,6 +63,8 @@ class MementoMoriManager(private val context: Context) {
         prefs.edit()
             .remove(KEY_BIRTH_YEAR)
             .remove(KEY_BIRTH_MONTH)
+            .remove(KEY_LAST_SEEN_MONTH)
+            .remove(KEY_LAST_COMPILED_YEAR_IDX)
             .apply()
     }
 
@@ -66,10 +78,20 @@ class MementoMoriManager(private val context: Context) {
     }
 
     fun setBirthDate(year: Int, month: Int) {
+        val prevYear = prefs.getInt(KEY_BIRTH_YEAR, -1)
+        val prevMonth = prefs.getInt(KEY_BIRTH_MONTH, -1)
         prefs.edit()
             .putInt(KEY_BIRTH_YEAR, year)
             .putInt(KEY_BIRTH_MONTH, month)
             .apply()
+
+        val progress = calculateProgress()
+        if (progress.currentMonthIndex >= 0 && (!prefs.contains(KEY_LAST_SEEN_MONTH) || prevYear != year || prevMonth != month)) {
+            prefs.edit()
+                .putInt(KEY_LAST_SEEN_MONTH, progress.currentMonthIndex)
+                .putInt(KEY_LAST_COMPILED_YEAR_IDX, (progress.currentMonthIndex / 12).coerceAtLeast(0))
+                .apply()
+        }
     }
 
     fun calculateProgress(): LifeProgress {
@@ -133,11 +155,40 @@ class MementoMoriManager(private val context: Context) {
         )
     }
 
+    /**
+     * بررسی می‌کند آیا ماه جدیدی شروع شده و ماه قبلی به پایان رسیده است یا خیر.
+     * در صورت تمام شدن ماه، اندیس ماهِ تمام‌شده (currentMonthIdx - 1) را برمی‌گرداند.
+     */
+    fun getPendingCompletedMonthIndex(currentMonthIdx: Int): Int? {
+        if (!isBirthDateConfigured() || currentMonthIdx <= 0) return null
+        if (!prefs.contains(KEY_LAST_SEEN_MONTH)) {
+            val prevMonthIdx = currentMonthIdx - 1
+            val hasNoteForPrevMonth = !getReflectionNote(prevMonthIdx).isNullOrBlank()
+            return if (!hasNoteForPrevMonth) {
+                prefs.edit().putInt(KEY_LAST_SEEN_MONTH, prevMonthIdx).apply()
+                prevMonthIdx
+            } else {
+                prefs.edit().putInt(KEY_LAST_SEEN_MONTH, currentMonthIdx).apply()
+                null
+            }
+        }
+        val lastSeen = prefs.getInt(KEY_LAST_SEEN_MONTH, currentMonthIdx)
+        return if (currentMonthIdx > lastSeen) {
+            currentMonthIdx - 1
+        } else {
+            null
+        }
+    }
+
+    fun acknowledgeMonthCompleted(currentMonthIdx: Int) {
+        if (currentMonthIdx < 0) return
+        prefs.edit().putInt(KEY_LAST_SEEN_MONTH, currentMonthIdx).apply()
+    }
+
     fun checkNewMonthCompleted(currentMonthIdx: Int): Boolean {
-        if (currentMonthIdx < 0) return false
-        val lastSeen = prefs.getInt("last_seen_month", currentMonthIdx)
-        if (currentMonthIdx > lastSeen) {
-            prefs.edit().putInt("last_seen_month", currentMonthIdx).apply()
+        val pending = getPendingCompletedMonthIndex(currentMonthIdx)
+        if (pending != null) {
+            acknowledgeMonthCompleted(currentMonthIdx)
             return true
         }
         return false
@@ -147,7 +198,12 @@ class MementoMoriManager(private val context: Context) {
         val notesJson = prefs.getString(KEY_NOTES_JSON, "{}") ?: "{}"
         try {
             val json = JSONObject(notesJson)
-            json.put(monthIndex.toString(), note.trim())
+            val trimmed = note.trim()
+            if (trimmed.isEmpty()) {
+                json.remove(monthIndex.toString())
+            } else {
+                json.put(monthIndex.toString(), trimmed)
+            }
             prefs.edit().putString(KEY_NOTES_JSON, json.toString()).apply()
         } catch (_: Exception) {}
     }
@@ -156,9 +212,97 @@ class MementoMoriManager(private val context: Context) {
         val notesJson = prefs.getString(KEY_NOTES_JSON, "{}") ?: "{}"
         return try {
             val json = JSONObject(notesJson)
-            if (json.has(monthIndex.toString())) json.getString(monthIndex.toString()) else null
+            if (json.has(monthIndex.toString())) {
+                val text = json.getString(monthIndex.toString()).trim()
+                if (text.isNotEmpty()) text else null
+            } else null
         } catch (_: Exception) {
             null
         }
+    }
+
+    fun getMonthYearLabel(monthIndex: Int, isFa: Boolean = true): String {
+        if (monthIndex < 0) return ""
+        val yearIdx = monthIndex / 12
+        val monthInYear = monthIndex % 12
+        val persianYear = getBirthYear() + yearIdx
+        return if (isFa) {
+            val monthName = PersianCalendarHelper.PERSIAN_MONTH_NAMES.getOrElse(monthInYear) { "" }
+            "$monthName ${PersianCalendarHelper.toPersianDigits(persianYear.toString())}"
+        } else {
+            val monthName = EN_MONTH_NAMES.getOrElse(monthInYear) { "" }
+            "$monthName $persianYear"
+        }
+    }
+
+    fun getNotesForYear(yearIdx: Int): Map<Int, String> {
+        val result = LinkedHashMap<Int, String>()
+        if (yearIdx < 0) return result
+        val startMonthIdx = yearIdx * 12
+        for (monthInYear in 0..11) {
+            val absMonthIdx = startMonthIdx + monthInYear
+            val note = getReflectionNote(absMonthIdx)
+            if (!note.isNullOrBlank()) {
+                result[monthInYear] = note
+            }
+        }
+        return result
+    }
+
+    fun buildYearlyReflectionNote(yearIdx: Int, isFa: Boolean = true): NoteEntity? {
+        if (!isBirthDateConfigured() || yearIdx < 0) return null
+        val monthNotes = getNotesForYear(yearIdx)
+        if (monthNotes.isEmpty()) return null
+
+        val persianYear = getBirthYear() + yearIdx
+        val noteId = "yearly_reflection_$persianYear"
+        val startAge = yearIdx
+        val endAge = yearIdx + 1
+
+        val title = if (isFa) {
+            val yearFa = PersianCalendarHelper.toPersianDigits(persianYear.toString())
+            val startAgeFa = PersianCalendarHelper.toPersianDigits(startAge.toString())
+            val endAgeFa = PersianCalendarHelper.toPersianDigits(endAge.toString())
+            "کارنامه عملکرد سال $yearFa ($startAgeFa تا $endAgeFa سالگی)"
+        } else {
+            "Year $persianYear Performance Review (Age $startAge to $endAge)"
+        }
+
+        val sb = StringBuilder()
+        if (isFa) {
+            val yearFa = PersianCalendarHelper.toPersianDigits(persianYear.toString())
+            sb.appendLine("📋 مرور ماه‌به‌ماه نقطه‌های عمر در سال $yearFa:")
+            sb.appendLine()
+            for ((monthInYear, noteText) in monthNotes) {
+                val monthName = PersianCalendarHelper.PERSIAN_MONTH_NAMES.getOrElse(monthInYear) { "ماه ${monthInYear + 1}" }
+                sb.appendLine("🔹 $monthName:")
+                sb.appendLine(noteText)
+                sb.appendLine()
+            }
+            sb.appendLine("────────────────────")
+            val countFa = PersianCalendarHelper.toPersianDigits(monthNotes.size.toString())
+            sb.append("📊 مجموع ماه‌های ثبت‌شده: $countFa از ۱۲ ماه")
+        } else {
+            sb.appendLine("📋 Month-by-month Life Grid reflections in $persianYear:")
+            sb.appendLine()
+            for ((monthInYear, noteText) in monthNotes) {
+                val monthName = EN_MONTH_NAMES.getOrElse(monthInYear) { "Month ${monthInYear + 1}" }
+                sb.appendLine("🔹 $monthName:")
+                sb.appendLine(noteText)
+                sb.appendLine()
+            }
+            sb.appendLine("────────────────────")
+            sb.append("📊 Recorded months: ${monthNotes.size} of 12")
+        }
+
+        return NoteEntity(
+            id = noteId,
+            title = title,
+            content = sb.toString().trim(),
+            persianDate = PersianCalendarHelper.getCurrentJalaliDate().formattedPersian,
+            colorHex = "#FEF3C7",
+            isPinned = true,
+            tag = if (isFa) "عمر من, عملکرد سالانه" else "Life Grid, Yearly Review"
+        )
     }
 }

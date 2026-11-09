@@ -14,6 +14,7 @@ data class NoteEntity(
     val colorHex: String = "#FEF3C7", // Soft warm sticky note tone
     val isPinned: Boolean = false,
     val drawingPath: String? = null,
+    val tag: String = "",
     val updatedAt: Long = System.currentTimeMillis(),
     val isDeleted: Boolean = false
 )

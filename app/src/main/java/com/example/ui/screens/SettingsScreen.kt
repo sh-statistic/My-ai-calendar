@@ -12,6 +12,8 @@ import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.gestures.awaitEachGesture
+import androidx.compose.foundation.gestures.awaitFirstDown
 import androidx.compose.foundation.gestures.detectHorizontalDragGestures
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.Arrangement
@@ -151,12 +153,6 @@ fun SettingsScreen(
     val isServerRunning by viewModel.isServerRunning.collectAsState()
     val serverIp by viewModel.serverIp.collectAsState()
     val serverPort by viewModel.serverPort.collectAsState()
-    val logs by viewModel.activityLogList.collectAsState()
-    val dbLogs by viewModel.syncLogs.collectAsState()
-
-    val isGoogleCalendarEnabled by viewModel.isGoogleCalendarEnabled.collectAsState()
-
-    val fajrSettings by viewModel.fajrAlarmSettings.collectAsState()
     val isCheckingUpdate by viewModel.isCheckingUpdate.collectAsState()
     val updateStatusMessage by viewModel.updateStatusMessage.collectAsState()
     val updateDownloadState by viewModel.updateDownloadState.collectAsState()
@@ -176,7 +172,6 @@ fun SettingsScreen(
     var occasionToEditInSettings by remember { mutableStateOf<com.example.calendar.PersianOccasion?>(null) }
     var customOccasionsVersion by remember { mutableStateOf(0) }
 
-    val networkInfo = NetworkUtils.getNetworkInfo(context)
     val serverUrl = "http://$serverIp:$serverPort"
 
     Column(
@@ -551,436 +546,11 @@ fun SettingsScreen(
         // ==========================================
         // 3. Fajr Smart Alarm Settings Card
         // ==========================================
-        Card(
-            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
-            shape = RoundedCornerShape(16.dp),
-            elevation = CardDefaults.cardElevation(defaultElevation = 1.dp),
-            modifier = Modifier.fillMaxWidth()
-        ) {
-            Column(modifier = Modifier.padding(16.dp)) {
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Row(
-                        modifier = Modifier.weight(1f),
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Icon(
-                            Icons.Default.Alarm,
-                            contentDescription = null,
-                            tint = Color(0xFFF59E0B),
-                            modifier = Modifier.size(26.dp)
-                        )
-                        Spacer(modifier = Modifier.width(10.dp))
-                        Column {
-                            Text(
-                                text = strings.smartFajrAlarm,
-                                style = MaterialTheme.typography.titleMedium,
-                                fontWeight = FontWeight.Bold
-                            )
-                            Text(
-                                text = if (fajrSettings.isEnabled) "${strings.activeStatus} (${fajrSettings.cityName})" else strings.inactiveStatus,
-                                style = MaterialTheme.typography.labelSmall,
-                                color = if (fajrSettings.isEnabled) Color(0xFF15803D) else MaterialTheme.colorScheme.onSurfaceVariant
-                            )
-                        }
-                    }
-
-                    Switch(
-                        checked = fajrSettings.isEnabled,
-                        onCheckedChange = { enabled ->
-                            viewModel.updateFajrAlarm(enabled, fajrSettings.offsetMinutesBefore)
-                        }
-                    )
-                }
-
-                Spacer(modifier = Modifier.height(10.dp))
-
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Text("${strings.calendarPrayerHorizonCity} ${fajrSettings.cityName}", style = MaterialTheme.typography.bodySmall, fontWeight = FontWeight.SemiBold)
-                    OutlinedButton(onClick = { showFajrCityDialog = true }) {
-                        Text(strings.changeCity, fontSize = 11.sp)
-                    }
-                }
-
-                if (fajrSettings.isEnabled) {
-                    Spacer(modifier = Modifier.height(18.dp))
-
-                    // تابع تبدیل آفست به موقعیت فرکشن اسلایدر (0.0f تا 1.0f)
-                    // بازه متقارن: 0.0f = 15 دقیقه قبل، 0.5f = همزمان، 1.0f = 60 دقیقه بعد
-                    fun offsetToFraction(offset: Int): Float {
-                        return when {
-                            offset > 0 -> {
-                                val progress = (15 - offset).coerceIn(0, 15) / 15f
-                                0.5f * progress
-                            }
-                            offset < 0 -> {
-                                val progress = (-offset).coerceIn(0, 60) / 60f
-                                0.5f + 0.5f * progress
-                            }
-                            else -> 0.5f
-                        }.coerceIn(0f, 1f)
-                    }
-
-                    fun fractionToOffset(fraction: Float): Int {
-                        val f = fraction.coerceIn(0f, 1f)
-                        return if (f <= 0.5f) {
-                            val progress = f / 0.5f
-                            (15f * (1f - progress)).roundToInt().coerceIn(0, 15)
-                        } else {
-                            val progress = (f - 0.5f) / 0.5f
-                            -((60f * progress).roundToInt().coerceIn(0, 60))
-                        }
-                    }
-
-                    var isDragging by remember { mutableStateOf(false) }
-                    var previewOffsetMinutes by remember {
-                        mutableIntStateOf(fajrSettings.offsetMinutesBefore)
-                    }
-                    var sliderFraction by remember {
-                        mutableFloatStateOf(offsetToFraction(fajrSettings.offsetMinutesBefore))
-                    }
-
-                    LaunchedEffect(fajrSettings.offsetMinutesBefore) {
-                        if (!isDragging) {
-                            previewOffsetMinutes = fajrSettings.offsetMinutesBefore
-                            sliderFraction = offsetToFraction(fajrSettings.offsetMinutesBefore)
-                        }
-                    }
-
-                    // عنوان متنی بالای اسلایدر با نگارش تمیز فارسی بدون دو نقطه اضافی
-                    val labelText = when {
-                        previewOffsetMinutes > 0 -> {
-                            val digits = if (strings.isFa) PersianCalendarHelper.toPersianDigits(previewOffsetMinutes.toString()) else previewOffsetMinutes.toString()
-                            if (strings.isFa) "$digits دقیقه قبل از اذان" else "$digits min before Fajr"
-                        }
-                        previewOffsetMinutes < 0 -> {
-                            val after = -previewOffsetMinutes
-                            val digits = if (strings.isFa) PersianCalendarHelper.toPersianDigits(after.toString()) else after.toString()
-                            if (strings.isFa) "$digits دقیقه بعد از اذان" else "$digits min after Fajr"
-                        }
-                        else -> {
-                            if (strings.isFa) "همزمان با اذان" else "At Fajr"
-                        }
-                    }
-
-                    Text(
-                        text = labelText,
-                        style = MaterialTheme.typography.titleMedium,
-                        fontWeight = FontWeight.Medium,
-                        textAlign = TextAlign.Center,
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(bottom = 8.dp)
-                    )
-
-                    // کل بخش کنترل زمان (دکمه‌های منفی/مثبت، اسلایدر و دکمه‌های میانبر) در جهت استاندارد LTR
-                    CompositionLocalProvider(LocalLayoutDirection provides LayoutDirection.Ltr) {
-                        // رنگ‌های هماهنگ با تم کهربایی و گرم اپلیکیشن
-                        val primaryColor = MaterialTheme.colorScheme.primary
-                        val trackInactiveColor = MaterialTheme.colorScheme.surfaceVariant
-                        val trackActiveColor = primaryColor
-
-                        // ردیف اسلایدر و دکمه‌های (-) و (+)
-                        Row(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(horizontal = 4.dp),
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.Center
-                        ) {
-                            // دکمه (-) در سمت چپ: حرکت به سمت زودتر (قبل از اذان / چپ)
-                            val canDecrease = previewOffsetMinutes < 15
-                            Box(
-                                modifier = Modifier
-                                    .size(34.dp)
-                                    .border(
-                                        width = 1.2.dp,
-                                        color = if (canDecrease) primaryColor.copy(alpha = 0.5f) else MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f),
-                                        shape = CircleShape
-                                    )
-                                    .clip(CircleShape)
-                                    .clickable(enabled = canDecrease) {
-                                        val newOffset = (previewOffsetMinutes + 1).coerceAtMost(15)
-                                        if (newOffset != fajrSettings.offsetMinutesBefore) {
-                                            previewOffsetMinutes = newOffset
-                                            sliderFraction = offsetToFraction(newOffset)
-                                            viewModel.updateFajrAlarm(true, newOffset)
-                                        }
-                                    },
-                                contentAlignment = Alignment.Center
-                            ) {
-                                Icon(
-                                    imageVector = Icons.Default.Remove,
-                                    contentDescription = "کاهش زمان",
-                                    tint = if (canDecrease) primaryColor else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.25f),
-                                    modifier = Modifier.size(17.dp)
-                                )
-                            }
-
-                            // اسلایدر سفارشی با پالت هماهنگ تم گرم اپلیکیشن
-                            val density = LocalDensity.current
-                            val thumbRadiusDp = 9.dp
-
-                            Box(
-                                modifier = Modifier
-                                    .weight(1f)
-                                    .height(36.dp)
-                                    .padding(horizontal = 10.dp)
-                                    .pointerInput(Unit) {
-                                        val thumbRadiusPx = with(density) { thumbRadiusDp.toPx() }
-                                        detectTapGestures { offset ->
-                                            val availableWidth = (size.width - thumbRadiusPx * 2).coerceAtLeast(1f)
-                                            val touchX = (offset.x - thumbRadiusPx).coerceIn(0f, availableWidth)
-                                            val fraction = touchX / availableWidth
-                                            sliderFraction = fraction
-                                            val newOffset = fractionToOffset(fraction)
-                                            previewOffsetMinutes = newOffset
-                                            if (newOffset != fajrSettings.offsetMinutesBefore) {
-                                                viewModel.updateFajrAlarm(true, newOffset)
-                                            }
-                                        }
-                                    }
-                                    .pointerInput(Unit) {
-                                        val thumbRadiusPx = with(density) { thumbRadiusDp.toPx() }
-                                        detectHorizontalDragGestures(
-                                            onDragStart = {
-                                                isDragging = true
-                                            },
-                                            onDragEnd = {
-                                                isDragging = false
-                                                val newOffset = fractionToOffset(sliderFraction)
-                                                previewOffsetMinutes = newOffset
-                                                if (newOffset != fajrSettings.offsetMinutesBefore) {
-                                                    viewModel.updateFajrAlarm(true, newOffset)
-                                                }
-                                            },
-                                            onDragCancel = {
-                                                isDragging = false
-                                                val newOffset = fractionToOffset(sliderFraction)
-                                                previewOffsetMinutes = newOffset
-                                                if (newOffset != fajrSettings.offsetMinutesBefore) {
-                                                    viewModel.updateFajrAlarm(true, newOffset)
-                                                }
-                                            }
-                                        ) { change, _ ->
-                                            change.consume()
-                                            val availableWidth = (size.width - thumbRadiusPx * 2).coerceAtLeast(1f)
-                                            val touchX = (change.position.x - thumbRadiusPx).coerceIn(0f, availableWidth)
-                                            val fraction = touchX / availableWidth
-                                            sliderFraction = fraction
-                                            previewOffsetMinutes = fractionToOffset(fraction)
-                                        }
-                                    },
-                                contentAlignment = Alignment.Center
-                            ) {
-                                Canvas(
-                                    modifier = Modifier
-                                        .fillMaxWidth()
-                                        .height(36.dp)
-                                ) {
-                                    val trackH = 6.dp.toPx()
-                                    val trackY = (size.height - trackH) / 2f
-                                    val radius = trackH / 2f
-                                    val thumbRadiusPx = thumbRadiusDp.toPx()
-                                    val availableWidth = size.width - thumbRadiusPx * 2
-                                    val thumbCenterXPx = thumbRadiusPx + (availableWidth * sliderFraction.coerceIn(0f, 1f))
-
-                                    // ترک غیرفعال (رنگ ملایم سرفیس گرم)
-                                    drawRoundRect(
-                                        color = trackInactiveColor,
-                                        topLeft = Offset(0f, trackY),
-                                        size = Size(size.width, trackH),
-                                        cornerRadius = CornerRadius(radius, radius)
-                                    )
-
-                                    // ترک فعال (رنگ تم اصلی کهربایی)
-                                    if (thumbCenterXPx > 0f) {
-                                        drawRoundRect(
-                                            color = trackActiveColor,
-                                            topLeft = Offset(0f, trackY),
-                                            size = Size(thumbCenterXPx.coerceAtMost(size.width), trackH),
-                                            cornerRadius = CornerRadius(radius, radius)
-                                        )
-                                    }
-
-                                    // دایره نشانگر کهربایی با مرکز سفید شیک
-                                    drawCircle(
-                                        color = primaryColor,
-                                        radius = thumbRadiusPx,
-                                        center = Offset(thumbCenterXPx, size.height / 2f)
-                                    )
-                                    drawCircle(
-                                        color = Color.White,
-                                        radius = thumbRadiusPx * 0.38f,
-                                        center = Offset(thumbCenterXPx, size.height / 2f)
-                                    )
-                                }
-                            }
-
-                            // دکمه (+) در سمت راست: حرکت به سمت دیرتر (بعد از اذان / راست)
-                            val canIncrease = previewOffsetMinutes > -60
-                            Box(
-                                modifier = Modifier
-                                    .size(34.dp)
-                                    .border(
-                                        width = 1.2.dp,
-                                        color = if (canIncrease) primaryColor.copy(alpha = 0.5f) else MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f),
-                                        shape = CircleShape
-                                    )
-                                    .clip(CircleShape)
-                                    .clickable(enabled = canIncrease) {
-                                        val newOffset = (previewOffsetMinutes - 1).coerceAtLeast(-60)
-                                        if (newOffset != fajrSettings.offsetMinutesBefore) {
-                                            previewOffsetMinutes = newOffset
-                                            sliderFraction = offsetToFraction(newOffset)
-                                            viewModel.updateFajrAlarm(true, newOffset)
-                                        }
-                                    },
-                                contentAlignment = Alignment.Center
-                            ) {
-                                Icon(
-                                    imageVector = Icons.Default.Add,
-                                    contentDescription = "افزایش زمان",
-                                    tint = if (canIncrease) primaryColor else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.25f),
-                                    modifier = Modifier.size(17.dp)
-                                )
-                            }
-                        }
-
-                        Spacer(modifier = Modifier.height(14.dp))
-
-                        // ۳ دکمه میانبر زمانی بدون عناوین زائد ابتدا/انتها
-                        Row(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(horizontal = 4.dp),
-                            horizontalArrangement = Arrangement.spacedBy(8.dp)
-                        ) {
-                            // ۱. دکمه ۱۵ دقیقه قبل (سمت چپ)
-                            val isStartSelected = previewOffsetMinutes == 15
-                            Surface(
-                                onClick = {
-                                    if (previewOffsetMinutes != 15) {
-                                        previewOffsetMinutes = 15
-                                        sliderFraction = 0f
-                                        viewModel.updateFajrAlarm(true, 15)
-                                    }
-                                },
-                                shape = RoundedCornerShape(10.dp),
-                                color = if (isStartSelected) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.45f),
-                                border = BorderStroke(
-                                    1.2.dp,
-                                    if (isStartSelected) primaryColor else MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.6f)
-                                ),
-                                modifier = Modifier.weight(1f)
-                            ) {
-                                Box(
-                                    modifier = Modifier
-                                        .fillMaxWidth()
-                                        .padding(vertical = 10.dp, horizontal = 2.dp),
-                                    contentAlignment = Alignment.Center
-                                ) {
-                                    CompositionLocalProvider(LocalLayoutDirection provides if (strings.isFa) LayoutDirection.Rtl else LayoutDirection.Ltr) {
-                                        Text(
-                                            text = if (strings.isFa) "۱۵ دقیقه قبل" else "15m before",
-                                            style = MaterialTheme.typography.labelMedium.copy(
-                                                textDirection = if (strings.isFa) TextDirection.Rtl else TextDirection.Ltr
-                                            ),
-                                            fontWeight = if (isStartSelected) FontWeight.Bold else FontWeight.Medium,
-                                            color = if (isStartSelected) primaryColor else MaterialTheme.colorScheme.onSurface,
-                                            textAlign = TextAlign.Center
-                                        )
-                                    }
-                                }
-                            }
-
-                            // ۲. دکمه همزمان با اذان (وسط)
-                            val isSimultaneousSelected = previewOffsetMinutes == 0
-                            Surface(
-                                onClick = {
-                                    if (previewOffsetMinutes != 0) {
-                                        previewOffsetMinutes = 0
-                                        sliderFraction = 0.5f
-                                        viewModel.updateFajrAlarm(true, 0)
-                                    }
-                                },
-                                shape = RoundedCornerShape(10.dp),
-                                color = if (isSimultaneousSelected) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.45f),
-                                border = BorderStroke(
-                                    1.2.dp,
-                                    if (isSimultaneousSelected) primaryColor else MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.6f)
-                                ),
-                                modifier = Modifier.weight(1f)
-                            ) {
-                                Box(
-                                    modifier = Modifier
-                                        .fillMaxWidth()
-                                        .padding(vertical = 10.dp, horizontal = 2.dp),
-                                    contentAlignment = Alignment.Center
-                                ) {
-                                    CompositionLocalProvider(LocalLayoutDirection provides if (strings.isFa) LayoutDirection.Rtl else LayoutDirection.Ltr) {
-                                        Text(
-                                            text = if (strings.isFa) "همزمان با اذان" else "At Fajr",
-                                            style = MaterialTheme.typography.labelMedium.copy(
-                                                textDirection = if (strings.isFa) TextDirection.Rtl else TextDirection.Ltr
-                                            ),
-                                            fontWeight = if (isSimultaneousSelected) FontWeight.Bold else FontWeight.Medium,
-                                            color = if (isSimultaneousSelected) primaryColor else MaterialTheme.colorScheme.onSurface,
-                                            textAlign = TextAlign.Center
-                                        )
-                                    }
-                                }
-                            }
-
-                            // ۳. دکمه ۱ ساعت بعد (سمت راست)
-                            val isEndSelected = previewOffsetMinutes == -60
-                            Surface(
-                                onClick = {
-                                    if (previewOffsetMinutes != -60) {
-                                        previewOffsetMinutes = -60
-                                        sliderFraction = 1f
-                                        viewModel.updateFajrAlarm(true, -60)
-                                    }
-                                },
-                                shape = RoundedCornerShape(10.dp),
-                                color = if (isEndSelected) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.45f),
-                                border = BorderStroke(
-                                    1.2.dp,
-                                    if (isEndSelected) primaryColor else MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.6f)
-                                ),
-                                modifier = Modifier.weight(1f)
-                            ) {
-                                Box(
-                                    modifier = Modifier
-                                        .fillMaxWidth()
-                                        .padding(vertical = 10.dp, horizontal = 2.dp),
-                                    contentAlignment = Alignment.Center
-                                ) {
-                                    CompositionLocalProvider(LocalLayoutDirection provides if (strings.isFa) LayoutDirection.Rtl else LayoutDirection.Ltr) {
-                                        Text(
-                                            text = if (strings.isFa) "۱ ساعت بعد" else "1h after",
-                                            style = MaterialTheme.typography.labelMedium.copy(
-                                                textDirection = if (strings.isFa) TextDirection.Rtl else TextDirection.Ltr
-                                            ),
-                                            fontWeight = if (isEndSelected) FontWeight.Bold else FontWeight.Medium,
-                                            color = if (isEndSelected) primaryColor else MaterialTheme.colorScheme.onSurface,
-                                            textAlign = TextAlign.Center
-                                        )
-                                    }
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-        }
+        FajrSmartAlarmCard(
+            viewModel = viewModel,
+            strings = strings,
+            onOpenCityDialog = { showFajrCityDialog = true }
+        )
 
         // ==========================================
         // 3. Custom Occasions Management
@@ -1093,108 +663,10 @@ fun SettingsScreen(
         // ==========================================
         // 4. Live Activity & Sync Logs
         // ==========================================
-        Card(
-            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
-            shape = RoundedCornerShape(16.dp),
-            elevation = CardDefaults.cardElevation(defaultElevation = 1.dp),
-            modifier = Modifier.fillMaxWidth()
-        ) {
-            Column(modifier = Modifier.padding(16.dp)) {
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        Icon(Icons.Default.Sync, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
-                        Spacer(modifier = Modifier.width(8.dp))
-                        Text(strings.appLogs, fontWeight = FontWeight.Bold)
-                    }
-
-                    IconButton(onClick = { viewModel.clearSyncLogs() }, modifier = Modifier.size(28.dp)) {
-                        Icon(Icons.Default.Refresh, contentDescription = strings.clearLogs, modifier = Modifier.size(16.dp))
-                    }
-                }
-
-                Spacer(modifier = Modifier.height(8.dp))
-
-                if (dbLogs.isEmpty() && logs.isEmpty()) {
-                    Text(
-                        text = strings.noSyncLogsYet,
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                } else if (dbLogs.isNotEmpty()) {
-                    Column(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .heightIn(max = 260.dp)
-                            .verticalScroll(rememberScrollState()),
-                        verticalArrangement = Arrangement.spacedBy(6.dp)
-                    ) {
-                        dbLogs.take(25).forEach { log ->
-                            Surface(
-                                color = if (log.isSuccess) MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.35f) else MaterialTheme.colorScheme.errorContainer.copy(alpha = 0.3f),
-                                shape = RoundedCornerShape(10.dp),
-                                modifier = Modifier.fillMaxWidth()
-                            ) {
-                                Row(
-                                    modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
-                                    verticalAlignment = Alignment.CenterVertically
-                                ) {
-                                    Surface(
-                                        color = if (log.isSuccess) Color(0xFFE0F2FE) else Color(0xFFFEE2E2),
-                                        shape = RoundedCornerShape(6.dp)
-                                    ) {
-                                        Text(
-                                            text = log.source,
-                                            fontSize = 11.sp,
-                                            fontWeight = FontWeight.Bold,
-                                            color = if (log.isSuccess) Color(0xFF0369A1) else Color(0xFFDC2626),
-                                            modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp)
-                                        )
-                                    }
-                                    Spacer(modifier = Modifier.width(10.dp))
-                                    Column(modifier = Modifier.weight(1f)) {
-                                        Text(
-                                            text = log.details,
-                                            fontSize = 12.sp,
-                                            fontWeight = FontWeight.Medium,
-                                            color = MaterialTheme.colorScheme.onSurface,
-                                            lineHeight = 18.sp
-                                        )
-                                        Spacer(modifier = Modifier.height(2.dp))
-                                        Text(
-                                            text = formatLogTime(log.timestamp),
-                                            fontSize = 11.sp,
-                                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                                        )
-                                    }
-                                }
-                            }
-                        }
-                    }
-                } else {
-                    Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                        logs.take(10).forEach { log ->
-                            Surface(
-                                color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.35f),
-                                shape = RoundedCornerShape(8.dp),
-                                modifier = Modifier.fillMaxWidth()
-                            ) {
-                                Text(
-                                    text = log,
-                                    fontSize = 12.sp,
-                                    fontWeight = FontWeight.Medium,
-                                    modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp),
-                                    color = MaterialTheme.colorScheme.onSurface
-                                )
-                            }
-                        }
-                    }
-                }
-            }
-        }
+        ActivityAndSyncLogsCard(
+            viewModel = viewModel,
+            strings = strings
+        )
 
         // ==========================================
         // Language & Onboarding Setup Card
@@ -1446,6 +918,7 @@ fun SettingsScreen(
     }
 
     if (showFajrCityDialog) {
+        val fajrSettings by viewModel.fajrAlarmSettings.collectAsState()
         val cities = PrayerTimesCalculator.CITIES
         AlertDialog(
             onDismissRequest = { showFajrCityDialog = false },
@@ -1506,5 +979,526 @@ private fun formatLogTime(timestamp: Long): String {
         String.format(java.util.Locale.US, "%02d:%02d:%02d", hour, minute, second)
     )
     return "${jDate.formattedPersian} $timeFormatted"
+}
+
+@Composable
+private fun FajrSmartAlarmCard(
+    viewModel: MainViewModel,
+    strings: com.example.ui.AppStrings,
+    onOpenCityDialog: () -> Unit
+) {
+    val fajrSettings by viewModel.fajrAlarmSettings.collectAsState()
+
+    Card(
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+        shape = RoundedCornerShape(16.dp),
+        elevation = CardDefaults.cardElevation(defaultElevation = 1.dp),
+        modifier = Modifier.fillMaxWidth()
+    ) {
+        Column(modifier = Modifier.padding(16.dp)) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Row(
+                    modifier = Modifier.weight(1f),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Icon(
+                        Icons.Default.Alarm,
+                        contentDescription = null,
+                        tint = Color(0xFFF59E0B),
+                        modifier = Modifier.size(26.dp)
+                    )
+                    Spacer(modifier = Modifier.width(10.dp))
+                    Column {
+                        Text(
+                            text = strings.smartFajrAlarm,
+                            style = MaterialTheme.typography.titleMedium,
+                            fontWeight = FontWeight.Bold
+                        )
+                        Text(
+                            text = if (fajrSettings.isEnabled) "${strings.activeStatus} (${fajrSettings.cityName})" else strings.inactiveStatus,
+                            style = MaterialTheme.typography.labelSmall,
+                            color = if (fajrSettings.isEnabled) Color(0xFF15803D) else MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                }
+
+                Switch(
+                    checked = fajrSettings.isEnabled,
+                    onCheckedChange = { enabled ->
+                        viewModel.updateFajrAlarm(enabled, fajrSettings.offsetMinutesBefore)
+                    }
+                )
+            }
+
+            Spacer(modifier = Modifier.height(10.dp))
+
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(
+                    "${strings.calendarPrayerHorizonCity} ${fajrSettings.cityName}",
+                    style = MaterialTheme.typography.bodySmall,
+                    fontWeight = FontWeight.SemiBold
+                )
+                OutlinedButton(onClick = onOpenCityDialog) {
+                    Text(strings.changeCity, fontSize = 11.sp)
+                }
+            }
+
+            if (fajrSettings.isEnabled) {
+                Spacer(modifier = Modifier.height(18.dp))
+
+                fun offsetToFraction(offset: Int): Float {
+                    return when {
+                        offset > 0 -> {
+                            val progress = (15 - offset).coerceIn(0, 15) / 15f
+                            0.5f * progress
+                        }
+                        offset < 0 -> {
+                            val progress = (-offset).coerceIn(0, 60) / 60f
+                            0.5f + 0.5f * progress
+                        }
+                        else -> 0.5f
+                    }.coerceIn(0f, 1f)
+                }
+
+                fun fractionToOffset(fraction: Float): Int {
+                    val f = fraction.coerceIn(0f, 1f)
+                    return if (f <= 0.5f) {
+                        val progress = f / 0.5f
+                        (15f * (1f - progress)).roundToInt().coerceIn(0, 15)
+                    } else {
+                        val progress = (f - 0.5f) / 0.5f
+                        -((60f * progress).roundToInt().coerceIn(0, 60))
+                    }
+                }
+
+                var isDragging by remember { mutableStateOf(false) }
+                var previewOffsetMinutes by remember {
+                    mutableIntStateOf(fajrSettings.offsetMinutesBefore)
+                }
+                var sliderFraction by remember {
+                    mutableFloatStateOf(offsetToFraction(fajrSettings.offsetMinutesBefore))
+                }
+
+                LaunchedEffect(fajrSettings.offsetMinutesBefore) {
+                    if (!isDragging && previewOffsetMinutes != fajrSettings.offsetMinutesBefore) {
+                        previewOffsetMinutes = fajrSettings.offsetMinutesBefore
+                        sliderFraction = offsetToFraction(fajrSettings.offsetMinutesBefore)
+                    }
+                }
+
+                val labelText = when {
+                    previewOffsetMinutes > 0 -> {
+                        val digits = if (strings.isFa) PersianCalendarHelper.toPersianDigits(previewOffsetMinutes.toString()) else previewOffsetMinutes.toString()
+                        if (strings.isFa) "$digits دقیقه قبل از اذان" else "$digits min before Fajr"
+                    }
+                    previewOffsetMinutes < 0 -> {
+                        val after = -previewOffsetMinutes
+                        val digits = if (strings.isFa) PersianCalendarHelper.toPersianDigits(after.toString()) else after.toString()
+                        if (strings.isFa) "$digits دقیقه بعد از اذان" else "$digits min after Fajr"
+                    }
+                    else -> {
+                        if (strings.isFa) "همزمان با اذان" else "At Fajr"
+                    }
+                }
+
+                Text(
+                    text = labelText,
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.Medium,
+                    textAlign = TextAlign.Center,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(bottom = 8.dp)
+                )
+
+                CompositionLocalProvider(LocalLayoutDirection provides LayoutDirection.Ltr) {
+                    val primaryColor = MaterialTheme.colorScheme.primary
+                    val trackInactiveColor = MaterialTheme.colorScheme.surfaceVariant
+                    val trackActiveColor = primaryColor
+
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 4.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.Center
+                    ) {
+                        val canDecrease = previewOffsetMinutes < 15
+                        Box(
+                            modifier = Modifier
+                                .size(34.dp)
+                                .border(
+                                    width = 1.2.dp,
+                                    color = if (canDecrease) primaryColor.copy(alpha = 0.5f) else MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f),
+                                    shape = CircleShape
+                                )
+                                .clip(CircleShape)
+                                .clickable(enabled = canDecrease) {
+                                    val newOffset = (previewOffsetMinutes + 1).coerceAtMost(15)
+                                    if (newOffset != fajrSettings.offsetMinutesBefore) {
+                                        previewOffsetMinutes = newOffset
+                                        sliderFraction = offsetToFraction(newOffset)
+                                        viewModel.updateFajrAlarm(true, newOffset)
+                                    }
+                                },
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.Remove,
+                                contentDescription = "کاهش زمان",
+                                tint = if (canDecrease) primaryColor else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.25f),
+                                modifier = Modifier.size(17.dp)
+                            )
+                        }
+
+                        val density = LocalDensity.current
+                        val thumbRadiusDp = 9.dp
+
+                        Box(
+                            modifier = Modifier
+                                .weight(1f)
+                                .height(36.dp)
+                                .padding(horizontal = 10.dp)
+                                .pointerInput(density) {
+                                    val thumbRadiusPx = with(density) { thumbRadiusDp.toPx() }
+                                    awaitEachGesture {
+                                        val down = awaitFirstDown(requireUnconsumed = false)
+                                        val availableWidth = (size.width - thumbRadiusPx * 2).coerceAtLeast(1f)
+                                        val touchX = (down.position.x - thumbRadiusPx).coerceIn(0f, availableWidth)
+                                        val initialFraction = touchX / availableWidth
+                                        sliderFraction = initialFraction
+                                        previewOffsetMinutes = fractionToOffset(initialFraction)
+                                        isDragging = true
+                                        down.consume()
+
+                                        val pointerId = down.id
+                                        while (true) {
+                                            val event = awaitPointerEvent()
+                                            val change = event.changes.firstOrNull { it.id == pointerId } ?: break
+                                            if (change.pressed) {
+                                                val currentX = (change.position.x - thumbRadiusPx).coerceIn(0f, availableWidth)
+                                                val fraction = currentX / availableWidth
+                                                sliderFraction = fraction
+                                                previewOffsetMinutes = fractionToOffset(fraction)
+                                                change.consume()
+                                            } else {
+                                                change.consume()
+                                                break
+                                            }
+                                        }
+                                        isDragging = false
+                                        val finalOffset = fractionToOffset(sliderFraction)
+                                        previewOffsetMinutes = finalOffset
+                                        if (finalOffset != fajrSettings.offsetMinutesBefore) {
+                                            viewModel.updateFajrAlarm(true, finalOffset)
+                                        }
+                                    }
+                                },
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Canvas(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .height(36.dp)
+                            ) {
+                                val trackH = 6.dp.toPx()
+                                val trackY = (size.height - trackH) / 2f
+                                val radius = trackH / 2f
+                                val thumbRadiusPx = thumbRadiusDp.toPx()
+                                val availableWidth = size.width - thumbRadiusPx * 2
+                                val thumbCenterXPx = thumbRadiusPx + (availableWidth * sliderFraction.coerceIn(0f, 1f))
+
+                                drawRoundRect(
+                                    color = trackInactiveColor,
+                                    topLeft = Offset(0f, trackY),
+                                    size = Size(size.width, trackH),
+                                    cornerRadius = CornerRadius(radius, radius)
+                                )
+
+                                if (thumbCenterXPx > 0f) {
+                                    drawRoundRect(
+                                        color = trackActiveColor,
+                                        topLeft = Offset(0f, trackY),
+                                        size = Size(thumbCenterXPx.coerceAtMost(size.width), trackH),
+                                        cornerRadius = CornerRadius(radius, radius)
+                                    )
+                                }
+
+                                drawCircle(
+                                    color = Color.White,
+                                    radius = thumbRadiusPx,
+                                    center = Offset(thumbCenterXPx, size.height / 2f)
+                                )
+                                drawCircle(
+                                    color = primaryColor,
+                                    radius = thumbRadiusPx - 2.5.dp.toPx(),
+                                    center = Offset(thumbCenterXPx, size.height / 2f)
+                                )
+                            }
+                        }
+
+                        val canIncrease = previewOffsetMinutes > -60
+                        Box(
+                            modifier = Modifier
+                                .size(34.dp)
+                                .border(
+                                    width = 1.2.dp,
+                                    color = if (canIncrease) primaryColor.copy(alpha = 0.5f) else MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f),
+                                    shape = CircleShape
+                                )
+                                .clip(CircleShape)
+                                .clickable(enabled = canIncrease) {
+                                    val newOffset = (previewOffsetMinutes - 1).coerceAtLeast(-60)
+                                    if (newOffset != fajrSettings.offsetMinutesBefore) {
+                                        previewOffsetMinutes = newOffset
+                                        sliderFraction = offsetToFraction(newOffset)
+                                        viewModel.updateFajrAlarm(true, newOffset)
+                                    }
+                                },
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.Add,
+                                contentDescription = "افزایش زمان",
+                                tint = if (canIncrease) primaryColor else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.25f),
+                                modifier = Modifier.size(17.dp)
+                            )
+                        }
+                    }
+
+                    Spacer(modifier = Modifier.height(14.dp))
+
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 4.dp),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        val isStartSelected = previewOffsetMinutes == 15
+                        Surface(
+                            onClick = {
+                                if (previewOffsetMinutes != 15) {
+                                    previewOffsetMinutes = 15
+                                    sliderFraction = 0f
+                                    viewModel.updateFajrAlarm(true, 15)
+                                }
+                            },
+                            shape = RoundedCornerShape(10.dp),
+                            color = if (isStartSelected) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.45f),
+                            border = if (isStartSelected) BorderStroke(1.2.dp, primaryColor) else null,
+                            modifier = Modifier.weight(1f)
+                        ) {
+                            Box(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(vertical = 10.dp, horizontal = 2.dp),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                CompositionLocalProvider(LocalLayoutDirection provides if (strings.isFa) LayoutDirection.Rtl else LayoutDirection.Ltr) {
+                                    Text(
+                                        text = if (strings.isFa) "۱۵ دقیقه قبل" else "15m before",
+                                        style = MaterialTheme.typography.labelMedium.copy(
+                                            textDirection = if (strings.isFa) TextDirection.Rtl else TextDirection.Ltr
+                                        ),
+                                        fontWeight = if (isStartSelected) FontWeight.Bold else FontWeight.Medium,
+                                        color = if (isStartSelected) primaryColor else MaterialTheme.colorScheme.onSurface,
+                                        textAlign = TextAlign.Center
+                                    )
+                                }
+                            }
+                        }
+
+                        val isSimultaneousSelected = previewOffsetMinutes == 0
+                        Surface(
+                            onClick = {
+                                if (previewOffsetMinutes != 0) {
+                                    previewOffsetMinutes = 0
+                                    sliderFraction = 0.5f
+                                    viewModel.updateFajrAlarm(true, 0)
+                                }
+                            },
+                            shape = RoundedCornerShape(10.dp),
+                            color = if (isSimultaneousSelected) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.45f),
+                            border = if (isSimultaneousSelected) BorderStroke(1.2.dp, primaryColor) else null,
+                            modifier = Modifier.weight(1f)
+                        ) {
+                            Box(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(vertical = 10.dp, horizontal = 2.dp),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                CompositionLocalProvider(LocalLayoutDirection provides if (strings.isFa) LayoutDirection.Rtl else LayoutDirection.Ltr) {
+                                    Text(
+                                        text = if (strings.isFa) "همزمان با اذان" else "At Fajr",
+                                        style = MaterialTheme.typography.labelMedium.copy(
+                                            textDirection = if (strings.isFa) TextDirection.Rtl else TextDirection.Ltr
+                                        ),
+                                        fontWeight = if (isSimultaneousSelected) FontWeight.Bold else FontWeight.Medium,
+                                        color = if (isSimultaneousSelected) primaryColor else MaterialTheme.colorScheme.onSurface,
+                                        textAlign = TextAlign.Center
+                                    )
+                                }
+                            }
+                        }
+
+                        val isEndSelected = previewOffsetMinutes == -60
+                        Surface(
+                            onClick = {
+                                if (previewOffsetMinutes != -60) {
+                                    previewOffsetMinutes = -60
+                                    sliderFraction = 1f
+                                    viewModel.updateFajrAlarm(true, -60)
+                                }
+                            },
+                            shape = RoundedCornerShape(10.dp),
+                            color = if (isEndSelected) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.45f),
+                            border = if (isEndSelected) BorderStroke(1.2.dp, primaryColor) else null,
+                            modifier = Modifier.weight(1f)
+                        ) {
+                            Box(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(vertical = 10.dp, horizontal = 2.dp),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                CompositionLocalProvider(LocalLayoutDirection provides if (strings.isFa) LayoutDirection.Rtl else LayoutDirection.Ltr) {
+                                    Text(
+                                        text = if (strings.isFa) "۱ ساعت بعد" else "1h after",
+                                        style = MaterialTheme.typography.labelMedium.copy(
+                                            textDirection = if (strings.isFa) TextDirection.Rtl else TextDirection.Ltr
+                                        ),
+                                        fontWeight = if (isEndSelected) FontWeight.Bold else FontWeight.Medium,
+                                        color = if (isEndSelected) primaryColor else MaterialTheme.colorScheme.onSurface,
+                                        textAlign = TextAlign.Center
+                                    )
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun ActivityAndSyncLogsCard(
+    viewModel: MainViewModel,
+    strings: com.example.ui.AppStrings
+) {
+    val logs by viewModel.activityLogList.collectAsState()
+    val dbLogs by viewModel.syncLogs.collectAsState()
+
+    Card(
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+        shape = RoundedCornerShape(16.dp),
+        elevation = CardDefaults.cardElevation(defaultElevation = 1.dp),
+        modifier = Modifier.fillMaxWidth()
+    ) {
+        Column(modifier = Modifier.padding(16.dp)) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Icon(Icons.Default.Sync, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text(strings.appLogs, fontWeight = FontWeight.Bold)
+                }
+
+                IconButton(onClick = { viewModel.clearSyncLogs() }, modifier = Modifier.size(28.dp)) {
+                    Icon(Icons.Default.Refresh, contentDescription = strings.clearLogs, modifier = Modifier.size(16.dp))
+                }
+            }
+
+            Spacer(modifier = Modifier.height(8.dp))
+
+            if (dbLogs.isEmpty() && logs.isEmpty()) {
+                Text(
+                    text = strings.noSyncLogsYet,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            } else if (dbLogs.isNotEmpty()) {
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .heightIn(max = 260.dp)
+                        .verticalScroll(rememberScrollState()),
+                    verticalArrangement = Arrangement.spacedBy(6.dp)
+                ) {
+                    dbLogs.take(25).forEach { log ->
+                        Surface(
+                            color = if (log.isSuccess) MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.35f) else MaterialTheme.colorScheme.errorContainer.copy(alpha = 0.3f),
+                            shape = RoundedCornerShape(10.dp),
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Row(
+                                modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Surface(
+                                    color = if (log.isSuccess) Color(0xFFE0F2FE) else Color(0xFFFEE2E2),
+                                    shape = RoundedCornerShape(6.dp)
+                                ) {
+                                    Text(
+                                        text = log.source,
+                                        fontSize = 11.sp,
+                                        fontWeight = FontWeight.Bold,
+                                        color = if (log.isSuccess) Color(0xFF0369A1) else Color(0xFFDC2626),
+                                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp)
+                                    )
+                                }
+                                Spacer(modifier = Modifier.width(10.dp))
+                                Column(modifier = Modifier.weight(1f)) {
+                                    Text(
+                                        text = log.details,
+                                        fontSize = 12.sp,
+                                        fontWeight = FontWeight.Medium,
+                                        color = MaterialTheme.colorScheme.onSurface,
+                                        lineHeight = 18.sp
+                                    )
+                                    Spacer(modifier = Modifier.height(2.dp))
+                                    Text(
+                                        text = formatLogTime(log.timestamp),
+                                        fontSize = 11.sp,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                                    )
+                                }
+                            }
+                        }
+                    }
+                }
+            } else {
+                Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                    logs.take(10).forEach { log ->
+                        Surface(
+                            color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.35f),
+                            shape = RoundedCornerShape(8.dp),
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Text(
+                                text = log,
+                                fontSize = 12.sp,
+                                fontWeight = FontWeight.Medium,
+                                modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp),
+                                color = MaterialTheme.colorScheme.onSurface
+                            )
+                        }
+                    }
+                }
+            }
+        }
+    }
 }
 

@@ -36,6 +36,54 @@ interface EventDao {
     @Query("UPDATE events SET isDeleted = 1, updatedAt = :updatedAt WHERE recurrenceId = :recurrenceId AND persianDate >= :fromPersianDate")
     suspend fun softDeleteRecurringEventsFromDate(recurrenceId: String, fromPersianDate: String, updatedAt: Long = System.currentTimeMillis())
 
+    @Query("UPDATE events SET isDeleted = 1, updatedAt = :updatedAt WHERE recurrenceId = :recurrenceId")
+    suspend fun softDeleteAllRecurringEvents(recurrenceId: String, updatedAt: Long = System.currentTimeMillis())
+
+    @Query("""
+        UPDATE events 
+        SET title = :title, 
+            description = :description, 
+            startTime = :startTime, 
+            endTime = :endTime, 
+            category = :category, 
+            colorHex = :colorHex, 
+            updatedAt = :updatedAt 
+        WHERE recurrenceId = :recurrenceId AND persianDate >= :fromPersianDate AND isDeleted = 0
+    """)
+    suspend fun updateRecurringEventsFromDate(
+        recurrenceId: String,
+        fromPersianDate: String,
+        title: String,
+        description: String,
+        startTime: String,
+        endTime: String,
+        category: String,
+        colorHex: String,
+        updatedAt: Long = System.currentTimeMillis()
+    )
+
+    @Query("""
+        UPDATE events 
+        SET title = :title, 
+            description = :description, 
+            startTime = :startTime, 
+            endTime = :endTime, 
+            category = :category, 
+            colorHex = :colorHex, 
+            updatedAt = :updatedAt 
+        WHERE recurrenceId = :recurrenceId AND isDeleted = 0
+    """)
+    suspend fun updateAllRecurringEvents(
+        recurrenceId: String,
+        title: String,
+        description: String,
+        startTime: String,
+        endTime: String,
+        category: String,
+        colorHex: String,
+        updatedAt: Long = System.currentTimeMillis()
+    )
+
     @Query("DELETE FROM events WHERE id = :id")
     suspend fun hardDeleteEvent(id: String)
 }

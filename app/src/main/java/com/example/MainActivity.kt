@@ -2,6 +2,7 @@ package com.example
 
 import android.content.Intent
 import android.os.Bundle
+import android.widget.Toast
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.setContent
@@ -32,6 +33,7 @@ import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.ArrowForward
 import androidx.compose.material.icons.filled.AutoAwesome
 import androidx.compose.material.icons.filled.CalendarMonth
+import androidx.compose.material.icons.filled.Menu
 import androidx.compose.material.icons.filled.CalendarToday
 import androidx.compose.material.icons.filled.Checklist
 import androidx.compose.material.icons.filled.DarkMode
@@ -40,6 +42,9 @@ import androidx.compose.material.icons.filled.LightMode
 import androidx.compose.material.icons.filled.NoteAlt
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.Sync
+import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.CenterAlignedTopAppBar
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
@@ -47,9 +52,11 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.NavigationBar
 import androidx.compose.material3.NavigationBarItem
+import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.CompositionLocalProvider
@@ -74,6 +81,7 @@ import androidx.compose.ui.unit.sp
 import com.example.calendar.PersianCalendarHelper
 import com.example.settings.AppPreferences
 import com.example.ui.MainViewModel
+import com.example.ui.CalendarViewMode
 import com.example.ui.LocalAppLanguage
 import com.example.ui.rememberAppStrings
 import com.example.ui.screens.CalendarScreen
@@ -152,6 +160,7 @@ class MainActivity : ComponentActivity() {
                             onFinished = {
                                 isOnboardingCompleted = true
                                 viewModel.setAppLanguage(AppPreferences.getAppLanguage(context))
+                                viewModel.checkMementoMonthAndYearStatus()
                             }
                         )
                     } else {
@@ -174,6 +183,7 @@ class MainActivity : ComponentActivity() {
                         val selectedDate by viewModel.selectedDate.collectAsState()
                         val viewYear by viewModel.currentViewYear.collectAsState()
                         val viewMonth by viewModel.currentViewMonth.collectAsState()
+                        val calendarViewMode by viewModel.calendarViewMode.collectAsState()
                         val daysInMonth = remember(viewYear, viewMonth) { PersianCalendarHelper.getDaysInJalaliMonth(viewYear, viewMonth) }
                         val firstGDate = remember(viewYear, viewMonth) { PersianCalendarHelper.jalaliToGregorian(viewYear, viewMonth, 1) }
                         val lastGDate = remember(viewYear, viewMonth) { PersianCalendarHelper.jalaliToGregorian(viewYear, viewMonth, daysInMonth) }
@@ -281,31 +291,50 @@ class MainActivity : ComponentActivity() {
                                                 )
                                             }
 
-                                            // Left side: Quick jump to Today
-                                            Surface(
-                                                color = todayBtnContainerColor,
-                                                shape = RoundedCornerShape(12.dp),
-                                                modifier = Modifier
-                                                    .clickable { viewModel.setToday() }
-                                                    .testTag("btn_quick_today")
+                                            // Left side: View Mode Toggle & Quick jump to Today
+                                            Row(
+                                                verticalAlignment = Alignment.CenterVertically,
+                                                horizontalArrangement = Arrangement.spacedBy(2.dp)
                                             ) {
-                                                Row(
-                                                    modifier = Modifier.padding(horizontal = 6.dp, vertical = 3.dp),
-                                                    verticalAlignment = Alignment.CenterVertically
+                                                IconButton(
+                                                    onClick = { viewModel.toggleCalendarViewMode() },
+                                                    modifier = Modifier
+                                                        .size(34.dp)
+                                                        .testTag("top_bar_view_mode_toggle_btn")
                                                 ) {
                                                     Icon(
-                                                        Icons.Default.CalendarToday,
-                                                        contentDescription = strings.today,
-                                                        tint = todayBtnContentColor,
-                                                        modifier = Modifier.size(12.dp)
+                                                        imageVector = if (calendarViewMode == CalendarViewMode.MONTH) Icons.Default.Menu else Icons.Default.CalendarMonth,
+                                                        contentDescription = if (calendarViewMode == CalendarViewMode.MONTH) "نمای هفتگی" else "نمای ماهانه",
+                                                        tint = MaterialTheme.colorScheme.primary,
+                                                        modifier = Modifier.size(20.dp)
                                                     )
-                                                    Spacer(modifier = Modifier.width(3.dp))
-                                                    Text(
-                                                        text = strings.today,
-                                                        fontSize = 10.sp,
-                                                        fontWeight = if (isTodaySelected) FontWeight.Bold else FontWeight.Medium,
-                                                        color = todayBtnContentColor
-                                                    )
+                                                }
+
+                                                Surface(
+                                                    color = todayBtnContainerColor,
+                                                    shape = RoundedCornerShape(12.dp),
+                                                    modifier = Modifier
+                                                        .clickable { viewModel.setToday() }
+                                                        .testTag("btn_quick_today")
+                                                ) {
+                                                    Row(
+                                                        modifier = Modifier.padding(horizontal = 6.dp, vertical = 3.dp),
+                                                        verticalAlignment = Alignment.CenterVertically
+                                                    ) {
+                                                        Icon(
+                                                            Icons.Default.CalendarToday,
+                                                            contentDescription = strings.today,
+                                                            tint = todayBtnContentColor,
+                                                            modifier = Modifier.size(12.dp)
+                                                        )
+                                                        Spacer(modifier = Modifier.width(3.dp))
+                                                        Text(
+                                                            text = strings.today,
+                                                            fontSize = 10.sp,
+                                                            fontWeight = if (isTodaySelected) FontWeight.Bold else FontWeight.Medium,
+                                                            color = todayBtnContentColor
+                                                        )
+                                                    }
                                                 }
                                             }
                                         }
@@ -443,7 +472,7 @@ class MainActivity : ComponentActivity() {
                             label = "tab_crossfade"
                         ) { tab ->
                             when (tab) {
-                                0 -> CalendarScreen(viewModel = viewModel)
+                                0 -> CalendarScreen(viewModel = viewModel, modifier = Modifier.fillMaxSize())
                                 1 -> TasksScreen(viewModel = viewModel)
                                 2 -> NotesScreen(viewModel = viewModel)
                                 3 -> LifeGridScreen(viewModel = viewModel)
@@ -456,8 +485,97 @@ class MainActivity : ComponentActivity() {
                     // In-App Update Dialog with Automatic Safety Backup
                     val availableUpdate by viewModel.availableUpdate.collectAsState()
                     val updateDownloadState by viewModel.updateDownloadState.collectAsState()
+                    val pendingReflectionMonthIdx by viewModel.pendingReflectionMonthIdx.collectAsState()
                     val context = androidx.compose.ui.platform.LocalContext.current
                     val uriHandler = androidx.compose.ui.platform.LocalUriHandler.current
+
+                    // Global Monthly Reflection Prompt ("این ماه چطور گذشت؟") shown across the entire app
+                    if (availableUpdate == null && pendingReflectionMonthIdx != null) {
+                        val monthIdx = pendingReflectionMonthIdx!!
+                        val monthYearLabel = remember(monthIdx, isRtl) {
+                            viewModel.mementoManager.getMonthYearLabel(monthIdx, isRtl)
+                        }
+                        var reflectionText by remember(monthIdx) {
+                            mutableStateOf(viewModel.mementoManager.getReflectionNote(monthIdx) ?: "")
+                        }
+
+                        AlertDialog(
+                            onDismissRequest = { viewModel.dismissMonthlyReflectionPrompt() },
+                            title = {
+                                Row(verticalAlignment = Alignment.CenterVertically) {
+                                    Icon(
+                                        Icons.Default.HourglassBottom,
+                                        contentDescription = null,
+                                        tint = Color(0xFFF59E0B),
+                                        modifier = Modifier.size(22.dp)
+                                    )
+                                    Spacer(modifier = Modifier.width(8.dp))
+                                    Column {
+                                        Text(
+                                            text = strings.howWasThisMonthTitle,
+                                            fontWeight = FontWeight.Bold,
+                                            fontSize = 16.sp
+                                        )
+                                        if (monthYearLabel.isNotBlank()) {
+                                            Text(
+                                                text = monthYearLabel,
+                                                fontSize = 12.sp,
+                                                color = Color(0xFFF59E0B),
+                                                fontWeight = FontWeight.SemiBold
+                                            )
+                                        }
+                                    }
+                                }
+                            },
+                            text = {
+                                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                                    Text(
+                                        text = if (isRtl) {
+                                            "یک ماه دیگر از عمر شما ($monthYearLabel) به پایان رسید و در نقطه‌های عمر ثبت شد! مهم‌ترین دستاورد، خاطره یا تجربه‌تان در این ماه چه بود؟\n(در پایان سال، تمام نوشته‌های ماهانه شما به صورت یک کارنامه سالانه در بخش یادداشت‌ها جمع‌آوری می‌شود)"
+                                        } else {
+                                            "Another month of your life ($monthYearLabel) has completed! Write your key achievement or memory for this month (at year-end, all monthly notes are compiled into your Notes):"
+                                        },
+                                        fontSize = 13.sp,
+                                        lineHeight = 19.sp
+                                    )
+                                    OutlinedTextField(
+                                        value = reflectionText,
+                                        onValueChange = { reflectionText = it },
+                                        placeholder = { Text(strings.notePlaceholder) },
+                                        minLines = 3,
+                                        maxLines = 6,
+                                        modifier = Modifier.fillMaxWidth()
+                                    )
+                                }
+                            },
+                            confirmButton = {
+                                Button(
+                                    enabled = reflectionText.isNotBlank(),
+                                    onClick = {
+                                        viewModel.saveMonthlyReflection(
+                                            monthIdx = monthIdx,
+                                            noteText = reflectionText.trim(),
+                                            markPromptHandled = true
+                                        )
+                                        val toastMsg = if (isRtl) {
+                                            "یادداشت $monthYearLabel در نقطه‌های عمر ثبت شد ✓"
+                                        } else {
+                                            "Reflection for $monthYearLabel saved ✓"
+                                        }
+                                        Toast.makeText(context, toastMsg, Toast.LENGTH_SHORT).show()
+                                    },
+                                    colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFF59E0B))
+                                ) {
+                                    Text(strings.saveNote)
+                                }
+                            },
+                            dismissButton = {
+                                TextButton(onClick = { viewModel.dismissMonthlyReflectionPrompt() }) {
+                                    Text(strings.later)
+                                }
+                            }
+                        )
+                    }
 
                     availableUpdate?.let { updateInfo ->
                         com.example.ui.components.UpdateDialog(
@@ -489,6 +607,7 @@ class MainActivity : ComponentActivity() {
         super.onResume()
         // الزام ۵: بررسی خودکار داشتن مجوز نصب در onResume و اجرای درجا و خودکار نصب بدون نیاز به کلیک مجدد
         viewModel.checkAndResumePendingInstall(this)
+        viewModel.checkMementoMonthAndYearStatus()
     }
 
     override fun onNewIntent(intent: Intent) {

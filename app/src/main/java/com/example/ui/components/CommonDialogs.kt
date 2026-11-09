@@ -1,6 +1,7 @@
 package com.example.ui.components
 
 import android.graphics.BitmapFactory
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -8,6 +9,7 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
@@ -22,16 +24,22 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.ArrowDropDown
 import androidx.compose.material.icons.filled.CalendarMonth
+import androidx.compose.material.icons.filled.Category
 import androidx.compose.material.icons.filled.Check
+import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.ContentCopy
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.DeleteForever
 import androidx.compose.material.icons.filled.DeleteSweep
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.EventBusy
+import androidx.compose.material.icons.filled.Flag
 import androidx.compose.material.icons.filled.NotificationsActive
+import androidx.compose.material.icons.filled.Palette
+import androidx.compose.material.icons.filled.Remove
 import androidx.compose.material.icons.filled.Repeat
 import androidx.compose.material.icons.filled.Schedule
 import androidx.compose.material.icons.filled.Star
@@ -44,20 +52,28 @@ import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilterChip
+import androidx.compose.material3.FilterChipDefaults
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.OutlinedTextFieldDefaults
+import androidx.compose.material3.RadioButton
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TimePicker
 import androidx.compose.material3.rememberTimePickerState
+import com.example.calendar.EventRecurrenceConfig
+import com.example.calendar.RecurrenceEndType
+import com.example.calendar.RecurrenceFrequency
 import com.example.calendar.PersianOccasion
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
@@ -105,6 +121,97 @@ fun reminderOptionLabel(opt: String, isFa: Boolean): String = if (isFa) opt else
     "۱ ساعت قبل" -> "1 hour before"
     "۱ روز قبل" -> "1 day before"
     else -> opt
+}
+
+@Composable
+fun modernDialogTextFieldColors() = OutlinedTextFieldDefaults.colors(
+    focusedContainerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.45f),
+    unfocusedContainerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.28f),
+    focusedBorderColor = MaterialTheme.colorScheme.primary,
+    unfocusedBorderColor = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.7f),
+    focusedLabelColor = MaterialTheme.colorScheme.primary,
+    unfocusedLabelColor = MaterialTheme.colorScheme.onSurfaceVariant
+)
+
+@Composable
+fun DialogSectionCard(
+    modifier: Modifier = Modifier,
+    title: String? = null,
+    icon: androidx.compose.ui.graphics.vector.ImageVector? = null,
+    content: @Composable ColumnScope.() -> Unit
+) {
+    Surface(
+        modifier = modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(14.dp),
+        color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.28f),
+        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.55f))
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 12.dp, vertical = 10.dp),
+            verticalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
+            if (title != null) {
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(6.dp)
+                ) {
+                    if (icon != null) {
+                        Icon(
+                            icon,
+                            contentDescription = null,
+                            tint = MaterialTheme.colorScheme.primary,
+                            modifier = Modifier.size(16.dp)
+                        )
+                    }
+                    Text(
+                        text = title,
+                        style = MaterialTheme.typography.labelMedium,
+                        fontWeight = FontWeight.Bold,
+                        color = MaterialTheme.colorScheme.onSurface
+                    )
+                }
+            }
+            content()
+        }
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun ModernDialogFilterChip(
+    selected: Boolean,
+    onClick: () -> Unit,
+    label: String,
+    modifier: Modifier = Modifier,
+    fontSize: androidx.compose.ui.unit.TextUnit = 11.sp
+) {
+    FilterChip(
+        selected = selected,
+        onClick = onClick,
+        label = {
+            Text(
+                text = label,
+                fontSize = fontSize,
+                fontWeight = if (selected) FontWeight.Bold else FontWeight.Medium
+            )
+        },
+        shape = RoundedCornerShape(8.dp),
+        colors = FilterChipDefaults.filterChipColors(
+            containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.45f),
+            labelColor = MaterialTheme.colorScheme.onSurface,
+            selectedContainerColor = MaterialTheme.colorScheme.primaryContainer,
+            selectedLabelColor = MaterialTheme.colorScheme.onPrimaryContainer
+        ),
+        border = FilterChipDefaults.filterChipBorder(
+            enabled = true,
+            selected = selected,
+            borderColor = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.7f),
+            selectedBorderColor = MaterialTheme.colorScheme.primary
+        ),
+        modifier = modifier
+    )
 }
 
 /**
@@ -217,6 +324,580 @@ fun PersianTimePicker(
     }
 }
 
+/**
+ * قالب‌بندی خوانا و شکیل تاریخ شمسی جهت نمایش دکمه
+ */
+fun formatUntilDateDisplay(pDate: String, isFa: Boolean): String {
+    val parts = PersianCalendarHelper.normalizePersianDate(pDate).split("/").mapNotNull { it.toIntOrNull() }
+    if (parts.size != 3) return pDate
+    val y = parts[0]
+    val m = parts[1]
+    val d = parts[2]
+    val monthName = PersianCalendarHelper.PERSIAN_MONTH_NAMES.getOrElse(m - 1) { "" }
+    return if (isFa) {
+        "${PersianCalendarHelper.toPersianDigits(d.toString())} $monthName ${PersianCalendarHelper.toPersianDigits(y.toString())}"
+    } else {
+        "$d $monthName $y"
+    }
+}
+
+/**
+ * دیالوگ انتخاب تقویم شمسی با انتخابگر سال، ماه و روز
+ * کاملاً لمسی و روان بدون نیاز به تایپ دستی یا باز شدن کیبورد
+ */
+@Composable
+fun PersianDatePickerDialog(
+    initialDateStr: String,
+    onDismiss: () -> Unit,
+    onConfirm: (String) -> Unit
+) {
+    val strings = rememberAppStrings()
+    val parts = PersianCalendarHelper.normalizePersianDate(initialDateStr).split("/").mapNotNull { it.toIntOrNull() }
+    val initialYear = if (parts.size == 3) parts[0] else 1405
+    val initialMonth = if (parts.size == 3) parts[1] else 1
+    val initialDay = if (parts.size == 3) parts[2] else 1
+
+    var year by remember { mutableIntStateOf(initialYear) }
+    var month by remember { mutableIntStateOf(initialMonth) }
+    var day by remember { mutableIntStateOf(initialDay) }
+
+    var yearMenuExpanded by remember { mutableStateOf(false) }
+    var monthMenuExpanded by remember { mutableStateOf(false) }
+    var dayMenuExpanded by remember { mutableStateOf(false) }
+
+    val daysInMonth = PersianCalendarHelper.getDaysInJalaliMonth(year, month)
+    if (day > daysInMonth) {
+        day = daysInMonth
+    }
+
+    val yearsList = (initialYear - 1..initialYear + 10).toList()
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = {
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                Icon(
+                    Icons.Default.CalendarMonth,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.primary,
+                    modifier = Modifier.size(22.dp)
+                )
+                Text(
+                    text = if (strings.isFa) "انتخاب تاریخ پایان" else "Select End Date",
+                    fontWeight = FontWeight.Bold,
+                    fontSize = 16.sp
+                )
+            }
+        },
+        text = {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(vertical = 4.dp),
+                verticalArrangement = Arrangement.spacedBy(14.dp)
+            ) {
+                // پیش‌نمایش تاریخ انتخابی
+                Surface(
+                    color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.5f),
+                    shape = RoundedCornerShape(12.dp),
+                    border = BorderStroke(1.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.4f)),
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    val monthName = strings.jalaliMonths.getOrElse(month - 1) { "" }
+                    val displayStr = if (strings.isFa) {
+                        "${PersianCalendarHelper.toPersianDigits(day.toString())} $monthName ${PersianCalendarHelper.toPersianDigits(year.toString())}"
+                    } else {
+                        "$day $monthName $year"
+                    }
+                    Text(
+                        text = displayStr,
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.Bold,
+                        color = MaterialTheme.colorScheme.primary,
+                        textAlign = androidx.compose.ui.text.style.TextAlign.Center,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(vertical = 12.dp)
+                    )
+                }
+
+                // ردیف سه سلکتور: روز، ماه، سال
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(6.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    // ۱. روز
+                    Box(modifier = Modifier.weight(1f)) {
+                        Surface(
+                            color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.45f),
+                            shape = RoundedCornerShape(10.dp),
+                            border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clickable { dayMenuExpanded = true }
+                        ) {
+                            Row(
+                                modifier = Modifier.padding(horizontal = 8.dp, vertical = 10.dp),
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Text(
+                                    text = if (strings.isFa) PersianCalendarHelper.toPersianDigits(day.toString()) else "$day",
+                                    fontSize = 13.sp,
+                                    fontWeight = FontWeight.Bold
+                                )
+                                Icon(Icons.Default.ArrowDropDown, contentDescription = null, modifier = Modifier.size(18.dp))
+                            }
+                        }
+                        DropdownMenu(
+                            expanded = dayMenuExpanded,
+                            onDismissRequest = { dayMenuExpanded = false }
+                        ) {
+                            for (d in 1..daysInMonth) {
+                                DropdownMenuItem(
+                                    text = {
+                                        Text(
+                                            if (strings.isFa) PersianCalendarHelper.toPersianDigits(d.toString()) else d.toString(),
+                                            fontWeight = if (d == day) FontWeight.Bold else FontWeight.Normal,
+                                            color = if (d == day) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface
+                                        )
+                                    },
+                                    onClick = {
+                                        day = d
+                                        dayMenuExpanded = false
+                                    }
+                                )
+                            }
+                        }
+                    }
+
+                    // ۲. ماه
+                    Box(modifier = Modifier.weight(1.3f)) {
+                        Surface(
+                            color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.45f),
+                            shape = RoundedCornerShape(10.dp),
+                            border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clickable { monthMenuExpanded = true }
+                        ) {
+                            Row(
+                                modifier = Modifier.padding(horizontal = 8.dp, vertical = 10.dp),
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Text(
+                                    text = strings.jalaliMonths.getOrElse(month - 1) { "" },
+                                    fontSize = 12.sp,
+                                    fontWeight = FontWeight.Bold
+                                )
+                                Icon(Icons.Default.ArrowDropDown, contentDescription = null, modifier = Modifier.size(18.dp))
+                            }
+                        }
+                        DropdownMenu(
+                            expanded = monthMenuExpanded,
+                            onDismissRequest = { monthMenuExpanded = false }
+                        ) {
+                            strings.jalaliMonths.forEachIndexed { index, mName ->
+                                val m = index + 1
+                                DropdownMenuItem(
+                                    text = {
+                                        Text(
+                                            mName,
+                                            fontWeight = if (m == month) FontWeight.Bold else FontWeight.Normal,
+                                            color = if (m == month) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface
+                                        )
+                                    },
+                                    onClick = {
+                                        month = m
+                                        monthMenuExpanded = false
+                                    }
+                                )
+                            }
+                        }
+                    }
+
+                    // ۳. سال
+                    Box(modifier = Modifier.weight(1.1f)) {
+                        Surface(
+                            color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.45f),
+                            shape = RoundedCornerShape(10.dp),
+                            border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clickable { yearMenuExpanded = true }
+                        ) {
+                            Row(
+                                modifier = Modifier.padding(horizontal = 8.dp, vertical = 10.dp),
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Text(
+                                    text = if (strings.isFa) PersianCalendarHelper.toPersianDigits(year.toString()) else "$year",
+                                    fontSize = 12.sp,
+                                    fontWeight = FontWeight.Bold
+                                )
+                                Icon(Icons.Default.ArrowDropDown, contentDescription = null, modifier = Modifier.size(18.dp))
+                            }
+                        }
+                        DropdownMenu(
+                            expanded = yearMenuExpanded,
+                            onDismissRequest = { yearMenuExpanded = false }
+                        ) {
+                            yearsList.forEach { y ->
+                                DropdownMenuItem(
+                                    text = {
+                                        Text(
+                                            if (strings.isFa) PersianCalendarHelper.toPersianDigits(y.toString()) else y.toString(),
+                                            fontWeight = if (y == year) FontWeight.Bold else FontWeight.Normal,
+                                            color = if (y == year) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface
+                                        )
+                                    },
+                                    onClick = {
+                                        year = y
+                                        yearMenuExpanded = false
+                                    }
+                                )
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        confirmButton = {
+            Button(
+                onClick = {
+                    val formatted = "%04d/%02d/%02d".format(year, month, day)
+                    onConfirm(formatted)
+                }
+            ) {
+                Text(if (strings.isFa) "تأیید تاریخ" else "Confirm Date")
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) {
+                Text(strings.cancel)
+            }
+        }
+    )
+}
+
+/**
+ * دیالوگ پیشرفته انتخاب و سفارشی‌سازی تکرار رویداد:
+ * دوره‌ها (بدون تکرار، هر روز، هر هفته، هر ماه، هر سال)
+ * شرایط پایان (برای همیشه، تا تاریخ، بعد از N تکرار)
+ */
+@Composable
+fun EventRecurrenceDialog(
+    initialConfig: EventRecurrenceConfig,
+    eventDate: String,
+    onDismiss: () -> Unit,
+    onConfirm: (EventRecurrenceConfig) -> Unit
+) {
+    val strings = rememberAppStrings()
+    var frequency by remember { mutableStateOf(initialConfig.frequency) }
+    var endType by remember { mutableStateOf(initialConfig.endType) }
+    var untilDate by remember {
+        mutableStateOf(
+            if (initialConfig.untilDate.isNotBlank()) initialConfig.untilDate
+            else {
+                val parts = PersianCalendarHelper.normalizePersianDate(eventDate).split("/").mapNotNull { it.toIntOrNull() }
+                if (parts.size == 3) "%04d/%02d/%02d".format(parts[0] + 1, parts[1], parts[2]) else eventDate
+            }
+        )
+    }
+    var count by remember { mutableIntStateOf(if (initialConfig.count > 0) initialConfig.count else 10) }
+    var showUntilDatePicker by remember { mutableStateOf(false) }
+
+    if (showUntilDatePicker) {
+        PersianDatePickerDialog(
+            initialDateStr = untilDate,
+            onDismiss = { showUntilDatePicker = false },
+            onConfirm = { selectedFormattedDate ->
+                untilDate = selectedFormattedDate
+                endType = RecurrenceEndType.UNTIL_DATE
+                showUntilDatePicker = false
+            }
+        )
+    }
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = {
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                Icon(
+                    Icons.Default.Repeat,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.primary,
+                    modifier = Modifier.size(24.dp)
+                )
+                Text(
+                    text = if (strings.isFa) "تکرار" else "Repeat",
+                    fontWeight = FontWeight.Bold,
+                    fontSize = 18.sp
+                )
+            }
+        },
+        text = {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .verticalScroll(rememberScrollState()),
+                verticalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                // بخش انتخاب فرکانس و دوره تکرار
+                val frequencies = listOf(
+                    RecurrenceFrequency.NONE,
+                    RecurrenceFrequency.DAILY,
+                    RecurrenceFrequency.WEEKLY,
+                    RecurrenceFrequency.MONTHLY,
+                    RecurrenceFrequency.YEARLY
+                )
+
+                frequencies.forEach { freq ->
+                    val isSelected = frequency == freq
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clip(RoundedCornerShape(8.dp))
+                            .clickable { frequency = freq }
+                            .padding(vertical = 4.dp, horizontal = 4.dp),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text(
+                            text = if (strings.isFa) freq.titleFa else freq.titleEn,
+                            fontSize = 14.sp,
+                            fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal,
+                            color = if (isSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface
+                        )
+                        RadioButton(
+                            selected = isSelected,
+                            onClick = { frequency = freq }
+                        )
+                    }
+                }
+
+                // بخش شرایط پایان تکرار (فقط زمانی که گزینه غیر از «بدون تکرار» است)
+                if (frequency != RecurrenceFrequency.NONE) {
+                    Spacer(modifier = Modifier.height(4.dp))
+                    HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f))
+                    Spacer(modifier = Modifier.height(2.dp))
+
+                    Text(
+                        text = if (strings.isFa) "پایان تکرار" else "End repeat",
+                        style = MaterialTheme.typography.labelMedium,
+                        fontWeight = FontWeight.Bold,
+                        color = MaterialTheme.colorScheme.primary
+                    )
+
+                    // ۱. تکرار برای همیشه
+                    val isNeverSelected = endType == RecurrenceEndType.NEVER
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clip(RoundedCornerShape(8.dp))
+                            .clickable { endType = RecurrenceEndType.NEVER }
+                            .padding(vertical = 4.dp, horizontal = 4.dp),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text(
+                            text = if (strings.isFa) "تکرار برای همیشه" else "Never ends",
+                            fontSize = 13.sp,
+                            fontWeight = if (isNeverSelected) FontWeight.Bold else FontWeight.Normal,
+                            color = if (isNeverSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface
+                        )
+                        RadioButton(
+                            selected = isNeverSelected,
+                            onClick = { endType = RecurrenceEndType.NEVER }
+                        )
+                    }
+
+                    // ۲. تا تاریخ مشخص (انتخاب با تقویم لمسی بدون کیبورد)
+                    val isUntilSelected = endType == RecurrenceEndType.UNTIL_DATE
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clip(RoundedCornerShape(8.dp))
+                            .clickable {
+                                endType = RecurrenceEndType.UNTIL_DATE
+                                showUntilDatePicker = true
+                            }
+                            .padding(vertical = 4.dp, horizontal = 4.dp),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(8.dp),
+                            modifier = Modifier.weight(1f)
+                        ) {
+                            Text(
+                                text = if (strings.isFa) "تا تاریخ" else "Until date",
+                                fontSize = 13.sp,
+                                fontWeight = if (isUntilSelected) FontWeight.Bold else FontWeight.Normal,
+                                color = if (isUntilSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface
+                            )
+                            Surface(
+                                onClick = {
+                                    endType = RecurrenceEndType.UNTIL_DATE
+                                    showUntilDatePicker = true
+                                },
+                                shape = RoundedCornerShape(10.dp),
+                                color = if (isUntilSelected) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
+                                border = BorderStroke(1.dp, if (isUntilSelected) MaterialTheme.colorScheme.primary.copy(alpha = 0.6f) else MaterialTheme.colorScheme.outlineVariant),
+                                modifier = Modifier.padding(start = 4.dp)
+                            ) {
+                                Row(
+                                    modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp),
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.spacedBy(6.dp)
+                                ) {
+                                    Icon(
+                                        Icons.Default.CalendarMonth,
+                                        contentDescription = null,
+                                        tint = if (isUntilSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
+                                        modifier = Modifier.size(16.dp)
+                                    )
+                                    Text(
+                                        text = formatUntilDateDisplay(untilDate, strings.isFa),
+                                        fontSize = 12.sp,
+                                        fontWeight = FontWeight.Bold,
+                                        color = if (isUntilSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface
+                                    )
+                                }
+                            }
+                        }
+                        RadioButton(
+                            selected = isUntilSelected,
+                            onClick = {
+                                endType = RecurrenceEndType.UNTIL_DATE
+                                showUntilDatePicker = true
+                            }
+                        )
+                    }
+
+                    // ۳. بعد از N تکرار (شمارنده عددی لمسی بدون کیبورد)
+                    val isCountSelected = endType == RecurrenceEndType.AFTER_COUNT
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clip(RoundedCornerShape(8.dp))
+                            .clickable { endType = RecurrenceEndType.AFTER_COUNT }
+                            .padding(vertical = 4.dp, horizontal = 4.dp),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(8.dp),
+                            modifier = Modifier.weight(1f)
+                        ) {
+                            Text(
+                                text = if (strings.isFa) "بعد از" else "After",
+                                fontSize = 13.sp,
+                                fontWeight = if (isCountSelected) FontWeight.Bold else FontWeight.Normal,
+                                color = if (isCountSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface
+                            )
+
+                            // دکمه‌های استپر لمسی (-) و (+)
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(4.dp)
+                            ) {
+                                Box(
+                                    modifier = Modifier
+                                        .size(28.dp)
+                                        .clip(CircleShape)
+                                        .background(MaterialTheme.colorScheme.surfaceVariant)
+                                        .clickable(enabled = count > 1) {
+                                            if (count > 1) count--
+                                            endType = RecurrenceEndType.AFTER_COUNT
+                                        },
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    Icon(Icons.Default.Remove, contentDescription = null, modifier = Modifier.size(14.dp))
+                                }
+
+                                Surface(
+                                    color = if (isCountSelected) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.surfaceVariant,
+                                    shape = RoundedCornerShape(8.dp),
+                                    border = BorderStroke(1.dp, if (isCountSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outlineVariant),
+                                    modifier = Modifier.padding(horizontal = 2.dp)
+                                ) {
+                                    Text(
+                                        text = if (strings.isFa) PersianCalendarHelper.toPersianDigits(count.toString()) else count.toString(),
+                                        fontSize = 13.sp,
+                                        fontWeight = FontWeight.Bold,
+                                        color = if (isCountSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface,
+                                        modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp)
+                                    )
+                                }
+
+                                Box(
+                                    modifier = Modifier
+                                        .size(28.dp)
+                                        .clip(CircleShape)
+                                        .background(MaterialTheme.colorScheme.surfaceVariant)
+                                        .clickable(enabled = count < 365) {
+                                            if (count < 365) count++
+                                            endType = RecurrenceEndType.AFTER_COUNT
+                                        },
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    Icon(Icons.Default.Add, contentDescription = null, modifier = Modifier.size(14.dp))
+                                }
+                            }
+
+                            Text(
+                                text = if (strings.isFa) "تکرار" else "times",
+                                fontSize = 13.sp,
+                                color = if (isCountSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface
+                            )
+                        }
+                        RadioButton(
+                            selected = isCountSelected,
+                            onClick = { endType = RecurrenceEndType.AFTER_COUNT }
+                        )
+                    }
+                }
+            }
+        },
+        confirmButton = {
+            Button(
+                onClick = {
+                    val finalConfig = if (frequency == RecurrenceFrequency.NONE) {
+                        EventRecurrenceConfig(frequency = RecurrenceFrequency.NONE)
+                    } else {
+                        EventRecurrenceConfig(
+                            frequency = frequency,
+                            endType = endType,
+                            untilDate = untilDate.trim(),
+                            count = count
+                        )
+                    }
+                    onConfirm(finalConfig)
+                }
+            ) {
+                Text(if (strings.isFa) "ذخیره" else "Save")
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) {
+                Text(strings.cancel)
+            }
+        }
+    )
+}
+
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
 fun AddEventDialog(
@@ -229,7 +910,8 @@ fun AddEventDialog(
         time: String,
         category: String,
         colorHex: String,
-        isWeeklyRecurring: Boolean
+        isWeeklyRecurring: Boolean,
+        recurrenceConfig: EventRecurrenceConfig
     ) -> Unit
 ) {
     val strings = rememberAppStrings()
@@ -237,7 +919,8 @@ fun AddEventDialog(
     var description by remember { mutableStateOf("") }
     var persianDate by remember { mutableStateOf(initialDate.formatted) }
     var isAllDay by remember { mutableStateOf(false) }
-    var isWeeklyRecurring by remember { mutableStateOf(false) }
+    var recurrenceConfig by remember { mutableStateOf(EventRecurrenceConfig()) }
+    var showRecurrenceDialog by remember { mutableStateOf(false) }
     var eventTime by remember { mutableStateOf("10:00") }
     var reminderOption by remember { mutableStateOf("همزمان با رویداد") }
     var category by remember { mutableStateOf("کاری") }
@@ -246,6 +929,18 @@ fun AddEventDialog(
     val categories = listOf("کاری", "شخصی", "مهم", "جلسه", "یادآوری")
     val reminderOptions = listOf("بدون زنگ", "همزمان با رویداد", "۵ دقیقه قبل", "۱۰ دقیقه قبل", "۱۵ دقیقه قبل", "۳۰ دقیقه قبل", "۱ ساعت قبل", "۱ روز قبل")
     val colors = listOf("#3B82F6", "#10B981", "#F59E0B", "#EF4444", "#8B5CF6")
+
+    if (showRecurrenceDialog) {
+        EventRecurrenceDialog(
+            initialConfig = recurrenceConfig,
+            eventDate = persianDate,
+            onDismiss = { showRecurrenceDialog = false },
+            onConfirm = { newConfig ->
+                recurrenceConfig = newConfig
+                showRecurrenceDialog = false
+            }
+        )
+    }
 
     AlertDialog(
         onDismissRequest = onDismiss,
@@ -261,13 +956,15 @@ fun AddEventDialog(
                 modifier = Modifier
                     .fillMaxWidth()
                     .verticalScroll(rememberScrollState()),
-                verticalArrangement = Arrangement.spacedBy(10.dp)
+                verticalArrangement = Arrangement.spacedBy(12.dp)
             ) {
                 OutlinedTextField(
                     value = title,
                     onValueChange = { title = it },
                     label = { Text(if (strings.isFa) "عنوان رویداد *" else "Event Title *") },
                     singleLine = true,
+                    shape = RoundedCornerShape(12.dp),
+                    colors = modernDialogTextFieldColors(),
                     modifier = Modifier
                         .fillMaxWidth()
                         .testTag("event_title_input")
@@ -278,6 +975,8 @@ fun AddEventDialog(
                     onValueChange = { description = it },
                     label = { Text(if (strings.isFa) "توضیحات رویداد (اختیاری)" else "Description (optional)") },
                     maxLines = 3,
+                    shape = RoundedCornerShape(12.dp),
+                    colors = modernDialogTextFieldColors(),
                     modifier = Modifier.fillMaxWidth()
                 )
 
@@ -285,132 +984,213 @@ fun AddEventDialog(
                     value = persianDate,
                     onValueChange = { persianDate = it },
                     label = { Text(if (strings.isFa) "تاریخ شمسی (مثال: ۱۴۰۵/۰۱/۱۵)" else "Solar Date (e.g. 1405/01/15)") },
+                    leadingIcon = {
+                        Icon(
+                            Icons.Default.CalendarMonth,
+                            contentDescription = null,
+                            tint = MaterialTheme.colorScheme.primary,
+                            modifier = Modifier.size(20.dp)
+                        )
+                    },
                     singleLine = true,
+                    shape = RoundedCornerShape(12.dp),
+                    colors = modernDialogTextFieldColors(),
                     modifier = Modifier.fillMaxWidth()
                 )
 
-                // All-day switch
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f), RoundedCornerShape(10.dp))
-                        .padding(horizontal = 10.dp, vertical = 6.dp),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
+                // کارت زمان و تکرار رویداد
+                DialogSectionCard(
+                    title = if (strings.isFa) "زمان و تکرار رویداد:" else "Time & Recurrence:",
+                    icon = Icons.Default.Schedule
                 ) {
-                    Text(if (strings.isFa) "رویداد تمام‌روز (بدون ساعت خاص)" else "All-day event (no specific time)", fontSize = 12.sp, fontWeight = FontWeight.SemiBold)
-                    Switch(
-                        checked = isAllDay,
-                        onCheckedChange = { isAllDay = it }
-                    )
-                }
-
-                // Weekly recurrence switch
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .background(
-                            if (isWeeklyRecurring) MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.45f)
-                            else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f),
-                            RoundedCornerShape(10.dp)
-                        )
-                        .padding(horizontal = 10.dp, vertical = 6.dp),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
+                    // All-day switch
                     Row(
-                        verticalAlignment = Alignment.CenterVertically,
-                        modifier = Modifier.weight(1f)
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f), RoundedCornerShape(10.dp))
+                            .border(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f), RoundedCornerShape(10.dp))
+                            .padding(horizontal = 10.dp, vertical = 6.dp),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
                     ) {
-                        Icon(
-                            Icons.Default.Repeat,
-                            contentDescription = null,
-                            tint = if (isWeeklyRecurring) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
-                            modifier = Modifier.size(18.dp)
+                        Text(
+                            text = if (strings.isFa) "رویداد تمام‌روز (بدون ساعت خاص)" else "All-day event (no specific time)",
+                            fontSize = 12.sp,
+                            fontWeight = FontWeight.SemiBold
                         )
-                        Spacer(modifier = Modifier.width(8.dp))
-                        Column {
-                            Text(
-                                text = if (strings.isFa) "تکرار هفتگی رویداد" else "Repeat weekly",
-                                fontSize = 12.sp,
-                                fontWeight = FontWeight.SemiBold,
-                                color = MaterialTheme.colorScheme.onSurface
-                            )
-                            Text(
-                                text = if (strings.isFa) "ثبت خودکار هر هفته در همین روز (۵۲ هفته)" else "Repeats on this day every week (52 weeks)",
-                                fontSize = 10.sp,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant
-                            )
+                        Switch(
+                            checked = isAllDay,
+                            onCheckedChange = { isAllDay = it }
+                        )
+                    }
+
+                    // باکس تکرار رویداد با قابلیت سفارشی‌سازی کامل
+                    Surface(
+                        color = if (recurrenceConfig.frequency != RecurrenceFrequency.NONE)
+                            MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.45f)
+                        else
+                            MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f),
+                        shape = RoundedCornerShape(10.dp),
+                        border = BorderStroke(
+                            1.dp,
+                            if (recurrenceConfig.frequency != RecurrenceFrequency.NONE)
+                                MaterialTheme.colorScheme.primary.copy(alpha = 0.6f)
+                            else
+                                MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f)
+                        ),
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clip(RoundedCornerShape(10.dp))
+                            .clickable { showRecurrenceDialog = true }
+                    ) {
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(horizontal = 10.dp, vertical = 8.dp),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                                modifier = Modifier.weight(1f)
+                            ) {
+                                Icon(
+                                    Icons.Default.Repeat,
+                                    contentDescription = null,
+                                    tint = if (recurrenceConfig.frequency != RecurrenceFrequency.NONE)
+                                        MaterialTheme.colorScheme.primary
+                                    else
+                                        MaterialTheme.colorScheme.onSurfaceVariant,
+                                    modifier = Modifier.size(18.dp)
+                                )
+                                Column {
+                                    Text(
+                                        text = if (strings.isFa) "تکرار رویداد" else "Repeat",
+                                        fontSize = 12.sp,
+                                        fontWeight = FontWeight.SemiBold,
+                                        color = MaterialTheme.colorScheme.onSurface
+                                    )
+                                    Text(
+                                        text = recurrenceConfig.getSummaryText(strings.isFa),
+                                        fontSize = 10.sp,
+                                        fontWeight = if (recurrenceConfig.frequency != RecurrenceFrequency.NONE) FontWeight.Bold else FontWeight.Normal,
+                                        color = if (recurrenceConfig.frequency != RecurrenceFrequency.NONE)
+                                            MaterialTheme.colorScheme.primary
+                                        else
+                                            MaterialTheme.colorScheme.onSurfaceVariant
+                                    )
+                                }
+                            }
+
+                            Surface(
+                                color = if (recurrenceConfig.frequency != RecurrenceFrequency.NONE)
+                                    MaterialTheme.colorScheme.primary
+                                else
+                                    MaterialTheme.colorScheme.surfaceVariant,
+                                shape = RoundedCornerShape(6.dp)
+                            ) {
+                                Text(
+                                    text = if (strings.isFa) "تغییر" else "Change",
+                                    fontSize = 10.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    color = if (recurrenceConfig.frequency != RecurrenceFrequency.NONE)
+                                        MaterialTheme.colorScheme.onPrimary
+                                    else
+                                        MaterialTheme.colorScheme.onSurfaceVariant,
+                                    modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp)
+                                )
+                            }
                         }
                     }
-                    Switch(
-                        checked = isWeeklyRecurring,
-                        onCheckedChange = { isWeeklyRecurring = it }
-                    )
+
+                    if (!isAllDay) {
+                        // Simple Clean Persian Time Picker
+                        PersianTimePicker(
+                            initialHour = 10,
+                            initialMinute = 0,
+                            onTimeChange = { _, _, formatted -> eventTime = formatted },
+                            label = if (strings.isFa) "ساعت برگزاری رویداد" else "Event Time"
+                        )
+
+                        // Reminder Alarm Selection
+                        Text(
+                            text = if (strings.isFa) "⏰ زنگ و زمان یادآوری هشدار:" else "⏰ Reminder & Alarm:",
+                            style = MaterialTheme.typography.bodySmall,
+                            fontWeight = FontWeight.Bold
+                        )
+                        FlowRow(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.spacedBy(4.dp),
+                            verticalArrangement = Arrangement.spacedBy(4.dp)
+                        ) {
+                            reminderOptions.forEach { option ->
+                                ModernDialogFilterChip(
+                                    selected = reminderOption == option,
+                                    onClick = { reminderOption = option },
+                                    label = reminderOptionLabel(option, strings.isFa),
+                                    fontSize = 10.sp
+                                )
+                            }
+                        }
+                    }
                 }
 
-                if (!isAllDay) {
-                    // Simple Clean Persian Time Picker
-                    PersianTimePicker(
-                        initialHour = 10,
-                        initialMinute = 0,
-                        onTimeChange = { _, _, formatted -> eventTime = formatted },
-                        label = if (strings.isFa) "ساعت برگزاری رویداد" else "Event Time"
-                    )
-
-                    // Reminder Alarm Selection
-                    Text(if (strings.isFa) "⏰ زنگ و زمان یادآوری هشدار:" else "⏰ Reminder & Alarm:", style = MaterialTheme.typography.bodySmall, fontWeight = FontWeight.Bold)
+                // کارت دسته‌بندی
+                DialogSectionCard(
+                    title = if (strings.isFa) "دسته‌بندی رویداد:" else "Event Category:",
+                    icon = Icons.Default.Category
+                ) {
                     FlowRow(
                         modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.spacedBy(4.dp),
+                        horizontalArrangement = Arrangement.spacedBy(6.dp),
                         verticalArrangement = Arrangement.spacedBy(4.dp)
                     ) {
-                        reminderOptions.forEach { option ->
-                            FilterChip(
-                                selected = reminderOption == option,
-                                onClick = { reminderOption = option },
-                                label = { Text(reminderOptionLabel(option, strings.isFa), fontSize = 10.sp) }
+                        categories.forEach { cat ->
+                            ModernDialogFilterChip(
+                                selected = category == cat,
+                                onClick = { category = cat },
+                                label = eventCategoryLabel(cat, strings.isFa),
+                                fontSize = 11.sp
                             )
                         }
                     }
                 }
 
-                Text(if (strings.isFa) "دسته‌بندی:" else "Category:", style = MaterialTheme.typography.bodySmall, fontWeight = FontWeight.SemiBold)
-                FlowRow(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(6.dp),
-                    verticalArrangement = Arrangement.spacedBy(4.dp)
+                // کارت رنگ نشانگر
+                DialogSectionCard(
+                    title = if (strings.isFa) "رنگ نشانگر رویداد:" else "Event Marker Color:",
+                    icon = Icons.Default.Palette
                 ) {
-                    categories.forEach { cat ->
-                        FilterChip(
-                            selected = category == cat,
-                            onClick = { category = cat },
-                            label = { Text(eventCategoryLabel(cat, strings.isFa), fontSize = 11.sp) }
-                        )
-                    }
-                }
-
-                Text(if (strings.isFa) "رنگ نشانگر رویداد:" else "Event Marker Color:", style = MaterialTheme.typography.bodySmall, fontWeight = FontWeight.SemiBold)
-                Row(
-                    horizontalArrangement = Arrangement.spacedBy(12.dp)
-                ) {
-                    colors.forEach { hex ->
-                        val col = parseColor(hex)
-                        Box(
-                            modifier = Modifier
-                                .size(34.dp)
-                                .clip(CircleShape)
-                                .background(col)
-                                .clickable { selectedColor = hex }
-                                .then(
-                                    if (selectedColor == hex) {
-                                        Modifier.border(2.dp, MaterialTheme.colorScheme.onSurface, CircleShape)
-                                    } else Modifier
-                                ),
-                            contentAlignment = Alignment.Center
-                        ) {
-                            if (selectedColor == hex) {
-                                Icon(Icons.Default.Check, contentDescription = null, tint = Color.White, modifier = Modifier.size(16.dp))
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(12.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        colors.forEach { hex ->
+                            val col = parseColor(hex)
+                            val isSelected = selectedColor == hex
+                            Box(
+                                modifier = Modifier
+                                    .size(36.dp)
+                                    .clip(CircleShape)
+                                    .background(col)
+                                    .clickable { selectedColor = hex }
+                                    .border(
+                                        width = if (isSelected) 2.5.dp else 1.dp,
+                                        color = if (isSelected) MaterialTheme.colorScheme.primary else Color.Gray.copy(alpha = 0.35f),
+                                        shape = CircleShape
+                                    ),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                if (isSelected) {
+                                    Icon(
+                                        Icons.Default.Check,
+                                        contentDescription = null,
+                                        tint = Color.White,
+                                        modifier = Modifier.size(18.dp)
+                                    )
+                                }
                             }
                         }
                     }
@@ -427,7 +1207,16 @@ fun AddEventDialog(
                         } else {
                             if (description.isNotBlank()) "${description.trim()}\n[یادآوری: $reminderOption]" else "[یادآوری: $reminderOption]"
                         }
-                        onConfirm(title.trim(), descWithReminder, persianDate.trim(), finalTime, category, selectedColor, isWeeklyRecurring)
+                        onConfirm(
+                            title.trim(),
+                            descWithReminder,
+                            persianDate.trim(),
+                            finalTime,
+                            category,
+                            selectedColor,
+                            recurrenceConfig.frequency == RecurrenceFrequency.WEEKLY,
+                            recurrenceConfig
+                        )
                     }
                 },
                 enabled = title.isNotBlank(),
@@ -493,13 +1282,15 @@ fun EditEventDialog(
                 modifier = Modifier
                     .fillMaxWidth()
                     .verticalScroll(rememberScrollState()),
-                verticalArrangement = Arrangement.spacedBy(10.dp)
+                verticalArrangement = Arrangement.spacedBy(12.dp)
             ) {
                 OutlinedTextField(
                     value = title,
                     onValueChange = { title = it },
                     label = { Text(if (strings.isFa) "عنوان رویداد *" else "Event Title *") },
                     singleLine = true,
+                    shape = RoundedCornerShape(12.dp),
+                    colors = modernDialogTextFieldColors(),
                     modifier = Modifier.fillMaxWidth()
                 )
 
@@ -508,6 +1299,8 @@ fun EditEventDialog(
                     onValueChange = { description = it },
                     label = { Text(if (strings.isFa) "توضیحات رویداد" else "Description") },
                     maxLines = 3,
+                    shape = RoundedCornerShape(12.dp),
+                    colors = modernDialogTextFieldColors(),
                     modifier = Modifier.fillMaxWidth()
                 )
 
@@ -515,79 +1308,167 @@ fun EditEventDialog(
                     value = persianDate,
                     onValueChange = { persianDate = it },
                     label = { Text(if (strings.isFa) "تاریخ شمسی" else "Solar Date") },
+                    leadingIcon = {
+                        Icon(
+                            Icons.Default.CalendarMonth,
+                            contentDescription = null,
+                            tint = MaterialTheme.colorScheme.primary,
+                            modifier = Modifier.size(20.dp)
+                        )
+                    },
                     singleLine = true,
+                    shape = RoundedCornerShape(12.dp),
+                    colors = modernDialogTextFieldColors(),
                     modifier = Modifier.fillMaxWidth()
                 )
 
-                // All-day switch
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f), RoundedCornerShape(10.dp))
-                        .padding(horizontal = 10.dp, vertical = 6.dp),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
+                // کارت زمان و یادآوری رویداد
+                DialogSectionCard(
+                    title = if (strings.isFa) "زمان و تکرار رویداد:" else "Time & Recurrence:",
+                    icon = Icons.Default.Schedule
                 ) {
-                    Text(if (strings.isFa) "رویداد تمام‌روز (بدون ساعت خاص)" else "All-day event (no specific time)", fontSize = 12.sp, fontWeight = FontWeight.SemiBold)
-                    Switch(checked = isAllDay, onCheckedChange = { isAllDay = it })
+                    // All-day switch
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f), RoundedCornerShape(10.dp))
+                            .border(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f), RoundedCornerShape(10.dp))
+                            .padding(horizontal = 10.dp, vertical = 6.dp),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text(
+                            text = if (strings.isFa) "رویداد تمام‌روز (بدون ساعت خاص)" else "All-day event (no specific time)",
+                            fontSize = 12.sp,
+                            fontWeight = FontWeight.SemiBold
+                        )
+                        Switch(checked = isAllDay, onCheckedChange = { isAllDay = it })
+                    }
+
+                    // نشان تکرار رویداد در صورت تکراری بودن
+                    if (initialEvent.recurrenceId != null) {
+                        val recRuleLabel = when (initialEvent.recurrenceRule) {
+                            "DAILY" -> if (strings.isFa) "تکرار روزانه" else "Daily repeat"
+                            "WEEKLY" -> if (strings.isFa) "تکرار هفتگی" else "Weekly repeat"
+                            "MONTHLY" -> if (strings.isFa) "تکرار ماهانه" else "Monthly repeat"
+                            "YEARLY" -> if (strings.isFa) "تکرار سالانه" else "Yearly repeat"
+                            else -> if (strings.isFa) "رویداد تکرارشونده" else "Recurring event"
+                        }
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .background(MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.45f), RoundedCornerShape(10.dp))
+                                .border(1.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.5f), RoundedCornerShape(10.dp))
+                            .padding(horizontal = 10.dp, vertical = 8.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Icon(
+                                Icons.Default.Repeat,
+                                contentDescription = null,
+                                tint = MaterialTheme.colorScheme.primary,
+                                modifier = Modifier.size(18.dp)
+                            )
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Text(
+                                text = recRuleLabel,
+                                fontSize = 12.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = MaterialTheme.colorScheme.primary
+                            )
+                        }
+                    }
+
+                    if (!isAllDay) {
+                        val (h, m) = try {
+                            val parts = eventTime.split(":")
+                            (parts[0].toIntOrNull() ?: 10) to (parts.getOrNull(1)?.toIntOrNull() ?: 0)
+                        } catch (_: Exception) { 10 to 0 }
+
+                        PersianTimePicker(
+                            initialHour = h,
+                            initialMinute = m,
+                            onTimeChange = { _, _, formatted -> eventTime = formatted },
+                            label = if (strings.isFa) "ساعت برگزاری رویداد" else "Event Time"
+                        )
+
+                        // Reminder Alarm Selection
+                        Text(
+                            text = if (strings.isFa) "⏰ زمان زنگ و یادآوری هشدار:" else "⏰ Reminder & Alarm:",
+                            style = MaterialTheme.typography.bodySmall,
+                            fontWeight = FontWeight.Bold
+                        )
+                        FlowRow(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.spacedBy(4.dp),
+                            verticalArrangement = Arrangement.spacedBy(4.dp)
+                        ) {
+                            reminderOptions.forEach { option ->
+                                ModernDialogFilterChip(
+                                    selected = reminderOption == option,
+                                    onClick = { reminderOption = option },
+                                    label = reminderOptionLabel(option, strings.isFa),
+                                    fontSize = 10.sp
+                                )
+                            }
+                        }
+                    }
                 }
 
-                if (!isAllDay) {
-                    val (h, m) = try {
-                        val parts = eventTime.split(":")
-                        (parts[0].toIntOrNull() ?: 10) to (parts.getOrNull(1)?.toIntOrNull() ?: 0)
-                    } catch (_: Exception) { 10 to 0 }
-
-                    PersianTimePicker(
-                        initialHour = h,
-                        initialMinute = m,
-                        onTimeChange = { _, _, formatted -> eventTime = formatted },
-                        label = if (strings.isFa) "ساعت برگزاری رویداد" else "Event Time"
-                    )
-
-                    // Reminder Alarm Selection
-                    Text(if (strings.isFa) "⏰ زمان زنگ و یادآوری هشدار:" else "⏰ Reminder & Alarm:", style = MaterialTheme.typography.bodySmall, fontWeight = FontWeight.Bold)
+                // کارت دسته‌بندی
+                DialogSectionCard(
+                    title = if (strings.isFa) "دسته‌بندی رویداد:" else "Event Category:",
+                    icon = Icons.Default.Category
+                ) {
                     FlowRow(
                         modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.spacedBy(4.dp),
+                        horizontalArrangement = Arrangement.spacedBy(6.dp),
                         verticalArrangement = Arrangement.spacedBy(4.dp)
                     ) {
-                        reminderOptions.forEach { option ->
-                            FilterChip(
-                                selected = reminderOption == option,
-                                onClick = { reminderOption = option },
-                                label = { Text(reminderOptionLabel(option, strings.isFa), fontSize = 10.sp) }
+                        categories.forEach { cat ->
+                            ModernDialogFilterChip(
+                                selected = category == cat,
+                                onClick = { category = cat },
+                                label = eventCategoryLabel(cat, strings.isFa),
+                                fontSize = 11.sp
                             )
                         }
                     }
                 }
 
-                Text(if (strings.isFa) "دسته‌بندی:" else "Category:", style = MaterialTheme.typography.bodySmall, fontWeight = FontWeight.SemiBold)
-                FlowRow(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(6.dp),
-                    verticalArrangement = Arrangement.spacedBy(4.dp)
+                // کارت رنگ نشانگر
+                DialogSectionCard(
+                    title = if (strings.isFa) "رنگ نشانگر رویداد:" else "Marker Color:",
+                    icon = Icons.Default.Palette
                 ) {
-                    categories.forEach { cat ->
-                        FilterChip(selected = category == cat, onClick = { category = cat }, label = { Text(eventCategoryLabel(cat, strings.isFa), fontSize = 11.sp) })
-                    }
-                }
-
-                Text(if (strings.isFa) "رنگ نشانگر:" else "Marker Color:", style = MaterialTheme.typography.bodySmall, fontWeight = FontWeight.SemiBold)
-                Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                    colors.forEach { hex ->
-                        val col = parseColor(hex)
-                        Box(
-                            modifier = Modifier
-                                .size(34.dp)
-                                .clip(CircleShape)
-                                .background(col)
-                                .clickable { selectedColor = hex }
-                                .then(if (selectedColor == hex) Modifier.border(2.dp, MaterialTheme.colorScheme.onSurface, CircleShape) else Modifier),
-                            contentAlignment = Alignment.Center
-                        ) {
-                            if (selectedColor == hex) {
-                                Icon(Icons.Default.Check, contentDescription = null, tint = Color.White, modifier = Modifier.size(16.dp))
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(12.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        colors.forEach { hex ->
+                            val col = parseColor(hex)
+                            val isSelected = selectedColor == hex
+                            Box(
+                                modifier = Modifier
+                                    .size(36.dp)
+                                    .clip(CircleShape)
+                                    .background(col)
+                                    .clickable { selectedColor = hex }
+                                    .border(
+                                        width = if (isSelected) 2.5.dp else 1.dp,
+                                        color = if (isSelected) MaterialTheme.colorScheme.primary else Color.Gray.copy(alpha = 0.35f),
+                                        shape = CircleShape
+                                    ),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                if (isSelected) {
+                                    Icon(
+                                        Icons.Default.Check,
+                                        contentDescription = null,
+                                        tint = Color.White,
+                                        modifier = Modifier.size(18.dp)
+                                    )
+                                }
                             }
                         }
                     }
@@ -619,15 +1500,17 @@ fun EditEventDialog(
 }
 
 /**
- * Dialog to delete recurring events with 2 specific options:
+ * Dialog to delete recurring events with 3 specific options:
  * 1. This event only
  * 2. This and all future recurring events from this date forward
+ * 3. All events in this recurring series
  */
 @Composable
 fun DeleteRecurringEventDialog(
     onDismiss: () -> Unit,
     onDeleteSingle: () -> Unit,
-    onDeleteFuture: () -> Unit
+    onDeleteFuture: () -> Unit,
+    onDeleteAll: (() -> Unit)? = null
 ) {
     val strings = rememberAppStrings()
     AlertDialog(
@@ -652,9 +1535,9 @@ fun DeleteRecurringEventDialog(
             Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
                 Text(
                     text = if (strings.isFa)
-                        "این رویداد به صورت هفتگی تکرار می‌شود. مایلید چگونه حذف شود؟"
+                        "این یک رویداد تکرارشونده است. مایلید چگونه حذف شود؟"
                     else
-                        "This event repeats weekly. How would you like to delete it?",
+                        "This is a recurring event. How would you like to delete it?",
                     fontSize = 13.sp,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
@@ -686,7 +1569,7 @@ fun DeleteRecurringEventDialog(
                                 color = MaterialTheme.colorScheme.onSurface
                             )
                             Text(
-                                text = if (strings.isFa) "رویدادهای سایر هفته‌ها دست‌نخورده باقی می‌مانند" else "Other recurring events will stay intact",
+                                text = if (strings.isFa) "رویدادهای سایر روزها و تکرارها دست‌نخورده باقی می‌مانند" else "Other recurring dates will stay intact",
                                 fontSize = 10.sp,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant
                             )
@@ -707,7 +1590,7 @@ fun DeleteRecurringEventDialog(
                         verticalAlignment = Alignment.CenterVertically
                     ) {
                         Icon(
-                            Icons.Default.DeleteForever,
+                            Icons.Default.DeleteSweep,
                             contentDescription = null,
                             tint = MaterialTheme.colorScheme.error,
                             modifier = Modifier.size(22.dp)
@@ -721,7 +1604,200 @@ fun DeleteRecurringEventDialog(
                                 color = MaterialTheme.colorScheme.error
                             )
                             Text(
-                                text = if (strings.isFa) "از این تاریخ به بعد تمام تکرارهای هفتگی حذف می‌شوند" else "Deletes this and all future recurring events",
+                                text = if (strings.isFa) "از این تاریخ به بعد تکرار متوقف شده و تمام تکرارهای آینده حذف می‌شوند" else "Stops recurring and deletes all future events from this date",
+                                fontSize = 10.sp,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+                    }
+                }
+
+                // گزینه ۳: تمامی تکرارها (کل سری)
+                if (onDeleteAll != null) {
+                    Surface(
+                        color = MaterialTheme.colorScheme.errorContainer.copy(alpha = 0.55f),
+                        shape = RoundedCornerShape(10.dp),
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clickable { onDeleteAll() }
+                    ) {
+                        Row(
+                            modifier = Modifier.padding(12.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Icon(
+                                Icons.Default.DeleteForever,
+                                contentDescription = null,
+                                tint = MaterialTheme.colorScheme.error,
+                                modifier = Modifier.size(22.dp)
+                            )
+                            Spacer(modifier = Modifier.width(10.dp))
+                            Column {
+                                Text(
+                                    text = if (strings.isFa) "تمامی تکرارها (کل سری)" else "All events in series",
+                                    fontWeight = FontWeight.Bold,
+                                    fontSize = 13.sp,
+                                    color = MaterialTheme.colorScheme.error
+                                )
+                                Text(
+                                    text = if (strings.isFa) "تمام تکرارهای این رویداد (گذشته و آینده) کلاً حذف می‌شوند" else "Deletes all occurrences of this recurring event series",
+                                    fontSize = 10.sp,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        confirmButton = {},
+        dismissButton = {
+            TextButton(onClick = onDismiss) { Text(strings.cancel) }
+        }
+    )
+}
+
+/**
+ * Dialog to choose the scope when saving changes to a recurring event:
+ * 1. This event only
+ * 2. This and all future events
+ * 3. All events in the series
+ */
+@Composable
+fun EditRecurringEventScopeDialog(
+    onDismiss: () -> Unit,
+    onEditSingle: () -> Unit,
+    onEditFuture: () -> Unit,
+    onEditAll: () -> Unit
+) {
+    val strings = rememberAppStrings()
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Icon(
+                    Icons.Default.Edit,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.primary,
+                    modifier = Modifier.size(24.dp)
+                )
+                Spacer(modifier = Modifier.width(8.dp))
+                Text(
+                    text = if (strings.isFa) "ذخیره تغییرات رویداد تکرارشونده" else "Save Recurring Event Changes",
+                    fontWeight = FontWeight.Bold,
+                    fontSize = 16.sp
+                )
+            }
+        },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                Text(
+                    text = if (strings.isFa)
+                        "این یک رویداد تکرارشونده است. مایلید تغییرات چگونه اعمال شوند؟"
+                    else
+                        "This is a recurring event. How would you like to apply changes?",
+                    fontSize = 13.sp,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+
+                // گزینه ۱: فقط همین رویداد
+                Surface(
+                    color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
+                    shape = RoundedCornerShape(10.dp),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clickable { onEditSingle() }
+                ) {
+                    Row(
+                        modifier = Modifier.padding(12.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Icon(
+                            Icons.Default.CalendarMonth,
+                            contentDescription = null,
+                            tint = MaterialTheme.colorScheme.primary,
+                            modifier = Modifier.size(22.dp)
+                        )
+                        Spacer(modifier = Modifier.width(10.dp))
+                        Column {
+                            Text(
+                                text = if (strings.isFa) "فقط همین رویداد" else "This event only",
+                                fontWeight = FontWeight.Bold,
+                                fontSize = 13.sp,
+                                color = MaterialTheme.colorScheme.onSurface
+                            )
+                            Text(
+                                text = if (strings.isFa) "فقط تاریخ فعلی تغییر می‌کند و سایر تکرارها دست‌نخورده می‌مانند" else "Only this date changes; other recurrences remain unchanged",
+                                fontSize = 10.sp,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+                    }
+                }
+
+                // گزینه ۲: این رویداد و تکرارهای بعدی
+                Surface(
+                    color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.45f),
+                    shape = RoundedCornerShape(10.dp),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clickable { onEditFuture() }
+                ) {
+                    Row(
+                        modifier = Modifier.padding(12.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Icon(
+                            Icons.Default.Repeat,
+                            contentDescription = null,
+                            tint = MaterialTheme.colorScheme.primary,
+                            modifier = Modifier.size(22.dp)
+                        )
+                        Spacer(modifier = Modifier.width(10.dp))
+                        Column {
+                            Text(
+                                text = if (strings.isFa) "این رویداد و تکرارهای بعدی" else "This and following events",
+                                fontWeight = FontWeight.Bold,
+                                fontSize = 13.sp,
+                                color = MaterialTheme.colorScheme.primary
+                            )
+                            Text(
+                                text = if (strings.isFa) "تغییرات از این تاریخ به بعد روی تمام تکرارهای آینده اعمال می‌شوند" else "Applies changes to this date and all future recurrences",
+                                fontSize = 10.sp,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+                    }
+                }
+
+                // گزینه ۳: تمامی تکرارها
+                Surface(
+                    color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.8f),
+                    shape = RoundedCornerShape(10.dp),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clickable { onEditAll() }
+                ) {
+                    Row(
+                        modifier = Modifier.padding(12.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Icon(
+                            Icons.Default.Schedule,
+                            contentDescription = null,
+                            tint = MaterialTheme.colorScheme.secondary,
+                            modifier = Modifier.size(22.dp)
+                        )
+                        Spacer(modifier = Modifier.width(10.dp))
+                        Column {
+                            Text(
+                                text = if (strings.isFa) "تمامی تکرارها (کل سری)" else "All events in series",
+                                fontWeight = FontWeight.Bold,
+                                fontSize = 13.sp,
+                                color = MaterialTheme.colorScheme.onSurface
+                            )
+                            Text(
+                                text = if (strings.isFa) "تمام دفعات این رویداد (گذشته و آینده) با متن و تنظیمات جدید به‌روز می‌شوند" else "Updates all occurrences of this recurring event series",
                                 fontSize = 10.sp,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant
                             )
@@ -780,13 +1856,15 @@ fun AddToCalendarFromNoteDialog(
                 modifier = Modifier
                     .fillMaxWidth()
                     .verticalScroll(rememberScrollState()),
-                verticalArrangement = Arrangement.spacedBy(10.dp)
+                verticalArrangement = Arrangement.spacedBy(12.dp)
             ) {
                 OutlinedTextField(
                     value = title,
                     onValueChange = { title = it },
                     label = { Text(if (strings.isFa) "عنوان رویداد / یادآور" else "Event / Reminder Title") },
                     singleLine = true,
+                    shape = RoundedCornerShape(12.dp),
+                    colors = modernDialogTextFieldColors(),
                     modifier = Modifier.fillMaxWidth()
                 )
 
@@ -795,6 +1873,8 @@ fun AddToCalendarFromNoteDialog(
                     onValueChange = { description = it },
                     label = { Text(if (strings.isFa) "متن یادداشت" else "Note Content") },
                     maxLines = 3,
+                    shape = RoundedCornerShape(12.dp),
+                    colors = modernDialogTextFieldColors(),
                     modifier = Modifier.fillMaxWidth()
                 )
 
@@ -802,30 +1882,50 @@ fun AddToCalendarFromNoteDialog(
                     value = persianDate,
                     onValueChange = { persianDate = it },
                     label = { Text(if (strings.isFa) "تاریخ اجرای رویداد (شمسی)" else "Execution Date (Solar)") },
+                    leadingIcon = {
+                        Icon(
+                            Icons.Default.CalendarMonth,
+                            contentDescription = null,
+                            tint = MaterialTheme.colorScheme.primary,
+                            modifier = Modifier.size(20.dp)
+                        )
+                    },
                     singleLine = true,
+                    shape = RoundedCornerShape(12.dp),
+                    colors = modernDialogTextFieldColors(),
                     modifier = Modifier.fillMaxWidth()
                 )
 
-                PersianTimePicker(
-                    initialHour = 10,
-                    initialMinute = 0,
-                    onTimeChange = { _, _, formatted -> eventTime = formatted },
-                    label = if (strings.isFa) "ساعت رویداد و یادآور" else "Time & Reminder"
-                )
-
-                // Reminder alarm options
-                Text(if (strings.isFa) "⏰ زنگ و هشدار یادآوری:" else "⏰ Reminder & Alarm:", style = MaterialTheme.typography.bodySmall, fontWeight = FontWeight.Bold)
-                FlowRow(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(4.dp),
-                    verticalArrangement = Arrangement.spacedBy(4.dp)
+                DialogSectionCard(
+                    title = if (strings.isFa) "زمان و هشدار یادآوری:" else "Time & Reminder:",
+                    icon = Icons.Default.Schedule
                 ) {
-                    reminderOptions.forEach { option ->
-                        FilterChip(
-                            selected = reminderOption == option,
-                            onClick = { reminderOption = option },
-                            label = { Text(reminderOptionLabel(option, strings.isFa), fontSize = 10.sp) }
-                        )
+                    PersianTimePicker(
+                        initialHour = 10,
+                        initialMinute = 0,
+                        onTimeChange = { _, _, formatted -> eventTime = formatted },
+                        label = if (strings.isFa) "ساعت رویداد و یادآور" else "Time & Reminder"
+                    )
+
+                    // Reminder alarm options
+                    Text(
+                        text = if (strings.isFa) "⏰ زنگ و هشدار یادآوری:" else "⏰ Reminder & Alarm:",
+                        style = MaterialTheme.typography.bodySmall,
+                        fontWeight = FontWeight.Bold
+                    )
+                    FlowRow(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(4.dp),
+                        verticalArrangement = Arrangement.spacedBy(4.dp)
+                    ) {
+                        reminderOptions.forEach { option ->
+                            ModernDialogFilterChip(
+                                selected = reminderOption == option,
+                                onClick = { reminderOption = option },
+                                label = reminderOptionLabel(option, strings.isFa),
+                                fontSize = 10.sp
+                            )
+                        }
                     }
                 }
             }
@@ -876,13 +1976,15 @@ fun AddTaskDialog(
                 modifier = Modifier
                     .fillMaxWidth()
                     .verticalScroll(rememberScrollState()),
-                verticalArrangement = Arrangement.spacedBy(10.dp)
+                verticalArrangement = Arrangement.spacedBy(12.dp)
             ) {
                 OutlinedTextField(
                     value = title,
                     onValueChange = { title = it },
                     label = { Text(if (strings.isFa) "عنوان کار یا وظیفه *" else "Task Title *") },
                     singleLine = true,
+                    shape = RoundedCornerShape(12.dp),
+                    colors = modernDialogTextFieldColors(),
                     modifier = Modifier
                         .fillMaxWidth()
                         .testTag("task_title_input")
@@ -892,36 +1994,59 @@ fun AddTaskDialog(
                     value = dueDate,
                     onValueChange = { dueDate = it },
                     label = { Text(if (strings.isFa) "تاریخ موعد (شمسی)" else "Due Date (Solar)") },
+                    leadingIcon = {
+                        Icon(
+                            Icons.Default.CalendarMonth,
+                            contentDescription = null,
+                            tint = MaterialTheme.colorScheme.primary,
+                            modifier = Modifier.size(20.dp)
+                        )
+                    },
                     singleLine = true,
+                    shape = RoundedCornerShape(12.dp),
+                    colors = modernDialogTextFieldColors(),
                     modifier = Modifier.fillMaxWidth()
                 )
 
-                Text(if (strings.isFa) "اولویت:" else "Priority:", style = MaterialTheme.typography.bodySmall, fontWeight = FontWeight.SemiBold)
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(6.dp)
+                // کارت انتخاب اولویت
+                DialogSectionCard(
+                    title = if (strings.isFa) "اولویت انجام:" else "Task Priority:",
+                    icon = Icons.Default.Flag
                 ) {
-                    priorities.forEach { prio ->
-                        FilterChip(
-                            selected = priority == prio,
-                            onClick = { priority = prio },
-                            label = { Text(strings.taskPriority(prio), fontSize = 12.sp) }
-                        )
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(6.dp)
+                    ) {
+                        priorities.forEach { prio ->
+                            ModernDialogFilterChip(
+                                selected = priority == prio,
+                                onClick = { priority = prio },
+                                label = strings.taskPriority(prio),
+                                fontSize = 12.sp,
+                                modifier = Modifier.weight(1f)
+                            )
+                        }
                     }
                 }
 
-                Text(if (strings.isFa) "دسته‌بندی:" else "Category:", style = MaterialTheme.typography.bodySmall, fontWeight = FontWeight.SemiBold)
-                FlowRow(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(6.dp),
-                    verticalArrangement = Arrangement.spacedBy(4.dp)
+                // کارت دسته‌بندی موضوعی
+                DialogSectionCard(
+                    title = if (strings.isFa) "دسته‌بندی موضوعی:" else "Task Category:",
+                    icon = Icons.Default.Category
                 ) {
-                    categories.forEach { cat ->
-                        FilterChip(
-                            selected = category == cat,
-                            onClick = { category = cat },
-                            label = { Text(strings.taskTag(cat), fontSize = 11.sp) }
-                        )
+                    FlowRow(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(6.dp),
+                        verticalArrangement = Arrangement.spacedBy(6.dp)
+                    ) {
+                        categories.forEach { cat ->
+                            ModernDialogFilterChip(
+                                selected = category == cat,
+                                onClick = { category = cat },
+                                label = strings.taskTag(cat),
+                                fontSize = 11.sp
+                            )
+                        }
                     }
                 }
             }
@@ -981,13 +2106,15 @@ fun EditTaskDialog(
                 modifier = Modifier
                     .fillMaxWidth()
                     .verticalScroll(rememberScrollState()),
-                verticalArrangement = Arrangement.spacedBy(10.dp)
+                verticalArrangement = Arrangement.spacedBy(12.dp)
             ) {
                 OutlinedTextField(
                     value = title,
                     onValueChange = { title = it },
                     label = { Text(if (strings.isFa) "عنوان کار یا وظیفه *" else "Task Title *") },
                     singleLine = true,
+                    shape = RoundedCornerShape(12.dp),
+                    colors = modernDialogTextFieldColors(),
                     modifier = Modifier.fillMaxWidth()
                 )
 
@@ -995,36 +2122,59 @@ fun EditTaskDialog(
                     value = dueDate,
                     onValueChange = { dueDate = it },
                     label = { Text(if (strings.isFa) "تاریخ موعد (شمسی)" else "Due Date (Solar)") },
+                    leadingIcon = {
+                        Icon(
+                            Icons.Default.CalendarMonth,
+                            contentDescription = null,
+                            tint = MaterialTheme.colorScheme.primary,
+                            modifier = Modifier.size(20.dp)
+                        )
+                    },
                     singleLine = true,
+                    shape = RoundedCornerShape(12.dp),
+                    colors = modernDialogTextFieldColors(),
                     modifier = Modifier.fillMaxWidth()
                 )
 
-                Text(if (strings.isFa) "اولویت:" else "Priority:", style = MaterialTheme.typography.bodySmall, fontWeight = FontWeight.SemiBold)
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(6.dp)
+                // کارت انتخاب اولویت
+                DialogSectionCard(
+                    title = if (strings.isFa) "اولویت انجام:" else "Task Priority:",
+                    icon = Icons.Default.Flag
                 ) {
-                    priorities.forEach { prio ->
-                        FilterChip(
-                            selected = priority == prio,
-                            onClick = { priority = prio },
-                            label = { Text(strings.taskPriority(prio), fontSize = 12.sp) }
-                        )
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(6.dp)
+                    ) {
+                        priorities.forEach { prio ->
+                            ModernDialogFilterChip(
+                                selected = priority == prio,
+                                onClick = { priority = prio },
+                                label = strings.taskPriority(prio),
+                                fontSize = 12.sp,
+                                modifier = Modifier.weight(1f)
+                            )
+                        }
                     }
                 }
 
-                Text(if (strings.isFa) "دسته‌بندی:" else "Category:", style = MaterialTheme.typography.bodySmall, fontWeight = FontWeight.SemiBold)
-                FlowRow(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(6.dp),
-                    verticalArrangement = Arrangement.spacedBy(4.dp)
+                // کارت دسته‌بندی موضوعی
+                DialogSectionCard(
+                    title = if (strings.isFa) "دسته‌بندی موضوعی:" else "Task Category:",
+                    icon = Icons.Default.Category
                 ) {
-                    categories.forEach { cat ->
-                        FilterChip(
-                            selected = category == cat,
-                            onClick = { category = cat },
-                            label = { Text(strings.taskTag(cat), fontSize = 11.sp) }
-                        )
+                    FlowRow(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(6.dp),
+                        verticalArrangement = Arrangement.spacedBy(6.dp)
+                    ) {
+                        categories.forEach { cat ->
+                            ModernDialogFilterChip(
+                                selected = category == cat,
+                                onClick = { category = cat },
+                                label = strings.taskTag(cat),
+                                fontSize = 11.sp
+                            )
+                        }
                     }
                 }
             }
@@ -1047,17 +2197,38 @@ fun EditTaskDialog(
     )
 }
 
+/**
+ * توابع کمکی هوشمند تشخیص برچسب با علامت # مشابه Google Keep
+ */
+fun extractActiveHashtagQuery(text: String): String? {
+    val regex = Regex("""(?:^|\s)#([\p{L}\p{N}_]*)$""")
+    val match = regex.find(text) ?: return null
+    return match.groupValues.getOrNull(1) ?: ""
+}
+
+fun removeActiveHashtagFromContent(text: String): String {
+    return text.replace(Regex("""(?:^|\s)#[\p{L}\p{N}_]*$"""), "").trimEnd()
+}
+
+@OptIn(ExperimentalLayoutApi::class)
 @Composable
 fun AddNoteDialog(
     onDismiss: () -> Unit,
-    onConfirm: (title: String, content: String, colorHex: String) -> Unit
+    onConfirm: (title: String, content: String, colorHex: String, tag: String) -> Unit,
+    existingTags: List<String> = emptyList()
 ) {
     val strings = rememberAppStrings()
     var title by remember { mutableStateOf("") }
     var content by remember { mutableStateOf("") }
     var selectedColor by remember { mutableStateOf("#FEF3C7") }
+    val tagsList = remember { mutableStateListOf<String>() }
 
     val noteColors = listOf("#FEF3C7", "#DCFCE7", "#E0F2FE", "#FCE7F3", "#F3E8FF", "#F1F5F9")
+    val defaultSuggestions = listOf("ایده", "شخصی", "کاری", "مهم", "مطالعه", "پروژه", "خرید")
+    // ترکیب تگ‌های پیش‌فرض با تگ‌های قبلی کاربر (داینامیک)
+    val allSuggestions = remember(existingTags) {
+        (defaultSuggestions + existingTags).distinct()
+    }
 
     AlertDialog(
         onDismissRequest = onDismiss,
@@ -1067,13 +2238,15 @@ fun AddNoteDialog(
                 modifier = Modifier
                     .fillMaxWidth()
                     .verticalScroll(rememberScrollState()),
-                verticalArrangement = Arrangement.spacedBy(10.dp)
+                verticalArrangement = Arrangement.spacedBy(12.dp)
             ) {
                 OutlinedTextField(
                     value = title,
                     onValueChange = { title = it },
                     label = { Text(strings.noteTitleLabel) },
                     singleLine = true,
+                    shape = RoundedCornerShape(12.dp),
+                    colors = modernDialogTextFieldColors(),
                     modifier = Modifier
                         .fillMaxWidth()
                         .testTag("note_title_input")
@@ -1082,37 +2255,181 @@ fun AddNoteDialog(
                 OutlinedTextField(
                     value = content,
                     onValueChange = { content = it },
-                    label = { Text(if (strings.isFa) "متن یادداشت *" else "Note Content *") },
+                    label = { Text(if (strings.isFa) "متن یادداشت (برای برچسب # بنویسید)" else "Note Content (use # for label)") },
                     minLines = 4,
                     maxLines = 8,
+                    shape = RoundedCornerShape(12.dp),
+                    colors = modernDialogTextFieldColors(),
                     modifier = Modifier
                         .fillMaxWidth()
                         .testTag("note_content_input")
                 )
 
+                // پاپ‌آپ هوشمند ایجاد و انتخاب برچسب با # (دقیقاً مشابه Google Keep)
+                val activeHashtag = extractActiveHashtagQuery(content)
+                if (activeHashtag != null) {
+                    Surface(
+                        modifier = Modifier.fillMaxWidth(),
+                        shape = RoundedCornerShape(12.dp),
+                        color = MaterialTheme.colorScheme.surfaceVariant,
+                        border = BorderStroke(1.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.5f)),
+                        shadowElevation = 6.dp
+                    ) {
+                        Column(
+                            modifier = Modifier.padding(6.dp),
+                            verticalArrangement = Arrangement.spacedBy(2.dp)
+                        ) {
+                            if (activeHashtag.isNotBlank()) {
+                                Surface(
+                                    onClick = {
+                                        val newTag = activeHashtag.trim()
+                                        if (newTag.isNotBlank() && !tagsList.contains(newTag)) {
+                                            tagsList.add(newTag)
+                                        }
+                                        content = removeActiveHashtagFromContent(content)
+                                    },
+                                    shape = RoundedCornerShape(8.dp),
+                                    color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.5f),
+                                    modifier = Modifier.fillMaxWidth()
+                                ) {
+                                    Row(
+                                        modifier = Modifier.padding(horizontal = 12.dp, vertical = 9.dp),
+                                        verticalAlignment = Alignment.CenterVertically,
+                                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                                    ) {
+                                        Icon(
+                                            Icons.Default.Add,
+                                            contentDescription = null,
+                                            tint = MaterialTheme.colorScheme.primary,
+                                            modifier = Modifier.size(18.dp)
+                                        )
+                                        Text(
+                                            text = if (strings.isFa) "ایجاد برچسب: $activeHashtag" else "Create: $activeHashtag",
+                                            fontSize = 13.sp,
+                                            fontWeight = FontWeight.Bold,
+                                            color = MaterialTheme.colorScheme.primary
+                                        )
+                                    }
+                                }
+                            }
+
+                            val suggestions = allSuggestions.filter {
+                                it.contains(activeHashtag, ignoreCase = true) && !tagsList.contains(it)
+                            }
+                            suggestions.take(5).forEach { cand ->
+                                Surface(
+                                    onClick = {
+                                        if (!tagsList.contains(cand)) {
+                                            tagsList.add(cand)
+                                        }
+                                        content = removeActiveHashtagFromContent(content)
+                                    },
+                                    shape = RoundedCornerShape(8.dp),
+                                    color = Color.Transparent,
+                                    modifier = Modifier.fillMaxWidth()
+                                ) {
+                                    Row(
+                                        modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
+                                        verticalAlignment = Alignment.CenterVertically,
+                                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                                    ) {
+                                        Text(
+                                            text = "#",
+                                            fontSize = 14.sp,
+                                            fontWeight = FontWeight.Bold,
+                                            color = MaterialTheme.colorScheme.primary
+                                        )
+                                        Text(
+                                            text = if (cand == "ایده") "💡 $cand" else cand,
+                                            fontSize = 13.sp,
+                                            fontWeight = FontWeight.Medium,
+                                            color = MaterialTheme.colorScheme.onSurface
+                                        )
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+
                 val isDark = MaterialTheme.colorScheme.background.luminance() < 0.5f
 
-                Text(if (strings.isFa) "رنگ یادداشت:" else "Note Color:", style = MaterialTheme.typography.bodySmall, fontWeight = FontWeight.SemiBold)
-                Row(
-                    horizontalArrangement = Arrangement.spacedBy(10.dp)
+                // نمایش برچسب‌های الصاق‌شده به یادداشت
+                if (tagsList.isNotEmpty()) {
+                    FlowRow(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(6.dp),
+                        verticalArrangement = Arrangement.spacedBy(6.dp)
+                    ) {
+                        tagsList.forEach { tagItem ->
+                            val isIdea = tagItem == "ایده"
+                            Surface(
+                                shape = RoundedCornerShape(8.dp),
+                                color = if (isIdea) {
+                                    if (isDark) Color(0xFF3B2E1E) else Color(0xFFFEF3C7)
+                                } else {
+                                    MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.7f)
+                                },
+                                border = BorderStroke(
+                                    0.8.dp,
+                                    if (isIdea) MaterialTheme.colorScheme.primary.copy(alpha = 0.6f)
+                                    else MaterialTheme.colorScheme.outlineVariant
+                                )
+                            ) {
+                                Row(
+                                    modifier = Modifier.padding(horizontal = 8.dp, vertical = 5.dp),
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.spacedBy(4.dp)
+                                ) {
+                                    Text(
+                                        text = if (isIdea) "💡 $tagItem" else tagItem,
+                                        fontSize = 11.sp,
+                                        fontWeight = FontWeight.Bold,
+                                        color = if (isIdea) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface
+                                    )
+                                    Icon(
+                                        Icons.Default.Close,
+                                        contentDescription = "حذف",
+                                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                                        modifier = Modifier
+                                            .size(14.dp)
+                                            .clickable { tagsList.remove(tagItem) }
+                                    )
+                                }
+                            }
+                        }
+                    }
+                }
+
+                // کارت انتخاب رنگ کارت یادداشت
+                DialogSectionCard(
+                    title = if (strings.isFa) "رنگ کارت یادداشت:" else "Note Card Color:",
+                    icon = Icons.Default.Palette
                 ) {
-                    noteColors.forEach { hex ->
-                        val col = if (isDark) getNoteAccentColor(hex) else parseColor(hex)
-                        Box(
-                            modifier = Modifier
-                                .size(34.dp)
-                                .clip(CircleShape)
-                                .background(col)
-                                .clickable { selectedColor = hex }
-                                .then(
-                                    if (selectedColor == hex) {
-                                        Modifier.border(2.5.dp, MaterialTheme.colorScheme.primary, CircleShape)
-                                    } else Modifier.border(1.dp, Color.Gray.copy(alpha = 0.35f), CircleShape)
-                                ),
-                            contentAlignment = Alignment.Center
-                        ) {
-                            if (selectedColor == hex) {
-                                Icon(Icons.Default.Check, contentDescription = null, tint = Color.White, modifier = Modifier.size(16.dp))
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(10.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        noteColors.forEach { hex ->
+                            val col = if (isDark) getNoteAccentColor(hex) else parseColor(hex)
+                            val isSelected = selectedColor == hex
+                            Box(
+                                modifier = Modifier
+                                    .size(36.dp)
+                                    .clip(CircleShape)
+                                    .background(col)
+                                    .clickable { selectedColor = hex }
+                                    .border(
+                                        width = if (isSelected) 2.5.dp else 1.dp,
+                                        color = if (isSelected) MaterialTheme.colorScheme.primary else Color.Gray.copy(alpha = 0.35f),
+                                        shape = CircleShape
+                                    ),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                if (isSelected) {
+                                    Icon(Icons.Default.Check, contentDescription = null, tint = Color.White, modifier = Modifier.size(18.dp))
+                                }
                             }
                         }
                     }
@@ -1123,7 +2440,8 @@ fun AddNoteDialog(
             Button(
                 onClick = {
                     if (content.isNotBlank()) {
-                        onConfirm(title.trim(), content.trim(), selectedColor)
+                        val combinedTag = tagsList.joinToString(",")
+                        onConfirm(title.trim(), content.trim(), selectedColor, combinedTag)
                     }
                 },
                 enabled = content.isNotBlank(),
@@ -1138,21 +2456,33 @@ fun AddNoteDialog(
     )
 }
 
+@OptIn(ExperimentalLayoutApi::class)
 @Composable
 fun EditNoteDialog(
     initialNote: NoteEntity,
     onDismiss: () -> Unit,
     onOpenDrawingFullScreen: ((NoteEntity) -> Unit)? = null,
-    onConfirm: (title: String, content: String, colorHex: String, isPinned: Boolean, drawingPath: String?) -> Unit
+    onConfirm: (title: String, content: String, colorHex: String, isPinned: Boolean, drawingPath: String?, tag: String) -> Unit,
+    existingTags: List<String> = emptyList()
 ) {
     val strings = rememberAppStrings()
     var title by remember { mutableStateOf(initialNote.title) }
     var content by remember { mutableStateOf(initialNote.content) }
     var selectedColor by remember { mutableStateOf(initialNote.colorHex) }
+    val initialTags = remember(initialNote.tag) {
+        initialNote.tag.split(",").map { it.trim() }.filter { it.isNotBlank() }
+    }
+    val tagsList = remember { mutableStateListOf<String>().apply { addAll(initialTags) } }
     var isPinned by remember { mutableStateOf(initialNote.isPinned) }
     var currentDrawingPath by remember { mutableStateOf(initialNote.drawingPath) }
 
+    val isDark = MaterialTheme.colorScheme.background.luminance() < 0.5f
     val noteColors = listOf("#FEF3C7", "#DCFCE7", "#E0F2FE", "#FCE7F3", "#F3E8FF", "#F1F5F9")
+    val defaultSuggestions = listOf("ایده", "شخصی", "کاری", "مهم", "مطالعه", "پروژه", "خرید")
+    // ترکیب تگ‌های پیش‌فرض با تگ‌های قبلی کاربر (داینامیک)
+    val allSuggestions = remember(existingTags) {
+        (defaultSuggestions + existingTags).distinct()
+    }
 
     AlertDialog(
         onDismissRequest = onDismiss,
@@ -1162,24 +2492,162 @@ fun EditNoteDialog(
                 modifier = Modifier
                     .fillMaxWidth()
                     .verticalScroll(rememberScrollState()),
-                verticalArrangement = Arrangement.spacedBy(10.dp)
+                verticalArrangement = Arrangement.spacedBy(12.dp)
             ) {
                 OutlinedTextField(
                     value = title,
                     onValueChange = { title = it },
                     label = { Text(strings.noteTitleLabel) },
                     singleLine = true,
+                    shape = RoundedCornerShape(12.dp),
+                    colors = modernDialogTextFieldColors(),
                     modifier = Modifier.fillMaxWidth()
                 )
 
                 OutlinedTextField(
                     value = content,
                     onValueChange = { content = it },
-                    label = { Text(if (strings.isFa) "متن یادداشت" else "Note Content") },
+                    label = { Text(if (strings.isFa) "متن یادداشت (برای برچسب # بنویسید)" else "Note Content (use # for label)") },
                     minLines = 3,
                     maxLines = 6,
+                    shape = RoundedCornerShape(12.dp),
+                    colors = modernDialogTextFieldColors(),
                     modifier = Modifier.fillMaxWidth()
                 )
+
+                // پاپ‌آپ هوشمند ایجاد و انتخاب برچسب با # (دقیقاً مشابه Google Keep)
+                val activeHashtag = extractActiveHashtagQuery(content)
+                if (activeHashtag != null) {
+                    Surface(
+                        modifier = Modifier.fillMaxWidth(),
+                        shape = RoundedCornerShape(12.dp),
+                        color = MaterialTheme.colorScheme.surfaceVariant,
+                        border = BorderStroke(1.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.5f)),
+                        shadowElevation = 6.dp
+                    ) {
+                        Column(
+                            modifier = Modifier.padding(6.dp),
+                            verticalArrangement = Arrangement.spacedBy(2.dp)
+                        ) {
+                            if (activeHashtag.isNotBlank()) {
+                                Surface(
+                                    onClick = {
+                                        val newTag = activeHashtag.trim()
+                                        if (newTag.isNotBlank() && !tagsList.contains(newTag)) {
+                                            tagsList.add(newTag)
+                                        }
+                                        content = removeActiveHashtagFromContent(content)
+                                    },
+                                    shape = RoundedCornerShape(8.dp),
+                                    color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.5f),
+                                    modifier = Modifier.fillMaxWidth()
+                                ) {
+                                    Row(
+                                        modifier = Modifier.padding(horizontal = 12.dp, vertical = 9.dp),
+                                        verticalAlignment = Alignment.CenterVertically,
+                                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                                    ) {
+                                        Icon(
+                                            Icons.Default.Add,
+                                            contentDescription = null,
+                                            tint = MaterialTheme.colorScheme.primary,
+                                            modifier = Modifier.size(18.dp)
+                                        )
+                                        Text(
+                                            text = if (strings.isFa) "ایجاد برچسب: $activeHashtag" else "Create: $activeHashtag",
+                                            fontSize = 13.sp,
+                                            fontWeight = FontWeight.Bold,
+                                            color = MaterialTheme.colorScheme.primary
+                                        )
+                                    }
+                                }
+                            }
+
+                            val suggestions = allSuggestions.filter {
+                                it.contains(activeHashtag, ignoreCase = true) && !tagsList.contains(it)
+                            }
+                            suggestions.take(5).forEach { cand ->
+                                Surface(
+                                    onClick = {
+                                        if (!tagsList.contains(cand)) {
+                                            tagsList.add(cand)
+                                        }
+                                        content = removeActiveHashtagFromContent(content)
+                                    },
+                                    shape = RoundedCornerShape(8.dp),
+                                    color = Color.Transparent,
+                                    modifier = Modifier.fillMaxWidth()
+                                ) {
+                                    Row(
+                                        modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
+                                        verticalAlignment = Alignment.CenterVertically,
+                                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                                    ) {
+                                        Text(
+                                            text = "#",
+                                            fontSize = 14.sp,
+                                            fontWeight = FontWeight.Bold,
+                                            color = MaterialTheme.colorScheme.primary
+                                        )
+                                        Text(
+                                            text = if (cand == "ایده") "💡 $cand" else cand,
+                                            fontSize = 13.sp,
+                                            fontWeight = FontWeight.Medium,
+                                            color = MaterialTheme.colorScheme.onSurface
+                                        )
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+
+                // نمایش برچسب‌های الصاق‌شده به یادداشت
+                if (tagsList.isNotEmpty()) {
+                    FlowRow(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(6.dp),
+                        verticalArrangement = Arrangement.spacedBy(6.dp)
+                    ) {
+                        tagsList.forEach { tagItem ->
+                            val isIdea = tagItem == "ایده"
+                            Surface(
+                                shape = RoundedCornerShape(8.dp),
+                                color = if (isIdea) {
+                                    if (isDark) Color(0xFF3B2E1E) else Color(0xFFFEF3C7)
+                                } else {
+                                    MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.7f)
+                                },
+                                border = BorderStroke(
+                                    0.8.dp,
+                                    if (isIdea) MaterialTheme.colorScheme.primary.copy(alpha = 0.6f)
+                                    else MaterialTheme.colorScheme.outlineVariant
+                                )
+                            ) {
+                                Row(
+                                    modifier = Modifier.padding(horizontal = 8.dp, vertical = 5.dp),
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.spacedBy(4.dp)
+                                ) {
+                                    Text(
+                                        text = if (isIdea) "💡 $tagItem" else tagItem,
+                                        fontSize = 11.sp,
+                                        fontWeight = FontWeight.Bold,
+                                        color = if (isIdea) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface
+                                    )
+                                    Icon(
+                                        Icons.Default.Close,
+                                        contentDescription = "حذف",
+                                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                                        modifier = Modifier
+                                            .size(14.dp)
+                                            .clickable { tagsList.remove(tagItem) }
+                                    )
+                                }
+                            }
+                        }
+                    }
+                }
 
                 // نمایش طرح وایت‌برد در صورت وجود با قابلیت کلیک جهت باز شدن تمام‌صفحه
                 if (!currentDrawingPath.isNullOrBlank()) {
@@ -1192,6 +2660,7 @@ fun EditNoteDialog(
                             modifier = Modifier
                                 .fillMaxWidth()
                                 .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f), RoundedCornerShape(12.dp))
+                                .border(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f), RoundedCornerShape(12.dp))
                                 .padding(8.dp)
                         ) {
                             Row(
@@ -1229,7 +2698,8 @@ fun EditNoteDialog(
                                                 content = content,
                                                 colorHex = selectedColor,
                                                 isPinned = isPinned,
-                                                drawingPath = currentDrawingPath
+                                                drawingPath = currentDrawingPath,
+                                                tag = tagsList.joinToString(",")
                                             )
                                         )
                                     }
@@ -1247,8 +2717,13 @@ fun EditNoteDialog(
                     }
                 }
 
+                // سوییچ سنجاق به بالا
                 Row(
-                    modifier = Modifier.fillMaxWidth(),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f), RoundedCornerShape(10.dp))
+                        .border(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f), RoundedCornerShape(10.dp))
+                        .padding(horizontal = 10.dp, vertical = 6.dp),
                     horizontalArrangement = Arrangement.SpaceBetween,
                     verticalAlignment = Alignment.CenterVertically
                 ) {
@@ -1256,29 +2731,35 @@ fun EditNoteDialog(
                     Switch(checked = isPinned, onCheckedChange = { isPinned = it })
                 }
 
-                val isDark = MaterialTheme.colorScheme.background.luminance() < 0.5f
-
-                Text(if (strings.isFa) "رنگ یادداشت:" else "Note Color:", style = MaterialTheme.typography.bodySmall, fontWeight = FontWeight.SemiBold)
-                Row(
-                    horizontalArrangement = Arrangement.spacedBy(10.dp)
+                // کارت انتخاب رنگ کارت یادداشت
+                DialogSectionCard(
+                    title = if (strings.isFa) "رنگ کارت یادداشت:" else "Note Card Color:",
+                    icon = Icons.Default.Palette
                 ) {
-                    noteColors.forEach { hex ->
-                        val col = if (isDark) getNoteAccentColor(hex) else parseColor(hex)
-                        Box(
-                            modifier = Modifier
-                                .size(34.dp)
-                                .clip(CircleShape)
-                                .background(col)
-                                .clickable { selectedColor = hex }
-                                .then(
-                                    if (selectedColor == hex) {
-                                        Modifier.border(2.5.dp, MaterialTheme.colorScheme.primary, CircleShape)
-                                    } else Modifier.border(1.dp, Color.Gray.copy(alpha = 0.35f), CircleShape)
-                                ),
-                            contentAlignment = Alignment.Center
-                        ) {
-                            if (selectedColor == hex) {
-                                Icon(Icons.Default.Check, contentDescription = null, tint = Color.White, modifier = Modifier.size(16.dp))
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(10.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        noteColors.forEach { hex ->
+                            val col = if (isDark) getNoteAccentColor(hex) else parseColor(hex)
+                            val isSelected = selectedColor == hex
+                            Box(
+                                modifier = Modifier
+                                    .size(36.dp)
+                                    .clip(CircleShape)
+                                    .background(col)
+                                    .clickable { selectedColor = hex }
+                                    .border(
+                                        width = if (isSelected) 2.5.dp else 1.dp,
+                                        color = if (isSelected) MaterialTheme.colorScheme.primary else Color.Gray.copy(alpha = 0.35f),
+                                        shape = CircleShape
+                                    ),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                if (isSelected) {
+                                    Icon(Icons.Default.Check, contentDescription = null, tint = Color.White, modifier = Modifier.size(18.dp))
+                                }
                             }
                         }
                     }
@@ -1290,7 +2771,7 @@ fun EditNoteDialog(
             Button(
                 onClick = {
                     if (canSave) {
-                        onConfirm(title.trim(), content.trim(), selectedColor, isPinned, currentDrawingPath)
+                        onConfirm(title.trim(), content.trim(), selectedColor, isPinned, currentDrawingPath, tagsList.joinToString(","))
                     }
                 },
                 enabled = canSave
@@ -1597,6 +3078,8 @@ fun EditOccasionDialog(
                     label = { Text(if (strings.isFa) "عنوان مناسبت" else "Occasion Title") },
                     placeholder = { Text(if (strings.isFa) "مثلاً: سالگرد، تولد، رویداد..." else "e.g. Anniversary, Birthday, Event...") },
                     modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(12.dp),
+                    colors = modernDialogTextFieldColors(),
                     singleLine = true
                 )
 

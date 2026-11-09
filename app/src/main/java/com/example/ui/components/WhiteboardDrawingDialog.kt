@@ -107,22 +107,6 @@ data class BoardTheme(
 
 val BoardThemes = listOf(
     BoardTheme(
-        id = "white",
-        name = "سفید",
-        bgColor = Color(0xFFFFFFFF),
-        noteBgHex = "#FEF3C7",
-        isDark = false,
-        defaultPenColor = Color(0xFF1E293B),
-        penPalette = listOf(
-            Color(0xFF1E293B), // مشکی تیره
-            Color(0xFF2563EB), // آبی
-            Color(0xFFDC2626), // قرمز
-            Color(0xFF16A34A), // سبز
-            Color(0xFFD97706), // کهربایی
-            Color(0xFF9333EA)  // بنفش
-        )
-    ),
-    BoardTheme(
         id = "black",
         name = "تخته سیاه",
         bgColor = Color(0xFF1E293B),
@@ -155,6 +139,22 @@ val BoardThemes = listOf(
         )
     ),
     BoardTheme(
+        id = "navy",
+        name = "سرمه‌ای شب",
+        bgColor = Color(0xFF0F172A),
+        noteBgHex = "#E0F2FE",
+        isDark = true,
+        defaultPenColor = Color(0xFF38BDF8),
+        penPalette = listOf(
+            Color(0xFF38BDF8), // آبی نئونی
+            Color(0xFFF8FAFC), // سفید ماه
+            Color(0xFFFBBF24), // زرد ستاره‌ای
+            Color(0xFFF472B6), // صورتی
+            Color(0xFF34D399), // زمردی
+            Color(0xFFA78BFA)  // بنفش روشن
+        )
+    ),
+    BoardTheme(
         id = "cream",
         name = "کرم کاهی",
         bgColor = Color(0xFFFAF5E9),
@@ -171,19 +171,19 @@ val BoardThemes = listOf(
         )
     ),
     BoardTheme(
-        id = "navy",
-        name = "سرمه‌ای شب",
-        bgColor = Color(0xFF0F172A),
-        noteBgHex = "#E0F2FE",
-        isDark = true,
-        defaultPenColor = Color(0xFF38BDF8),
+        id = "white",
+        name = "سفید",
+        bgColor = Color(0xFFFFFFFF),
+        noteBgHex = "#FEF3C7",
+        isDark = false,
+        defaultPenColor = Color(0xFF1E293B),
         penPalette = listOf(
-            Color(0xFF38BDF8), // آبی نئونی
-            Color(0xFFF8FAFC), // سفید ماه
-            Color(0xFFFBBF24), // زرد ستاره‌ای
-            Color(0xFFF472B6), // صورتی
-            Color(0xFF34D399), // زمردی
-            Color(0xFFA78BFA)  // بنفش روشن
+            Color(0xFF1E293B), // مشکی تیره
+            Color(0xFF2563EB), // آبی
+            Color(0xFFDC2626), // قرمز
+            Color(0xFF16A34A), // سبز
+            Color(0xFFD97706), // کهربایی
+            Color(0xFF9333EA)  // بنفش
         )
     )
 )
@@ -216,7 +216,7 @@ fun WhiteboardDrawingDialog(
                 try {
                     val content = jsonFile.readText()
                     val root = JSONObject(content)
-                    val themeId = root.optString("themeId", "white")
+                    val themeId = root.optString("themeId", "black")
                     val foundTheme = BoardThemes.find { it.id == themeId }
                     if (foundTheme != null) {
                         selectedBoardTheme = foundTheme

@@ -64,13 +64,16 @@ class LocalHttpSyncServer(
     }
 
     fun stop() {
+        val wasRunning = isRunning || serverSocket != null || serverJob?.isActive == true
         isRunning = false
         try {
             serverSocket?.close()
         } catch (_: Exception) {}
         serverJob?.cancel()
         serverSocket = null
-        onLog("سرور محلی متوقف شد")
+        if (wasRunning) {
+            onLog("سرور محلی متوقف شد")
+        }
     }
 
     private fun readHeaderLine(input: InputStream): String? {
