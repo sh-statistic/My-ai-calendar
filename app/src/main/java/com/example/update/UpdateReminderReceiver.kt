@@ -103,6 +103,7 @@ class UpdateReminderReceiver : BroadcastReceiver() {
 
                 val notificationManager = context.getSystemService(Context.NOTIFICATION_SERVICE) as? NotificationManager
                 notificationManager?.cancel(NOTIFICATION_ID)
+                notificationManager?.cancel(AppUpdateCheckWorker.NOTIFICATION_ID)
 
                 AppUpdateManager.clearPendingUpdateInfo(context)
                 Log.d(TAG, "Update reminder cancelled")

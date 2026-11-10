@@ -47,9 +47,50 @@ object AppUpdateManager {
     private const val KEY_PENDING_APK_NAME = "pending_update_apk_name"
     private const val KEY_LAST_KNOWN_VERSION = "last_known_installed_version"
     private const val KEY_SAFETY_BACKUP_RESTORED_TIME = "safety_backup_restored_timestamp"
+    private const val KEY_LAST_NOTIFIED_VERSION = "last_notified_update_version"
+    private const val KEY_SNOOZED_VERSION = "snoozed_update_version"
+    private const val KEY_SNOOZE_UNTIL = "snoozed_update_until"
 
-    // Check interval: 7 days in milliseconds
-    const val CHECK_INTERVAL_MILLIS = 30L * 24 * 60 * 60 * 1000
+    // فاصله بررسی خودکار گیت‌هاب هنگام باز شدن برنامه: ۱۲ ساعت
+    const val CHECK_INTERVAL_MILLIS = 12L * 60 * 60 * 1000
+
+    /**
+     * آیا برای این نسخه قبلاً اعلان «نسخه جدید منتشر شد» داده شده است؟ (هر نسخه فقط یک بار اعلان)
+     */
+    fun shouldNotifyForVersion(context: Context, version: String): Boolean {
+        val prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+        return prefs.getString(KEY_LAST_NOTIFIED_VERSION, null) != version
+    }
+
+    fun markVersionNotified(context: Context, version: String) {
+        val prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+        prefs.edit().putString(KEY_LAST_NOTIFIED_VERSION, version).apply()
+    }
+
+    /**
+     * با زدن «بعداً»، پنجره آپدیت همین نسخه تا شروع روز بعد دوباره به‌صورت خودکار نمایش داده نمی‌شود.
+     */
+    fun snoozeUpdateDialog(context: Context, version: String) {
+        val tomorrow = java.util.Calendar.getInstance().apply {
+            add(java.util.Calendar.DAY_OF_YEAR, 1)
+            set(java.util.Calendar.HOUR_OF_DAY, 0)
+            set(java.util.Calendar.MINUTE, 0)
+            set(java.util.Calendar.SECOND, 0)
+            set(java.util.Calendar.MILLISECOND, 0)
+        }
+        val prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+        prefs.edit()
+            .putString(KEY_SNOOZED_VERSION, version)
+            .putLong(KEY_SNOOZE_UNTIL, tomorrow.timeInMillis)
+            .apply()
+    }
+
+    fun isUpdateDialogSnoozed(context: Context, version: String): Boolean {
+        val prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+        val snoozedVersion = prefs.getString(KEY_SNOOZED_VERSION, null) ?: return false
+        val until = prefs.getLong(KEY_SNOOZE_UNTIL, 0L)
+        return snoozedVersion == version && System.currentTimeMillis() < until
+    }
 
     private val legacyGitHubSslSocketFactory by lazy {
         try {
@@ -579,6 +620,8 @@ object AppUpdateManager {
             clearPendingUpdateInfo(context)
             clearPendingInstallApk(context)
             cleanupOldUpdateApks(context)
+            // پاک کردن هر دو اعلان آپدیت (یادآور ۱۸:۰۰ و اعلان انتشار نسخه) و لغو آلارم یادآور
+            UpdateReminderReceiver.cancelReminder(context)
         } else {
             cleanupOldUpdateApks(context)
         }

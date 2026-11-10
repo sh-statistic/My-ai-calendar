@@ -1339,16 +1339,36 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
 
     fun checkForAppUpdate(isManual: Boolean = false) {
         viewModelScope.launch {
+            val app = getApplication<Application>()
             if (isManual) _isCheckingUpdate.value = true
+
+            // ۱) نمایش فوری نسخه‌ای که قبلاً (مثلاً توسط سرویس پس‌زمینه) پیدا و ذخیره شده — بدون نیاز به اینترنت
+            if (!isManual && _availableUpdate.value == null) {
+                val pending = AppUpdateManager.getPendingUpdateInfo(app)
+                if (pending != null && pending.isAvailable &&
+                    !AppUpdateManager.isUpdateDialogSnoozed(app, pending.latestVersion)
+                ) {
+                    _availableUpdate.value = pending
+                }
+            }
+
+            // ۲) بررسی گیت‌هاب (در حالت خودکار حداکثر هر ۱۲ ساعت یک بار)
             try {
-                val update = AppUpdateManager.checkForUpdates(getApplication(), isManual)
+                val update = AppUpdateManager.checkForUpdates(app, isManual)
                 if (update != null && update.isAvailable) {
-                    _availableUpdate.value = update
+                    val snoozed = !isManual && AppUpdateManager.isUpdateDialogSnoozed(app, update.latestVersion)
+                    if (!snoozed) {
+                        _availableUpdate.value = update
+                    }
                     // تنظیم یادآوری هوشمند ساعت ۱۸:۰۰ عصر در صورت عدم نصب
-                    com.example.update.UpdateReminderReceiver.scheduleReminder(getApplication(), update)
+                    com.example.update.UpdateReminderReceiver.scheduleReminder(app, update)
                 } else if (isManual) {
-                    val currentVersion = AppUpdateManager.getInstalledVersionName(getApplication())
-                    _updateStatusMessage.value = "برنامه شما به‌روز است (نسخه فعلی: $currentVersion)"
+                    val currentVersion = AppUpdateManager.getInstalledVersionName(app)
+                    _updateStatusMessage.value = if (update == null) {
+                        "خطا در ارتباط با گیت‌هاب؛ اتصال اینترنت را بررسی کنید."
+                    } else {
+                        "برنامه شما به‌روز است (نسخه فعلی: $currentVersion)"
+                    }
                 }
             } catch (e: Exception) {
                 if (isManual) {
@@ -1363,7 +1383,8 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     fun dismissUpdateDialog() {
         val pending = _availableUpdate.value ?: AppUpdateManager.getPendingUpdateInfo(getApplication())
         if (pending != null && pending.isAvailable) {
-            // در صورت رد کردن یا بستن دیالوگ توسط کاربر، یادآوری ساعت ۱۸ فعال می‌ماند
+            // «بعداً»: تا فردا پنجره خودکار نمایش داده نمی‌شود؛ یادآوری ساعت ۱۸ فعال می‌ماند
+            AppUpdateManager.snoozeUpdateDialog(getApplication(), pending.latestVersion)
             com.example.update.UpdateReminderReceiver.scheduleReminder(getApplication(), pending)
         }
         _availableUpdate.value = null
