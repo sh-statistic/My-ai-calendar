@@ -2932,10 +2932,65 @@ fun JsonBackupDialog(
     onImport: (String) -> Unit
 ) {
     val strings = rememberAppStrings()
+    val context = androidx.compose.ui.platform.LocalContext.current
     var importText by remember { mutableStateOf("") }
-    var activeTab by remember { mutableStateOf(0) }
+    var activeTab by remember(jsonString) { mutableStateOf(if (jsonString.isBlank()) 1 else 0) }
     val clipboardManager: ClipboardManager = LocalClipboardManager.current
     var copiedMessage by remember { mutableStateOf(false) }
+    val detectedAutoBackup = remember {
+        com.example.update.AppUpdateManager.getLatestSafetyBackup(context)
+    }
+
+    val openBackupFileLauncher = androidx.activity.compose.rememberLauncherForActivityResult(
+        contract = androidx.activity.result.contract.ActivityResultContracts.OpenDocument()
+    ) { uri ->
+        if (uri != null) {
+            try {
+                val content = context.contentResolver.openInputStream(uri)
+                    ?.bufferedReader()
+                    ?.use { it.readText() }
+                if (!content.isNullOrBlank()) {
+                    importText = content
+                    onImport(content)
+                } else {
+                    android.widget.Toast.makeText(
+                        context,
+                        if (strings.isFa) "فایل انتخاب‌شده خالی است" else "Selected file is empty",
+                        android.widget.Toast.LENGTH_SHORT
+                    ).show()
+                }
+            } catch (e: Exception) {
+                android.widget.Toast.makeText(
+                    context,
+                    if (strings.isFa) "خطا در خواندن فایل: ${e.localizedMessage}" else "Error reading file: ${e.localizedMessage}",
+                    android.widget.Toast.LENGTH_SHORT
+                ).show()
+            }
+        }
+    }
+
+    val saveBackupFileLauncher = androidx.activity.compose.rememberLauncherForActivityResult(
+        contract = androidx.activity.result.contract.ActivityResultContracts.CreateDocument("application/json")
+    ) { uri ->
+        if (uri != null && jsonString.isNotBlank()) {
+            try {
+                context.contentResolver.openOutputStream(uri)?.use { out ->
+                    out.write(jsonString.toByteArray(Charsets.UTF_8))
+                }
+                android.widget.Toast.makeText(
+                    context,
+                    if (strings.isFa) "فایل پشتیبان با موفقیت ذخیره شد ✓" else "Backup file saved successfully ✓",
+                    android.widget.Toast.LENGTH_SHORT
+                ).show()
+            } catch (e: Exception) {
+                android.widget.Toast.makeText(
+                    context,
+                    if (strings.isFa) "خطا در ذخیره فایل: ${e.localizedMessage}" else "Error saving file: ${e.localizedMessage}",
+                    android.widget.Toast.LENGTH_SHORT
+                ).show()
+            }
+        }
+    }
 
     AlertDialog(
         onDismissRequest = onDismiss,
@@ -2964,19 +3019,30 @@ fun JsonBackupDialog(
                 }
 
                 if (activeTab == 0) {
-                    Text(if (strings.isFa) "کد JSON کلیه رویدادها، وظایف و یادداشت‌های شما:" else "JSON code of all events, tasks, and notes:", style = MaterialTheme.typography.bodySmall)
+                    Text(if (strings.isFa) "کد JSON کلیه رویدادها، وظایف، یادداشت‌ها و نقطه‌های عمر شما:" else "JSON code of all events, tasks, notes, and life grid:", style = MaterialTheme.typography.bodySmall)
                     OutlinedTextField(
                         value = jsonString,
                         onValueChange = {},
                         readOnly = true,
-                        maxLines = 8,
+                        maxLines = 7,
                         modifier = Modifier.fillMaxWidth()
                     )
                     Button(
                         onClick = {
+                            com.example.update.AppUpdateManager.performSafetyBackup(context, jsonString)
+                            saveBackupFileLauncher.launch("MyCalendar_SafetyBackup.json")
+                        },
+                        enabled = jsonString.isNotBlank(),
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Text(if (strings.isFa) "💾 ذخیره فایل پشتیبان در گوشی (Downloads)" else "💾 Save Backup File to Phone")
+                    }
+                    androidx.compose.material3.OutlinedButton(
+                        onClick = {
                             clipboardManager.setText(AnnotatedString(jsonString))
                             copiedMessage = true
                         },
+                        enabled = jsonString.isNotBlank(),
                         modifier = Modifier.fillMaxWidth()
                     ) {
                         Icon(Icons.Default.ContentCopy, contentDescription = null)
@@ -2984,13 +3050,61 @@ fun JsonBackupDialog(
                         Text(if (copiedMessage) (if (strings.isFa) "کپی شد!" else "Copied!") else (if (strings.isFa) "کپی کد پشتیبان در حافظه" else "Copy backup code"))
                     }
                 } else {
-                    Text(if (strings.isFa) "کد پشتیبان JSON را در کادر زیر جای‌گذاری (Paste) کنید:" else "Paste backup JSON code below:", style = MaterialTheme.typography.bodySmall)
+                    Surface(
+                        color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.45f),
+                        shape = RoundedCornerShape(12.dp),
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Column(
+                            modifier = Modifier.padding(12.dp),
+                            verticalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
+                            Text(
+                                text = if (strings.isFa) {
+                                    "💡 راهنمای بازیابی پس از نصب مجدد یا آپدیت:\nبرنامه پیش از هر آپدیت، یک فایل پشتیبان خودکار با نام MyCalendar_SafetyBackup.json در پوشه Downloads گوشی ذخیره می‌کند. با دکمه زیر می‌توانید این فایل را انتخاب و تمام اطلاعات را بازیابی کنید:"
+                                } else {
+                                    "💡 Restore Tip:\nBefore every update, an automatic backup named MyCalendar_SafetyBackup.json is saved in your Downloads folder. Tap below to select and restore it:"
+                                },
+                                style = MaterialTheme.typography.bodySmall,
+                                lineHeight = 18.sp
+                            )
+
+                            Button(
+                                onClick = {
+                                    openBackupFileLauncher.launch(arrayOf("application/json", "*/*"))
+                                },
+                                modifier = Modifier.fillMaxWidth()
+                            ) {
+                                Text(
+                                    text = if (strings.isFa) "📂 انتخاب فایل پشتیبان از پوشه Downloads" else "📂 Select Backup File from Downloads",
+                                    fontWeight = FontWeight.Bold,
+                                    fontSize = 12.sp
+                                )
+                            }
+
+                            if (!detectedAutoBackup.isNullOrBlank()) {
+                                androidx.compose.material3.OutlinedButton(
+                                    onClick = {
+                                        onImport(detectedAutoBackup)
+                                    },
+                                    modifier = Modifier.fillMaxWidth()
+                                ) {
+                                    Text(
+                                        text = if (strings.isFa) "⚡ بازیابی فوری از آخرین پشتیبان خودکار" else "⚡ Instant Restore from Auto-Backup",
+                                        fontSize = 12.sp
+                                    )
+                                }
+                            }
+                        }
+                    }
+
+                    Text(if (strings.isFa) "یا کد پشتیبان JSON را در کادر زیر جای‌گذاری (Paste) کنید:" else "Or paste backup JSON code below:", style = MaterialTheme.typography.bodySmall)
                     OutlinedTextField(
                         value = importText,
                         onValueChange = { importText = it },
                         placeholder = { Text("{\"deviceId\":\"...\", ...}") },
-                        minLines = 5,
-                        maxLines = 8,
+                        minLines = 4,
+                        maxLines = 6,
                         modifier = Modifier.fillMaxWidth()
                     )
                     Button(
@@ -3002,7 +3116,7 @@ fun JsonBackupDialog(
                         enabled = importText.isNotBlank(),
                         modifier = Modifier.fillMaxWidth()
                     ) {
-                        Text(if (strings.isFa) "بازیابی و ادغام اطلاعات" else "Restore & Merge Data")
+                        Text(if (strings.isFa) "بازیابی و ادغام اطلاعات متنی" else "Restore & Merge Text Data")
                     }
                 }
             }

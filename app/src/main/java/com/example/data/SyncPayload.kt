@@ -8,7 +8,8 @@ data class SyncData(
     val timestamp: Long,
     val events: List<EventEntity>,
     val tasks: List<TaskEntity>,
-    val notes: List<NoteEntity>
+    val notes: List<NoteEntity>,
+    val mementoMoriJson: JSONObject? = null
 ) {
     fun toJsonString(): String {
         val root = JSONObject()
@@ -69,6 +70,9 @@ data class SyncData(
             notesArray.put(obj)
         }
         root.put("notes", notesArray)
+        if (mementoMoriJson != null) {
+            root.put("mementoMori", mementoMoriJson)
+        }
 
         return root.toString()
     }
@@ -147,7 +151,9 @@ data class SyncData(
                 }
             }
 
-            return SyncData(deviceId, timestamp, events, tasks, notes)
+            val mementoMoriJson = root.optJSONObject("mementoMori")
+
+            return SyncData(deviceId, timestamp, events, tasks, notes, mementoMoriJson)
         }
     }
 }

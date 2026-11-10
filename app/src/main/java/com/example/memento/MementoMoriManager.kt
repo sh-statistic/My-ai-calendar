@@ -305,4 +305,82 @@ class MementoMoriManager(private val context: Context) {
             tag = if (isFa) "عمر من, عملکرد سالانه" else "Life Grid, Yearly Review"
         )
     }
+
+    /**
+     * خروجی JSON از تنظیمات تاریخ تولد و تمام خاطرات ماهانه برای ذخیره در فایل پشتیبان
+     */
+    fun exportToJson(): JSONObject {
+        val obj = JSONObject()
+        obj.put("isConfigured", isBirthDateConfigured())
+        if (isBirthDateConfigured()) {
+            obj.put("birthYear", getBirthYear())
+            obj.put("birthMonth", getBirthMonth())
+        }
+        obj.put("expectedLifespan", getExpectedLifespan())
+        if (prefs.contains(KEY_LAST_SEEN_MONTH)) {
+            obj.put("lastSeenMonth", prefs.getInt(KEY_LAST_SEEN_MONTH, -1))
+        }
+        if (prefs.contains(KEY_LAST_COMPILED_YEAR_IDX)) {
+            obj.put("lastCompiledYearIdx", prefs.getInt(KEY_LAST_COMPILED_YEAR_IDX, 0))
+        }
+        val notesRaw = prefs.getString(KEY_NOTES_JSON, "{}") ?: "{}"
+        val notesObj = try { JSONObject(notesRaw) } catch (_: Exception) { JSONObject() }
+        obj.put("reflectionNotes", notesObj)
+        return obj
+    }
+
+    /**
+     * بازیابی و ادغام غیرمخرب اطلاعات «نقطه‌های عمر من» از فایل پشتیبان.
+     * خاطرات ماهانه‌ای که در دستگاه خالی هستند از بکاپ بازیابی می‌شوند.
+     */
+    fun importFromJson(obj: JSONObject?): Int {
+        if (obj == null) return 0
+        var restoredCount = 0
+        val editor = prefs.edit()
+
+        if (!isBirthDateConfigured() && obj.optBoolean("isConfigured", false)) {
+            val by = obj.optInt("birthYear", -1)
+            val bm = obj.optInt("birthMonth", -1)
+            if (by > 1200 && bm in 1..12) {
+                editor.putInt(KEY_BIRTH_YEAR, by)
+                editor.putInt(KEY_BIRTH_MONTH, bm)
+                restoredCount++
+            }
+        }
+
+        val lifespan = obj.optInt("expectedLifespan", -1)
+        if (lifespan in 40..120 && !prefs.contains(KEY_EXPECTED_LIFESPAN)) {
+            editor.putInt(KEY_EXPECTED_LIFESPAN, lifespan)
+        }
+
+        if (!prefs.contains(KEY_LAST_SEEN_MONTH) && obj.has("lastSeenMonth")) {
+            val lsm = obj.optInt("lastSeenMonth", -1)
+            if (lsm >= 0) editor.putInt(KEY_LAST_SEEN_MONTH, lsm)
+        }
+
+        if (!prefs.contains(KEY_LAST_COMPILED_YEAR_IDX) && obj.has("lastCompiledYearIdx")) {
+            val lcy = obj.optInt("lastCompiledYearIdx", -1)
+            if (lcy >= 0) editor.putInt(KEY_LAST_COMPILED_YEAR_IDX, lcy)
+        }
+
+        val incomingNotes = obj.optJSONObject("reflectionNotes")
+        if (incomingNotes != null) {
+            val currentNotesRaw = prefs.getString(KEY_NOTES_JSON, "{}") ?: "{}"
+            val currentNotes = try { JSONObject(currentNotesRaw) } catch (_: Exception) { JSONObject() }
+            val keys = incomingNotes.keys()
+            while (keys.hasNext()) {
+                val key = keys.next()
+                val incomingText = incomingNotes.optString(key, "").trim()
+                val existingText = currentNotes.optString(key, "").trim()
+                if (incomingText.isNotEmpty() && existingText.isEmpty()) {
+                    currentNotes.put(key, incomingText)
+                    restoredCount++
+                }
+            }
+            editor.putString(KEY_NOTES_JSON, currentNotes.toString())
+        }
+
+        editor.apply()
+        return restoredCount
+    }
 }

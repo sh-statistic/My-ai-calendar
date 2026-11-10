@@ -317,6 +317,13 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     private val _updateDownloadState = MutableStateFlow<UpdateDownloadState>(UpdateDownloadState.Idle)
     val updateDownloadState: StateFlow<UpdateDownloadState> = _updateDownloadState.asStateFlow()
 
+    private val _showExternalBackupPrompt = MutableStateFlow(false)
+    val showExternalBackupPrompt: StateFlow<Boolean> = _showExternalBackupPrompt.asStateFlow()
+
+    fun dismissExternalBackupPrompt() {
+        _showExternalBackupPrompt.value = false
+    }
+
     private fun calculateCurrentPrayerTimes(): PrayerTimes {
         val date = _selectedDate?.value ?: PersianCalendarHelper.getCurrentJalaliDate()
         val gDate = PersianCalendarHelper.jalaliToGregorian(date.year, date.month, date.day)
@@ -1237,7 +1244,8 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     // Backup & Restore
     fun exportBackupJson(onResult: (String) -> Unit) {
         viewModelScope.launch {
-            val syncData = repository.getFullSyncData("Android-Backup")
+            val baseSyncData = repository.getFullSyncData("Android-Backup")
+            val syncData = baseSyncData.copy(mementoMoriJson = mementoManager.exportToJson())
             val json = syncData.toJsonString()
             logMessage("پشتیبان کامل JSON با موفقیت تولید شد")
             onResult(json)
@@ -1249,7 +1257,12 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             try {
                 val syncData = SyncData.fromJsonString(jsonStr)
                 repository.mergeSyncData(syncData, "پشتیبان دستی JSON")
-                logMessage("بازیابی موفقیت‌آمیز فایل پشتیبان (${syncData.events.size} رویداد، ${syncData.tasks.size} کار)")
+                val restoredMemento = mementoManager.importFromJson(syncData.mementoMoriJson)
+                if (restoredMemento > 0) {
+                    _mementoRevision.value += 1
+                    checkMementoMonthAndYearStatus()
+                }
+                logMessage("بازیابی موفقیت‌آمیز فایل پشتیبان (${syncData.events.size} رویداد، ${syncData.tasks.size} کار، ${syncData.notes.size} یادداشت)")
                 onComplete(true, "داده‌ها با موفقیت بازیابی شدند")
             } catch (e: Exception) {
                 logMessage("خطا در پردازش فایل پشتیبان: ${e.localizedMessage}")
@@ -1276,16 +1289,49 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
 
     private fun checkAndSeedInitialData() {
         viewModelScope.launch {
+            val app = getApplication<Application>()
+            val upgradedToVersion = AppUpdateManager.checkAndConsumeVersionUpgrade(app)
+            val hasPendingSafetyBackup = AppUpdateManager.hasPendingSafetyBackupInPrefs(app)
+
             val existingEvents = repository.allActiveEvents.first()
-            if (existingEvents.isEmpty()) {
-                // Try auto-restoring from safety backup first if available
-                val safetyBackup = AppUpdateManager.getLatestSafetyBackup(getApplication())
+            val existingTasks = repository.allActiveTasks.first()
+            val existingNotes = repository.allActiveNotes.first()
+            val isDatabaseEmpty = existingEvents.isEmpty() && existingTasks.isEmpty() && existingNotes.isEmpty()
+
+            if (upgradedToVersion != null || hasPendingSafetyBackup || isDatabaseEmpty) {
+                val safetyBackup = AppUpdateManager.getLatestSafetyBackup(app)
                 if (!safetyBackup.isNullOrBlank()) {
-                    importBackupJson(safetyBackup) { success, msg ->
-                        if (success) {
-                            logMessage("اطلاعات شما با موفقیت از پشتیبان اضطراری بازگردانی شد ✓")
+                    try {
+                        val syncData = SyncData.fromJsonString(safetyBackup)
+                        repository.mergeSyncData(syncData, "پشتیبان اضطراری خودکار")
+                        val restoredMemento = mementoManager.importFromJson(syncData.mementoMoriJson)
+                        if (restoredMemento > 0) {
+                            _mementoRevision.value += 1
                         }
+                        AppUpdateManager.clearSafetyBackup(app)
+                        checkMementoMonthAndYearStatus()
+                        if (isDatabaseEmpty && (syncData.events.isNotEmpty() || syncData.tasks.isNotEmpty() || syncData.notes.isNotEmpty() || restoredMemento > 0)) {
+                            logMessage("اطلاعات شما با موفقیت از پشتیبان اضطراری بازگردانی شد ✓")
+                            if (upgradedToVersion == null) {
+                                _updateStatusMessage.value = "اطلاعات شما از نسخه پشتیبان اضطراری بازیابی شد ✓"
+                            }
+                        }
+                    } catch (e: Exception) {
+                        logMessage("خطا در بررسی پشتیبان اضطراری: ${e.localizedMessage}")
                     }
+                } else if (isDatabaseEmpty && AppUpdateManager.hasUnreadablePublicSafetyBackup(app)) {
+                    logMessage("فایل پشتیبان در پوشه Downloads شناسایی شد (نیازمند انتخاب توسط کاربر)")
+                    _showExternalBackupPrompt.value = true
+                }
+            }
+
+            if (upgradedToVersion != null) {
+                val isFa = AppPreferences.getAppLanguage(app) != "en"
+                val vDisplay = if (isFa) PersianCalendarHelper.toPersianDigits(upgradedToVersion) else upgradedToVersion
+                _updateStatusMessage.value = if (isFa) {
+                    "🎉 برنامه با موفقیت به نسخه $vDisplay ارتقا یافت"
+                } else {
+                    "🎉 App successfully updated to v$vDisplay"
                 }
             }
         }

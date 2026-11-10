@@ -485,9 +485,104 @@ class MainActivity : ComponentActivity() {
                     // In-App Update Dialog with Automatic Safety Backup
                     val availableUpdate by viewModel.availableUpdate.collectAsState()
                     val updateDownloadState by viewModel.updateDownloadState.collectAsState()
+                    val updateStatusMessage by viewModel.updateStatusMessage.collectAsState()
+                    val showExternalBackupPrompt by viewModel.showExternalBackupPrompt.collectAsState()
                     val pendingReflectionMonthIdx by viewModel.pendingReflectionMonthIdx.collectAsState()
                     val context = androidx.compose.ui.platform.LocalContext.current
                     val uriHandler = androidx.compose.ui.platform.LocalUriHandler.current
+
+                    androidx.compose.runtime.LaunchedEffect(updateStatusMessage) {
+                        if (selectedTab != 4) {
+                            updateStatusMessage?.let { msg ->
+                                Toast.makeText(context, msg, Toast.LENGTH_LONG).show()
+                                viewModel.clearUpdateStatusMessage()
+                            }
+                        }
+                    }
+
+                    val externalBackupFileLauncher = androidx.activity.compose.rememberLauncherForActivityResult(
+                        contract = androidx.activity.result.contract.ActivityResultContracts.OpenDocument()
+                    ) { uri ->
+                        if (uri != null) {
+                            try {
+                                val jsonText = context.contentResolver.openInputStream(uri)
+                                    ?.bufferedReader()
+                                    ?.use { it.readText() }
+                                if (!jsonText.isNullOrBlank()) {
+                                    viewModel.importBackupJson(jsonText) { ok, msg ->
+                                        Toast.makeText(context, msg, Toast.LENGTH_LONG).show()
+                                        if (ok) {
+                                            viewModel.dismissExternalBackupPrompt()
+                                        }
+                                    }
+                                } else {
+                                    Toast.makeText(
+                                        context,
+                                        if (isRtl) "فایل انتخاب‌شده خالی است" else "Selected file is empty",
+                                        Toast.LENGTH_SHORT
+                                    ).show()
+                                }
+                            } catch (e: Exception) {
+                                Toast.makeText(
+                                    context,
+                                    if (isRtl) "خطا در خواندن فایل: ${e.localizedMessage}" else "Error reading file: ${e.localizedMessage}",
+                                    Toast.LENGTH_SHORT
+                                ).show()
+                            }
+                        }
+                    }
+
+                    // Global Prompt when MyCalendar_SafetyBackup.json is detected in Downloads after Uninstall & Reinstall
+                    if (showExternalBackupPrompt && availableUpdate == null) {
+                        AlertDialog(
+                            onDismissRequest = { viewModel.dismissExternalBackupPrompt() },
+                            title = {
+                                Row(verticalAlignment = Alignment.CenterVertically) {
+                                    Icon(
+                                        Icons.Default.Sync,
+                                        contentDescription = null,
+                                        tint = MaterialTheme.colorScheme.primary,
+                                        modifier = Modifier.size(22.dp)
+                                    )
+                                    Spacer(modifier = Modifier.width(8.dp))
+                                    Text(
+                                        text = if (isRtl) "📦 فایل پشتیبان شما در گوشی پیدا شد!" else "📦 Backup File Found on Phone!",
+                                        fontWeight = FontWeight.Bold,
+                                        fontSize = 15.sp
+                                    )
+                                }
+                            },
+                            text = {
+                                Text(
+                                    text = if (isRtl) {
+                                        "به نظر می‌رسد برنامه حذف و مجدداً نصب شده است.\n\nیک فایل پشتیبان خودکار (MyCalendar_SafetyBackup.json) در پوشه Downloads گوشی شما شناسایی شد؛ اما به دلیل محدودیت امنیتی اندروید پس از نصب مجدد، نیاز است فایل را یک بار انتخاب کنید تا تمام رویدادها، کارها و یادداشت‌هایتان بازیابی شوند."
+                                    } else {
+                                        "It looks like the app was reinstalled.\n\nAn automatic backup file (MyCalendar_SafetyBackup.json) was detected in your Downloads folder. Due to Android security restrictions after reinstallation, please select the file once from Downloads to restore all your events, tasks, and notes."
+                                    },
+                                    fontSize = 13.sp,
+                                    lineHeight = 20.sp
+                                )
+                            },
+                            confirmButton = {
+                                Button(
+                                    onClick = {
+                                        externalBackupFileLauncher.launch(arrayOf("application/json", "*/*"))
+                                    }
+                                ) {
+                                    Text(
+                                        text = if (isRtl) "📂 انتخاب فایل از Downloads و بازیابی" else "📂 Select from Downloads & Restore",
+                                        fontSize = 12.sp,
+                                        fontWeight = FontWeight.Bold
+                                    )
+                                }
+                            },
+                            dismissButton = {
+                                TextButton(onClick = { viewModel.dismissExternalBackupPrompt() }) {
+                                    Text(strings.later)
+                                }
+                            }
+                        )
+                    }
 
                     // Global Monthly Reflection Prompt ("این ماه چطور گذشت؟") shown across the entire app
                     if (availableUpdate == null && pendingReflectionMonthIdx != null) {

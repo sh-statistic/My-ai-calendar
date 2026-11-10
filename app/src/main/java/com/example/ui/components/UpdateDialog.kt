@@ -1,6 +1,8 @@
 package com.example.ui.components
 
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -21,6 +23,7 @@ import androidx.compose.material.icons.filled.Download
 import androidx.compose.material.icons.filled.ErrorOutline
 import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.InstallMobile
+import androidx.compose.material.icons.filled.KeyboardArrowDown
 import androidx.compose.material.icons.filled.OpenInBrowser
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Security
@@ -38,9 +41,16 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.drawWithContent
+import androidx.compose.ui.geometry.CornerRadius
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Size
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import kotlinx.coroutines.launch
 import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.tooling.preview.Preview
@@ -356,26 +366,139 @@ fun UpdateDialogCard(
                             // Release notes
                             if (updateInfo.releaseNotes.isNotBlank()) {
                                 val localizedNotes = extractLocalizedNotes(updateInfo.releaseNotes, strings.isFa)
-                                Text(
-                                    text = strings.whatsNewInUpdate,
-                                    style = MaterialTheme.typography.bodySmall,
-                                    fontWeight = FontWeight.Bold
-                                )
-                                Surface(
-                                    color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
-                                    shape = RoundedCornerShape(10.dp),
-                                    modifier = Modifier
-                                        .fillMaxWidth()
-                                        .heightIn(max = 140.dp)
+                                val notesScrollState = rememberScrollState()
+                                val coroutineScope = rememberCoroutineScope()
+                                val primaryColor = MaterialTheme.colorScheme.primary
+                                val cardBgColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)
+                                val surfaceColor = MaterialTheme.colorScheme.surface
+
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    horizontalArrangement = Arrangement.SpaceBetween,
+                                    verticalAlignment = Alignment.CenterVertically
                                 ) {
                                     Text(
-                                        text = localizedNotes,
-                                        fontSize = 11.sp,
-                                        lineHeight = 18.sp,
-                                        modifier = Modifier
-                                            .padding(10.dp)
-                                            .verticalScroll(rememberScrollState())
+                                        text = strings.whatsNewInUpdate,
+                                        style = MaterialTheme.typography.bodySmall,
+                                        fontWeight = FontWeight.Bold
                                     )
+                                    if (notesScrollState.maxValue > 0) {
+                                        Text(
+                                            text = if (strings.isFa) "↕ قابل پیمایش" else "↕ Scrollable",
+                                            fontSize = 10.sp,
+                                            color = MaterialTheme.colorScheme.primary,
+                                            fontWeight = FontWeight.Medium
+                                        )
+                                    }
+                                }
+
+                                Surface(
+                                    color = cardBgColor,
+                                    shape = RoundedCornerShape(12.dp),
+                                    border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.6f)),
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .heightIn(max = 170.dp)
+                                ) {
+                                    Box(modifier = Modifier.fillMaxWidth()) {
+                                        Text(
+                                            text = localizedNotes,
+                                            fontSize = 11.sp,
+                                            lineHeight = 19.sp,
+                                            modifier = Modifier
+                                                .fillMaxWidth()
+                                                .verticalScroll(notesScrollState)
+                                                .drawWithContent {
+                                                    drawContent()
+                                                    // رسم اسکرول‌بار عمودی همیشه مشخص در کنار کادر توضیحات
+                                                    if (notesScrollState.maxValue > 0) {
+                                                        val barWidth = 4.dp.toPx()
+                                                        val barMargin = 3.dp.toPx()
+                                                        val xPos = if (strings.isFa) barMargin else size.width - barWidth - barMargin
+                                                        val trackHeight = size.height - 12.dp.toPx()
+                                                        val trackTop = 6.dp.toPx()
+
+                                                        drawRoundRect(
+                                                            color = primaryColor.copy(alpha = 0.18f),
+                                                            topLeft = Offset(xPos, trackTop),
+                                                            size = Size(barWidth, trackHeight),
+                                                            cornerRadius = CornerRadius(barWidth / 2f, barWidth / 2f)
+                                                        )
+
+                                                        val totalContentHeight = trackHeight + notesScrollState.maxValue
+                                                        val thumbHeight = (trackHeight * (trackHeight / totalContentHeight))
+                                                            .coerceIn(24.dp.toPx(), trackHeight)
+                                                        val scrollFraction = notesScrollState.value.toFloat() / notesScrollState.maxValue.toFloat()
+                                                        val thumbTop = trackTop + scrollFraction * (trackHeight - thumbHeight)
+
+                                                        drawRoundRect(
+                                                            color = primaryColor.copy(alpha = 0.85f),
+                                                            topLeft = Offset(xPos, thumbTop),
+                                                            size = Size(barWidth, thumbHeight),
+                                                            cornerRadius = CornerRadius(barWidth / 2f, barWidth / 2f)
+                                                        )
+                                                    }
+                                                }
+                                                .padding(
+                                                    start = 12.dp,
+                                                    end = 12.dp,
+                                                    top = 10.dp,
+                                                    bottom = if (notesScrollState.canScrollForward) 34.dp else 10.dp
+                                                )
+                                        )
+
+                                        // گرادیان محوشونده و نوار راهنمای «ادامه توضیحات» در پایین کادر زمانی که متن ادامه دارد
+                                        if (notesScrollState.canScrollForward) {
+                                            Box(
+                                                modifier = Modifier
+                                                    .align(Alignment.BottomCenter)
+                                                    .fillMaxWidth()
+                                                    .background(
+                                                        Brush.verticalGradient(
+                                                            colors = listOf(
+                                                                Color.Transparent,
+                                                                surfaceColor.copy(alpha = 0.88f),
+                                                                surfaceColor.copy(alpha = 0.98f)
+                                                            )
+                                                        )
+                                                    )
+                                                    .clickable {
+                                                        coroutineScope.launch {
+                                                            notesScrollState.animateScrollTo(
+                                                                (notesScrollState.value + 220).coerceAtMost(notesScrollState.maxValue)
+                                                            )
+                                                        }
+                                                    }
+                                                    .padding(top = 10.dp, bottom = 5.dp),
+                                                contentAlignment = Alignment.Center
+                                            ) {
+                                                Surface(
+                                                    color = MaterialTheme.colorScheme.primaryContainer,
+                                                    shape = RoundedCornerShape(50),
+                                                    border = BorderStroke(0.8.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.5f))
+                                                ) {
+                                                    Row(
+                                                        modifier = Modifier.padding(horizontal = 10.dp, vertical = 3.dp),
+                                                        verticalAlignment = Alignment.CenterVertically
+                                                    ) {
+                                                        Icon(
+                                                            Icons.Default.KeyboardArrowDown,
+                                                            contentDescription = null,
+                                                            tint = MaterialTheme.colorScheme.primary,
+                                                            modifier = Modifier.size(15.dp)
+                                                        )
+                                                        Spacer(modifier = Modifier.width(3.dp))
+                                                        Text(
+                                                            text = if (strings.isFa) "ادامه تغییرات (به پایین بکشید یا لمس کنید)" else "More changes (scroll or tap)",
+                                                            fontSize = 9.5.sp,
+                                                            fontWeight = FontWeight.Bold,
+                                                            color = MaterialTheme.colorScheme.primary
+                                                        )
+                                                    }
+                                                }
+                                            }
+                                        }
+                                    }
                                 }
                             }
 

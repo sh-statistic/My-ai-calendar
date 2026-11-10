@@ -540,6 +540,20 @@ fun SettingsScreen(
                         TextButton(onClick = { viewModel.exportBackupJson { json -> backupJsonContent = json; showBackupDialog = true } }) { Text(strings.exportBackup, fontSize = 11.sp) }
                     }
                 }
+
+                Spacer(modifier = Modifier.height(6.dp))
+
+                Text(
+                    text = if (strings.isFa) {
+                        "📌 پشتیبان خودکار پیش از آپدیت در مسیر Downloads/MyCalendar_SafetyBackup.json ذخیره می‌شود و از دکمه «بازیابی» قابل فراخوانی است."
+                    } else {
+                        "📌 Pre-update auto-backups are saved at Downloads/MyCalendar_SafetyBackup.json and can be restored anytime via Import."
+                    },
+                    style = MaterialTheme.typography.labelSmall,
+                    fontSize = 10.sp,
+                    lineHeight = 15.sp,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.85f)
+                )
             }
         }
 

@@ -66,7 +66,7 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import java.io.File
 
-private const val GITHUB_DIRECT_DOWNLOAD_URL = "https://github.com/sh-statistic/My-ai-calendar/releases/latest/download/app-debug.apk"
+private const val GITHUB_DIRECT_DOWNLOAD_URL = "https://github.com/sh-statistic/My-ai-calendar/releases/latest/download/app-release.apk"
 
 @Composable
 fun ShareAppDialog(
@@ -193,6 +193,21 @@ fun ShareAppDialog(
                                     fontWeight = FontWeight.Bold
                                 )
                             }
+
+                            Spacer(modifier = Modifier.height(6.dp))
+
+                            Text(
+                                text = if (isRtl)
+                                    "💡 نکته: در صورت ارسال با بلوتوث به گوشی‌های اندروید ۱۲ به بالا، در گوشی مقصد فایل دریافتی را از پوشه Downloads در برنامه مدیریت فایل (Files) باز و نصب کنید."
+                                else
+                                    "💡 Tip: When sending via Bluetooth to Android 12+ devices, open and install the received file from the Downloads folder in the Files app.",
+                                style = MaterialTheme.typography.bodySmall,
+                                fontSize = 10.sp,
+                                lineHeight = 15.sp,
+                                textAlign = TextAlign.Start,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.85f),
+                                modifier = Modifier.fillMaxWidth()
+                            )
                         }
                     }
 
@@ -345,14 +360,13 @@ private fun shareApkDirectly(context: Context) {
         val originalApk = File(context.applicationInfo.sourceDir)
         val sharedDir = File(context.cacheDir, "shared_apk").apply { mkdirs() }
 
-        // پاکسازی فایل‌های قدیمی قبلی از کش برای عدم اشغال حافظه
+        // پاکسازی فایل‌های قدیمی فقط در شروع اشتراک‌گذاری جدید (نه در حین ارسال بلوتوث که چند دقیقه طول می‌کشد!)
         sharedDir.listFiles()?.forEach {
             try { it.delete() } catch (_: Exception) {}
         }
 
-        val sharedApk = File(sharedDir, "MyCalendar.apk")
+        val sharedApk = File(sharedDir, "HamgamCalendar.apk")
         originalApk.copyTo(sharedApk, overwrite = true)
-        sharedApk.deleteOnExit()
 
         val uri = FileProvider.getUriForFile(
             context,
@@ -360,14 +374,11 @@ private fun shareApkDirectly(context: Context) {
             sharedApk
         )
 
+        // بدون EXTRA_TEXT تا سرویس بلوتوث اندروید به جای فایل HTML، خود فایل باینری APK را کامل بفرستد
         val sendIntent = Intent(Intent.ACTION_SEND).apply {
-            type = "application/vnd.android.package-archive"
+            type = "*/*"
             putExtra(Intent.EXTRA_STREAM, uri)
-            putExtra(Intent.EXTRA_SUBJECT, "تقویم هوشمند خورشیدی")
-            putExtra(
-                Intent.EXTRA_TEXT,
-                "نصب تقویم هوشمند خورشیدی\nدانلود مستقیم آخرین نسخه برنامه:\n$GITHUB_DIRECT_DOWNLOAD_URL"
-            )
+            clipData = ClipData.newRawUri("HamgamCalendar.apk", uri)
             addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
             addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
         }
@@ -376,16 +387,6 @@ private fun shareApkDirectly(context: Context) {
             addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
         }
         context.startActivity(chooser)
-
-        // پاکسازی خودکار فایل کپی‌شده از کش بعد از ارسال (۶۰ ثانیه تاخیر)
-        CoroutineScope(Dispatchers.IO).launch {
-            delay(60_000L)
-            try {
-                if (sharedApk.exists()) {
-                    sharedApk.delete()
-                }
-            } catch (_: Exception) {}
-        }
     } catch (e: Exception) {
         Toast.makeText(context, "خطا در اشتراک‌گذاری فایل نصبی: ${e.message}", Toast.LENGTH_LONG).show()
     }
