@@ -264,4 +264,11 @@ class ExampleUnitTest {
         assertTrue(yearlyNote.tag.contains("عمر من"))
         assertTrue(yearlyNote.tag.contains("عملکرد سالانه"))
     }
+
+    @Test
+    fun testGitHubTrustBundledCertificatesLoadCleanly() {
+        val context = org.robolectric.RuntimeEnvironment.getApplication()
+        val factory = com.example.update.GitHubTrust.socketFactory(context)
+        assertNotNull(factory)
+    }
 }
