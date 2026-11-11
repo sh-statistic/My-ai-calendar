@@ -1,6 +1,7 @@
 package com.example.ui
 
 import android.app.Application
+import android.os.Build
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.calendar.GregorianDate
@@ -49,6 +50,7 @@ import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.Job
@@ -1243,30 +1245,169 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
 
     // Backup & Restore
     fun exportBackupJson(onResult: (String) -> Unit) {
-        viewModelScope.launch {
+        viewModelScope.launch(Dispatchers.IO) {
+            val app = getApplication<Application>()
             val baseSyncData = repository.getFullSyncData("Android-Backup")
-            val syncData = baseSyncData.copy(mementoMoriJson = mementoManager.exportToJson())
+
+            // 1. Drawing Base64 for whiteboard notes
+            val drawingsMap = mutableMapOf<String, String>()
+            for (note in baseSyncData.notes) {
+                if (!note.drawingPath.isNullOrBlank()) {
+                    try {
+                        val file = File(note.drawingPath)
+                        if (file.exists() && file.isFile) {
+                            val bytes = file.readBytes()
+                            val b64 = android.util.Base64.encodeToString(bytes, android.util.Base64.NO_WRAP)
+                            drawingsMap[note.id] = b64
+                        }
+                    } catch (e: Exception) {
+                        e.printStackTrace()
+                    }
+                }
+            }
+
+            // 2. Custom Occasions
+            val (occData, occHiddenData) = PersianOccasionsHelper.exportCustomOccasionsRaw(app)
+
+            // 3. App preferences (hamgam_app_preferences, hamgam_prayer_prefs, hijri_offset_prefs)
+            // hamgam_gemini_prefs is intentionally excluded for security
+            fun getPrefsMap(prefsName: String): Map<String, Any?> {
+                val p = app.getSharedPreferences(prefsName, android.content.Context.MODE_PRIVATE)
+                return p.all
+            }
+
+            val appPrefsMap = getPrefsMap("hamgam_app_preferences")
+            val prayerPrefsMap = getPrefsMap("hamgam_prayer_prefs")
+            val hijriOffsetPrefsMap = getPrefsMap("hijri_offset_prefs")
+
+            val syncData = baseSyncData.copy(
+                mementoMoriJson = mementoManager.exportToJson(),
+                noteDrawingsBase64 = if (drawingsMap.isNotEmpty()) drawingsMap else null,
+                customOccasionsData = occData,
+                customOccasionsHiddenData = occHiddenData,
+                appPreferences = if (appPrefsMap.isNotEmpty()) appPrefsMap else null,
+                prayerPreferences = if (prayerPrefsMap.isNotEmpty()) prayerPrefsMap else null,
+                hijriOffsetPreferences = if (hijriOffsetPrefsMap.isNotEmpty()) hijriOffsetPrefsMap else null
+            )
             val json = syncData.toJsonString()
             logMessage("پشتیبان کامل JSON با موفقیت تولید شد")
-            onResult(json)
+            withContext(Dispatchers.Main) {
+                onResult(json)
+            }
+        }
+    }
+
+    private fun restorePreferencesMap(prefsName: String, map: Map<String, Any?>?) {
+        if (map.isNullOrEmpty()) return
+        val app = getApplication<Application>()
+        val p = app.getSharedPreferences(prefsName, android.content.Context.MODE_PRIVATE)
+        val editor = p.edit()
+        for ((key, value) in map) {
+            when (value) {
+                is Boolean -> editor.putBoolean(key, value)
+                is Int -> editor.putInt(key, value)
+                is Long -> editor.putLong(key, value)
+                is Float -> editor.putFloat(key, value)
+                is Double -> editor.putFloat(key, value.toFloat())
+                is String -> editor.putString(key, value)
+                is Number -> editor.putInt(key, value.toInt())
+                null -> editor.remove(key)
+            }
+        }
+        editor.apply()
+    }
+
+    private fun restoreDrawingFiles(syncData: SyncData): List<NoteEntity> {
+        val app = getApplication<Application>()
+        val drawingsDir = File(app.filesDir, "drawings")
+        if (!drawingsDir.exists()) {
+            drawingsDir.mkdirs()
+        }
+
+        val drawingsMap = syncData.noteDrawingsBase64 ?: return syncData.notes
+        return syncData.notes.map { note ->
+            val b64 = drawingsMap[note.id]
+            if (!b64.isNullOrBlank()) {
+                try {
+                    val bytes = android.util.Base64.decode(b64, android.util.Base64.DEFAULT)
+                    val existingFile = note.drawingPath?.let { File(it) }
+                    val targetFile = if (existingFile != null && existingFile.parentFile?.exists() == true) {
+                        existingFile
+                    } else {
+                        File(drawingsDir, "drawing_${note.id}.png")
+                    }
+                    targetFile.writeBytes(bytes)
+                    note.copy(drawingPath = targetFile.absolutePath)
+                } catch (e: Exception) {
+                    e.printStackTrace()
+                    note
+                }
+            } else {
+                note
+            }
         }
     }
 
     fun importBackupJson(jsonStr: String, onComplete: (Boolean, String) -> Unit) {
-        viewModelScope.launch {
+        viewModelScope.launch(Dispatchers.IO) {
+            val app = getApplication<Application>()
             try {
-                val syncData = SyncData.fromJsonString(jsonStr)
+                val rawSyncData = SyncData.fromJsonString(jsonStr)
+
+                // 1. Restore drawing files and connect drawingPath
+                val updatedNotes = restoreDrawingFiles(rawSyncData)
+                val syncData = rawSyncData.copy(notes = updatedNotes)
+
+                // 2. Merge database records
                 repository.mergeSyncData(syncData, "پشتیبان دستی JSON")
+
+                // 3. Restore Memento Mori
                 val restoredMemento = mementoManager.importFromJson(syncData.mementoMoriJson)
                 if (restoredMemento > 0) {
                     _mementoRevision.value += 1
                     checkMementoMonthAndYearStatus()
                 }
+
+                // 4. Restore Custom Occasions
+                if (syncData.customOccasionsData != null || syncData.customOccasionsHiddenData != null) {
+                    PersianOccasionsHelper.importCustomOccasionsRaw(
+                        app,
+                        syncData.customOccasionsData,
+                        syncData.customOccasionsHiddenData
+                    )
+                    withContext(Dispatchers.Main) {
+                        refreshOccasions()
+                    }
+                }
+
+                // 5. Restore Preferences
+                restorePreferencesMap("hamgam_app_preferences", syncData.appPreferences)
+                restorePreferencesMap("hamgam_prayer_prefs", syncData.prayerPreferences)
+                restorePreferencesMap("hijri_offset_prefs", syncData.hijriOffsetPreferences)
+
+                // Re-initialize managers / state affected by restored preferences
+                com.example.calendar.HijriOffsetManager.init(app)
+                val updatedPrayerSettings = com.example.prayer.FajrAlarmManager.getSettings(app)
+                _fajrAlarmSettings.value = updatedPrayerSettings
+                _selectedCity.value = com.example.prayer.PrayerTimesCalculator.getCityByName(updatedPrayerSettings.cityName)
+                _appLanguage.value = com.example.settings.AppPreferences.getAppLanguage(app)
+                _isDarkMode.value = com.example.settings.AppPreferences.isDarkMode(app)
+                _calendarViewMode.value = if (com.example.settings.AppPreferences.getCalendarViewMode(app) == "WEEK") CalendarViewMode.WEEK else CalendarViewMode.MONTH
+
+                withContext(Dispatchers.Main) {
+                    refreshPrayerTimes()
+                    refreshOccasions()
+                }
+
                 logMessage("بازیابی موفقیت‌آمیز فایل پشتیبان (${syncData.events.size} رویداد، ${syncData.tasks.size} کار، ${syncData.notes.size} یادداشت)")
-                onComplete(true, "داده‌ها با موفقیت بازیابی شدند")
+                withContext(Dispatchers.Main) {
+                    onComplete(true, "داده‌ها با موفقیت بازیابی شدند")
+                }
             } catch (e: Exception) {
                 logMessage("خطا در پردازش فایل پشتیبان: ${e.localizedMessage}")
-                onComplete(false, "فایل پشتیبان نامعتبر است")
+                withContext(Dispatchers.Main) {
+                    onComplete(false, "فایل پشتیبان نامعتبر است")
+                }
             }
         }
     }
@@ -1302,12 +1443,43 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 val safetyBackup = AppUpdateManager.getLatestSafetyBackup(app)
                 if (!safetyBackup.isNullOrBlank()) {
                     try {
-                        val syncData = SyncData.fromJsonString(safetyBackup)
+                        val rawSyncData = SyncData.fromJsonString(safetyBackup)
+                        val updatedNotes = restoreDrawingFiles(rawSyncData)
+                        val syncData = rawSyncData.copy(notes = updatedNotes)
                         repository.mergeSyncData(syncData, "پشتیبان اضطراری خودکار")
                         val restoredMemento = mementoManager.importFromJson(syncData.mementoMoriJson)
                         if (restoredMemento > 0) {
                             _mementoRevision.value += 1
                         }
+
+                        if (syncData.customOccasionsData != null || syncData.customOccasionsHiddenData != null) {
+                            PersianOccasionsHelper.importCustomOccasionsRaw(
+                                app,
+                                syncData.customOccasionsData,
+                                syncData.customOccasionsHiddenData
+                            )
+                            withContext(Dispatchers.Main) {
+                                refreshOccasions()
+                            }
+                        }
+
+                        restorePreferencesMap("hamgam_app_preferences", syncData.appPreferences)
+                        restorePreferencesMap("hamgam_prayer_prefs", syncData.prayerPreferences)
+                        restorePreferencesMap("hijri_offset_prefs", syncData.hijriOffsetPreferences)
+
+                        com.example.calendar.HijriOffsetManager.init(app)
+                        val updatedPrayerSettings = com.example.prayer.FajrAlarmManager.getSettings(app)
+                        _fajrAlarmSettings.value = updatedPrayerSettings
+                        _selectedCity.value = com.example.prayer.PrayerTimesCalculator.getCityByName(updatedPrayerSettings.cityName)
+                        _appLanguage.value = com.example.settings.AppPreferences.getAppLanguage(app)
+                        _isDarkMode.value = com.example.settings.AppPreferences.isDarkMode(app)
+                        _calendarViewMode.value = if (com.example.settings.AppPreferences.getCalendarViewMode(app) == "WEEK") CalendarViewMode.WEEK else CalendarViewMode.MONTH
+
+                        withContext(Dispatchers.Main) {
+                            refreshPrayerTimes()
+                            refreshOccasions()
+                        }
+
                         AppUpdateManager.clearSafetyBackup(app)
                         checkMementoMonthAndYearStatus()
                         if (isDatabaseEmpty && (syncData.events.isNotEmpty() || syncData.tasks.isNotEmpty() || syncData.notes.isNotEmpty() || restoredMemento > 0)) {
@@ -1395,7 +1567,25 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         _updateStatusMessage.value = null
     }
 
-    fun startUpdateWithSafetyBackup(context: android.content.Context, updateInfo: UpdateInfo) {
+    fun startUpdateWithSafetyBackup(
+        context: android.content.Context,
+        updateInfo: UpdateInfo,
+        onPermissionNeeded: (() -> Unit)? = null
+    ) {
+        // روی اندروید ۶ تا ۹ (API 23 تا 28) در صورت نبود مجوز WRITE_EXTERNAL_STORAGE،
+        // ابتدا درخواست مجوز به جریان اضافه می‌شود تا فایل پشتیبان در Downloads نوشته شود
+        if (Build.VERSION.SDK_INT in Build.VERSION_CODES.M..Build.VERSION_CODES.P &&
+            !AppUpdateManager.hasStoragePermissionForBackup(context)
+        ) {
+            if (onPermissionNeeded != null) {
+                onPermissionNeeded()
+                return
+            }
+        }
+        proceedWithUpdateAndBackup(context, updateInfo)
+    }
+
+    fun proceedWithUpdateAndBackup(context: android.content.Context, updateInfo: UpdateInfo) {
         viewModelScope.launch {
             val existingApk = AppUpdateManager.getDownloadedApkIfReady(context, updateInfo.apkName)
             if (existingApk != null) {

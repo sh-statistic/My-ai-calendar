@@ -170,6 +170,18 @@ class MainActivity : ComponentActivity() {
                             onResult = { /* granted or denied handled gracefully */ }
                         )
 
+                        // Request storage permission for safety backup on Android 6-9 (API 23-28)
+                        var pendingUpdateForStorageBackup by remember { mutableStateOf<com.example.update.UpdateInfo?>(null) }
+                        val storagePermissionLauncher = androidx.activity.compose.rememberLauncherForActivityResult(
+                            contract = androidx.activity.result.contract.ActivityResultContracts.RequestPermission(),
+                            onResult = { _ ->
+                                pendingUpdateForStorageBackup?.let { updateInfo ->
+                                    viewModel.proceedWithUpdateAndBackup(context, updateInfo)
+                                }
+                                pendingUpdateForStorageBackup = null
+                            }
+                        )
+
                         androidx.compose.runtime.LaunchedEffect(Unit) {
                             if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.TIRAMISU) {
                                 permissionLauncher.launch(android.Manifest.permission.POST_NOTIFICATIONS)
@@ -678,7 +690,14 @@ class MainActivity : ComponentActivity() {
                             downloadState = updateDownloadState,
                             onDismiss = { viewModel.dismissUpdateDialog() },
                             onConfirmUpdate = {
-                                viewModel.startUpdateWithSafetyBackup(context, updateInfo)
+                                viewModel.startUpdateWithSafetyBackup(
+                                    context = context,
+                                    updateInfo = updateInfo,
+                                    onPermissionNeeded = {
+                                        pendingUpdateForStorageBackup = updateInfo
+                                        storagePermissionLauncher.launch(android.Manifest.permission.WRITE_EXTERNAL_STORAGE)
+                                    }
+                                )
                             },
                             onInstallApk = { apkFile ->
                                 viewModel.installDownloadedUpdate(context, apkFile)

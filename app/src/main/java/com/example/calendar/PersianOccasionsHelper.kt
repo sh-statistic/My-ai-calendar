@@ -452,6 +452,27 @@ object PersianOccasionsHelper {
     
     fun getCustomOccasions(): List<PersianOccasion> = customOccasions
 
+    fun exportCustomOccasionsRaw(context: android.content.Context): Pair<String, String> {
+        val prefs = context.getSharedPreferences("CustomOccasions", android.content.Context.MODE_PRIVATE)
+        val data = prefs.getString("data", "[]") ?: "[]"
+        val hiddenData = prefs.getString("hidden_data", "[]") ?: "[]"
+        return Pair(data, hiddenData)
+    }
+
+    fun importCustomOccasionsRaw(context: android.content.Context, data: String?, hiddenData: String?) {
+        if (data == null && hiddenData == null) return
+        val prefs = context.getSharedPreferences("CustomOccasions", android.content.Context.MODE_PRIVATE)
+        val editor = prefs.edit()
+        if (data != null) {
+            editor.putString("data", data)
+        }
+        if (hiddenData != null) {
+            editor.putString("hidden_data", hiddenData)
+        }
+        editor.apply()
+        loadCustomOccasions(context)
+    }
+
     private fun saveCustomOccasionsToPrefs(context: android.content.Context) {
         val arr = org.json.JSONArray()
         for (occ in customOccasions) {

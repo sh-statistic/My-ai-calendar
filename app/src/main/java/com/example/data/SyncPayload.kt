@@ -1,7 +1,10 @@
 package com.example.data
 
+import android.content.Context
+import android.util.Base64
 import org.json.JSONArray
 import org.json.JSONObject
+import java.io.File
 
 data class SyncData(
     val deviceId: String,
@@ -9,7 +12,13 @@ data class SyncData(
     val events: List<EventEntity>,
     val tasks: List<TaskEntity>,
     val notes: List<NoteEntity>,
-    val mementoMoriJson: JSONObject? = null
+    val mementoMoriJson: JSONObject? = null,
+    val noteDrawingsBase64: Map<String, String>? = null, // key: note id, value: base64 drawing content
+    val customOccasionsData: String? = null,
+    val customOccasionsHiddenData: String? = null,
+    val appPreferences: Map<String, Any?>? = null,
+    val prayerPreferences: Map<String, Any?>? = null,
+    val hijriOffsetPreferences: Map<String, Any?>? = null
 ) {
     fun toJsonString(): String {
         val root = JSONObject()
@@ -65,6 +74,10 @@ data class SyncData(
             if (n.drawingPath != null) {
                 obj.put("drawingPath", n.drawingPath)
             }
+            val drawingB64 = noteDrawingsBase64?.get(n.id)
+            if (!drawingB64.isNullOrBlank()) {
+                obj.put("drawingBase64", drawingB64)
+            }
             obj.put("updatedAt", n.updatedAt)
             obj.put("isDeleted", n.isDeleted)
             notesArray.put(obj)
@@ -72,6 +85,25 @@ data class SyncData(
         root.put("notes", notesArray)
         if (mementoMoriJson != null) {
             root.put("mementoMori", mementoMoriJson)
+        }
+
+        if (customOccasionsData != null || customOccasionsHiddenData != null) {
+            val occObj = JSONObject()
+            if (customOccasionsData != null) occObj.put("data", customOccasionsData)
+            if (customOccasionsHiddenData != null) occObj.put("hidden_data", customOccasionsHiddenData)
+            root.put("customOccasions", occObj)
+        }
+
+        if (appPreferences != null) {
+            root.put("appPreferences", JSONObject(appPreferences))
+        }
+
+        if (prayerPreferences != null) {
+            root.put("prayerPreferences", JSONObject(prayerPreferences))
+        }
+
+        if (hijriOffsetPreferences != null) {
+            root.put("hijriOffsetPreferences", JSONObject(hijriOffsetPreferences))
         }
 
         return root.toString()
@@ -130,13 +162,19 @@ data class SyncData(
             }
 
             val notes = mutableListOf<NoteEntity>()
+            val drawingsMap = mutableMapOf<String, String>()
             val notesArray = root.optJSONArray("notes")
             if (notesArray != null) {
                 for (i in 0 until notesArray.length()) {
                     val obj = notesArray.getJSONObject(i)
+                    val noteId = obj.optString("id")
+                    val drawingB64 = if (obj.isNull("drawingBase64")) null else obj.optString("drawingBase64").takeIf { it.isNotBlank() }
+                    if (drawingB64 != null) {
+                        drawingsMap[noteId] = drawingB64
+                    }
                     notes.add(
                         NoteEntity(
-                            id = obj.optString("id"),
+                            id = noteId,
                             title = obj.optString("title", ""),
                             content = obj.optString("content", ""),
                             persianDate = obj.optString("persianDate", ""),
@@ -153,7 +191,43 @@ data class SyncData(
 
             val mementoMoriJson = root.optJSONObject("mementoMori")
 
-            return SyncData(deviceId, timestamp, events, tasks, notes, mementoMoriJson)
+            val customOccasionsObj = root.optJSONObject("customOccasions")
+            val customOccasionsData = if (customOccasionsObj != null && !customOccasionsObj.isNull("data")) {
+                customOccasionsObj.optString("data")
+            } else null
+            val customOccasionsHiddenData = if (customOccasionsObj != null && !customOccasionsObj.isNull("hidden_data")) {
+                customOccasionsObj.optString("hidden_data")
+            } else null
+
+            fun jsonObjectToMap(jObj: JSONObject?): Map<String, Any?>? {
+                if (jObj == null) return null
+                val map = mutableMapOf<String, Any?>()
+                val keys = jObj.keys()
+                while (keys.hasNext()) {
+                    val key = keys.next()
+                    map[key] = if (jObj.isNull(key)) null else jObj.get(key)
+                }
+                return map
+            }
+
+            val appPreferences = jsonObjectToMap(root.optJSONObject("appPreferences"))
+            val prayerPreferences = jsonObjectToMap(root.optJSONObject("prayerPreferences"))
+            val hijriOffsetPreferences = jsonObjectToMap(root.optJSONObject("hijriOffsetPreferences"))
+
+            return SyncData(
+                deviceId = deviceId,
+                timestamp = timestamp,
+                events = events,
+                tasks = tasks,
+                notes = notes,
+                mementoMoriJson = mementoMoriJson,
+                noteDrawingsBase64 = if (drawingsMap.isNotEmpty()) drawingsMap else null,
+                customOccasionsData = customOccasionsData,
+                customOccasionsHiddenData = customOccasionsHiddenData,
+                appPreferences = appPreferences,
+                prayerPreferences = prayerPreferences,
+                hijriOffsetPreferences = hijriOffsetPreferences
+            )
         }
     }
 }

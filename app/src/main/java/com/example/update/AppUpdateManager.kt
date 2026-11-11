@@ -8,6 +8,8 @@ import android.content.IntentFilter
 import android.net.Uri
 import android.os.Build
 import android.os.Environment
+import android.provider.MediaStore
+import android.content.ContentValues
 import android.provider.Settings
 import android.util.Log
 import androidx.core.content.FileProvider
@@ -483,13 +485,51 @@ object AppUpdateManager {
             // 3. Save in public Downloads directory so it survives app uninstall (only when backup has real data)
             if (isMeaningful) {
                 try {
-                    val downloadsDir = Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS)
-                    if (downloadsDir.exists() || downloadsDir.mkdirs()) {
-                        val publicFile = File(downloadsDir, "MyCalendar_SafetyBackup.json")
-                        publicFile.writeText(backupJson)
+                    val fileName = "MyCalendar_SafetyBackup.json"
+                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+                        val resolver = context.contentResolver
+                        // Check if an entry with this name already exists in Downloads
+                        val collection = MediaStore.Downloads.EXTERNAL_CONTENT_URI
+                        val projection = arrayOf(MediaStore.Downloads._ID)
+                        val selection = "${MediaStore.Downloads.DISPLAY_NAME} = ?"
+                        val selectionArgs = arrayOf(fileName)
+                        var existingUri: Uri? = null
+                        resolver.query(collection, projection, selection, selectionArgs, null)?.use { cursor ->
+                            if (cursor.moveToFirst()) {
+                                val id = cursor.getLong(cursor.getColumnIndexOrThrow(MediaStore.Downloads._ID))
+                                existingUri = android.content.ContentUris.withAppendedId(collection, id)
+                            }
+                        }
+
+                        val targetUri = existingUri ?: run {
+                            val values = ContentValues().apply {
+                                put(MediaStore.Downloads.DISPLAY_NAME, fileName)
+                                put(MediaStore.Downloads.MIME_TYPE, "application/json")
+                                put(MediaStore.Downloads.RELATIVE_PATH, Environment.DIRECTORY_DOWNLOADS)
+                            }
+                            resolver.insert(collection, values)
+                        }
+
+                        if (targetUri != null) {
+                            resolver.openOutputStream(targetUri, "wt")?.use { out ->
+                                out.write(backupJson.toByteArray(Charsets.UTF_8))
+                                out.flush()
+                            }
+                        } else {
+                            Log.w(TAG, "Failed to create or resolve MediaStore URI for $fileName")
+                        }
+                    } else {
+                        if (!hasStoragePermissionForBackup(context)) {
+                            Log.w(TAG, "WRITE_EXTERNAL_STORAGE permission not granted on API ${Build.VERSION.SDK_INT}; public Downloads write may fail")
+                        }
+                        val downloadsDir = Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS)
+                        if (downloadsDir.exists() || downloadsDir.mkdirs()) {
+                            val publicFile = File(downloadsDir, fileName)
+                            publicFile.writeText(backupJson)
+                        }
                     }
-                } catch (ignored: Exception) {
-                    // Secondary fallback, silent ignore
+                } catch (e: Exception) {
+                    Log.e(TAG, "Error writing safety backup to Downloads: ${e.message}", e)
                 }
             }
 
@@ -645,6 +685,22 @@ object AppUpdateManager {
             pInfo?.versionName?.removePrefix("v")?.removePrefix("V")?.trim()
         } catch (_: Exception) {
             null
+        }
+    }
+
+    /**
+     * بررسی می‌کند آیا برای نوشتن فایل در Downloads مجوز لازم است و داده شده است یا خیر.
+     * روی اندروید ۶ تا ۹ (API 23 تا 28) نیازمند WRITE_EXTERNAL_STORAGE است.
+     * روی اندروید ۱۰ به بالا (Scoped Storage با MediaStore) و اندروید ۵ به پایین نیازی به درخواست زمان اجرا نیست.
+     */
+    fun hasStoragePermissionForBackup(context: Context): Boolean {
+        return if (Build.VERSION.SDK_INT in Build.VERSION_CODES.M..Build.VERSION_CODES.P) {
+            androidx.core.content.ContextCompat.checkSelfPermission(
+                context,
+                android.Manifest.permission.WRITE_EXTERNAL_STORAGE
+            ) == android.content.pm.PackageManager.PERMISSION_GRANTED
+        } else {
+            true
         }
     }
 

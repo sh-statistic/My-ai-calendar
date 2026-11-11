@@ -141,6 +141,64 @@ class ExampleUnitTest {
     }
 
     @Test
+    fun testExtendedBackupFeatures() {
+        val note = NoteEntity(
+            id = "note-draw-1",
+            title = "طرح تست",
+            content = "",
+            drawingPath = "/data/user/0/com.example/files/drawings/drawing_1.png"
+        )
+        val dummyBase64 = "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII="
+
+        val appPrefs = mapOf(
+            "app_language" to "fa",
+            "is_dark_mode" to true,
+            "calendar_view_mode" to "WEEK",
+            "onboarding_completed" to true
+        )
+        val prayerPrefs = mapOf(
+            "fajr_alarm_city" to "مشهد",
+            "fajr_alarm_enabled" to true,
+            "fajr_alarm_offset_minutes" to 15
+        )
+        val hijriPrefs = mapOf(
+            "hijri_offset_days" to -1
+        )
+
+        val syncData = SyncData(
+            deviceId = "Test-Device",
+            timestamp = 123456789L,
+            events = emptyList(),
+            tasks = emptyList(),
+            notes = listOf(note),
+            noteDrawingsBase64 = mapOf("note-draw-1" to dummyBase64),
+            customOccasionsData = "[{\"title\":\"مناسبت تست\",\"month\":1,\"day\":1,\"isHoliday\":false}]",
+            customOccasionsHiddenData = "[\"مناسبت پنهان\"]",
+            appPreferences = appPrefs,
+            prayerPreferences = prayerPrefs,
+            hijriOffsetPreferences = hijriPrefs
+        )
+
+        val jsonStr = syncData.toJsonString()
+        assertTrue(jsonStr.contains("drawingBase64"))
+        assertTrue(jsonStr.contains("customOccasions"))
+        assertTrue(jsonStr.contains("appPreferences"))
+        assertTrue(jsonStr.contains("prayerPreferences"))
+        assertTrue(jsonStr.contains("hijriOffsetPreferences"))
+
+        val restored = SyncData.fromJsonString(jsonStr)
+        assertEquals(1, restored.notes.size)
+        assertEquals("note-draw-1", restored.notes[0].id)
+        assertEquals(dummyBase64, restored.noteDrawingsBase64?.get("note-draw-1"))
+        assertEquals("[{\"title\":\"مناسبت تست\",\"month\":1,\"day\":1,\"isHoliday\":false}]", restored.customOccasionsData)
+        assertEquals("[\"مناسبت پنهان\"]", restored.customOccasionsHiddenData)
+        assertEquals("fa", restored.appPreferences?.get("app_language"))
+        assertEquals(true, restored.appPreferences?.get("is_dark_mode"))
+        assertEquals("مشهد", restored.prayerPreferences?.get("fajr_alarm_city"))
+        assertEquals(-1, restored.hijriOffsetPreferences?.get("hijri_offset_days"))
+    }
+
+    @Test
     fun testEditOfficialOccasionAndDeduplication() {
         val context = androidx.test.core.app.ApplicationProvider.getApplicationContext<android.content.Context>()
         com.example.calendar.PersianOccasionsHelper.init(context)
