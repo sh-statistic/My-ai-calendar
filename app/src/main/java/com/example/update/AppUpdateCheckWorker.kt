@@ -35,18 +35,9 @@ class AppUpdateCheckWorker(
             Log.d(TAG, "AppUpdateCheckWorker started background update inquiry...")
 
             val update = AppUpdateManager.checkForUpdates(applicationContext, isManual = true)
-            if (update == null) {
-                // null در حالت isManual یعنی خطای شبکه/سرور؛ تا ۳ بار با تأخیر دوباره تلاش شود
-                Log.w(TAG, "Background update check failed (network/server). Will retry.")
-                return@withContext if (runAttemptCount < 3) Result.retry() else Result.success()
-            }
-            if (update.isAvailable) {
+            if (update != null && update.isAvailable) {
                 Log.i(TAG, "New release found in background work: v${update.latestVersion}")
-                // هر نسخه فقط یک بار اعلان «نسخه جدید» می‌گیرد؛ پس از آن فقط یادآور روزانه ۱۸:۰۰
-                if (AppUpdateManager.shouldNotifyForVersion(applicationContext, update.latestVersion)) {
-                    showNewReleaseNotification(applicationContext, update)
-                    AppUpdateManager.markVersionNotified(applicationContext, update.latestVersion)
-                }
+                showNewReleaseNotification(applicationContext, update)
 
                 // Arm the 18:00 reminder in case this notification is dismissed or missed
                 UpdateReminderReceiver.scheduleReminder(applicationContext, update)

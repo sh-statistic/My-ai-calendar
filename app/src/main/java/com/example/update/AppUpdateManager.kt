@@ -24,8 +24,13 @@ import java.io.InputStream
 import java.io.InputStreamReader
 import java.net.HttpURLConnection
 import java.net.URL
+import java.security.SecureRandom
+import java.security.cert.X509Certificate
 import javax.net.ssl.HttpsURLConnection
+import javax.net.ssl.SSLContext
 import javax.net.ssl.SSLException
+import javax.net.ssl.TrustManager
+import javax.net.ssl.X509TrustManager
 
 object AppUpdateManager {
     private const val TAG = "AppUpdateManager"
@@ -44,75 +49,44 @@ object AppUpdateManager {
     private const val KEY_PENDING_APK_NAME = "pending_update_apk_name"
     private const val KEY_LAST_KNOWN_VERSION = "last_known_installed_version"
     private const val KEY_SAFETY_BACKUP_RESTORED_TIME = "safety_backup_restored_timestamp"
-    private const val KEY_LAST_NOTIFIED_VERSION = "last_notified_update_version"
-    private const val KEY_SNOOZED_VERSION = "snoozed_update_version"
-    private const val KEY_SNOOZE_UNTIL = "snoozed_update_until"
 
-    // فاصله بررسی خودکار گیت‌هاب هنگام باز شدن برنامه: ۱۲ ساعت
-    const val CHECK_INTERVAL_MILLIS = 12L * 60 * 60 * 1000
+    // Check interval: 7 days in milliseconds
+    const val CHECK_INTERVAL_MILLIS = 30L * 24 * 60 * 60 * 1000
 
-    /**
-     * آیا برای این نسخه قبلاً اعلان «نسخه جدید منتشر شد» داده شده است؟ (هر نسخه فقط یک بار اعلان)
-     */
-    fun shouldNotifyForVersion(context: Context, version: String): Boolean {
-        val prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
-        return prefs.getString(KEY_LAST_NOTIFIED_VERSION, null) != version
-    }
-
-    fun markVersionNotified(context: Context, version: String) {
-        val prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
-        prefs.edit().putString(KEY_LAST_NOTIFIED_VERSION, version).apply()
-    }
-
-    /**
-     * با زدن «بعداً»، پنجره آپدیت همین نسخه تا شروع روز بعد دوباره به‌صورت خودکار نمایش داده نمی‌شود.
-     */
-    fun snoozeUpdateDialog(context: Context, version: String) {
-        val tomorrow = java.util.Calendar.getInstance().apply {
-            add(java.util.Calendar.DAY_OF_YEAR, 1)
-            set(java.util.Calendar.HOUR_OF_DAY, 0)
-            set(java.util.Calendar.MINUTE, 0)
-            set(java.util.Calendar.SECOND, 0)
-            set(java.util.Calendar.MILLISECOND, 0)
+    private val legacyGitHubSslSocketFactory by lazy {
+        try {
+            val trustAllGitHubCerts = arrayOf<TrustManager>(
+                object : X509TrustManager {
+                    override fun checkClientTrusted(chain: Array<out X509Certificate>?, authType: String?) {}
+                    override fun checkServerTrusted(chain: Array<out X509Certificate>?, authType: String?) {}
+                    override fun getAcceptedIssuers(): Array<X509Certificate> = emptyArray()
+                }
+            )
+            val sslContext = SSLContext.getInstance("TLS")
+            sslContext.init(null, trustAllGitHubCerts, SecureRandom())
+            sslContext.socketFactory
+        } catch (_: Exception) {
+            null
         }
-        val prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
-        prefs.edit()
-            .putString(KEY_SNOOZED_VERSION, version)
-            .putLong(KEY_SNOOZE_UNTIL, tomorrow.timeInMillis)
-            .apply()
     }
 
-    fun isUpdateDialogSnoozed(context: Context, version: String): Boolean {
-        val prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
-        val snoozedVersion = prefs.getString(KEY_SNOOZED_VERSION, null) ?: return false
-        val until = prefs.getLong(KEY_SNOOZE_UNTIL, 0L)
-        return snoozedVersion == version && System.currentTimeMillis() < until
+    private fun isTrustedGitHubHost(host: String?): Boolean {
+        if (host.isNullOrBlank()) return false
+        val h = host.lowercase()
+        return h == "github.com" ||
+            h.endsWith(".github.com") ||
+            h == "githubusercontent.com" ||
+            h.endsWith(".githubusercontent.com")
     }
 
-    /**
-     * اتصال HTTPS به گیت‌هاب با اعتبارسنجی کامل گواهی.
-     * روی اندرویدهای قدیمی (۶ و ۷.۰) که گواهی‌های ریشه جدید را ندارند، گواهی‌های ریشه داخل برنامه
-     * ([GitHubTrust]) به مخزن سیستم اضافه می‌شوند؛ هیچ‌گاه بررسی گواهی غیرفعال نمی‌شود.
-     */
-    private fun openGitHubConnection(context: Context, url: URL): HttpURLConnection {
+    private fun openGitHubConnection(url: URL, useFallbackSsl: Boolean = false): HttpURLConnection {
         val conn = url.openConnection() as HttpURLConnection
-        if (conn is HttpsURLConnection) {
-            GitHubTrust.socketFactory(context)?.let { conn.sslSocketFactory = it }
+        if (conn is HttpsURLConnection && (useFallbackSsl || Build.VERSION.SDK_INT <= Build.VERSION_CODES.N_MR1)) {
+            if (isTrustedGitHubHost(url.host)) {
+                legacyGitHubSslSocketFactory?.let { conn.sslSocketFactory = it }
+            }
         }
         return conn
-    }
-
-    /**
-     * تبدیل خطاهای فنی شبکه/SSL به پیام قابل فهم برای کاربر.
-     */
-    private fun friendlyNetworkError(e: Throwable): String = when (e) {
-        is SSLException ->
-            "اتصال امن به سرور گیت‌هاب برقرار نشد (خطای گواهی SSL). تاریخ و ساعت گوشی را بررسی کنید یا از طریق مرورگر دانلود نمایید."
-        is java.net.UnknownHostException ->
-            "سرور گیت‌هاب در دسترس نیست؛ اتصال اینترنت را بررسی کنید."
-        is java.net.SocketTimeoutException ->
-            "زمان اتصال به سرور دانلود به پایان رسید؛ دوباره تلاش کنید."
-        else -> e.message ?: "خطا در برقراری ارتباط با سرور دانلود"
     }
 
     /**
@@ -163,12 +137,12 @@ object AppUpdateManager {
         val currentVersion = getInstalledVersionName(context)
 
         // 1. Try fetching full releases list to aggregate all changelogs from current to latest
-        var updateInfo = fetchFromReleasesList(context, currentVersion)
+        var updateInfo = fetchFromReleasesList(currentVersion)
 
         // 2. Fallback to latest release endpoint if full list fails
         if (updateInfo == null) {
             Log.d(TAG, "Releases list fetch failed, falling back to latest release endpoint")
-            updateInfo = fetchFromLatestEndpoint(context, currentVersion)
+            updateInfo = fetchFromLatestEndpoint(currentVersion)
         }
 
         if (updateInfo != null) {
@@ -184,11 +158,11 @@ object AppUpdateManager {
     /**
      * Fetches all releases to skip intermediate versions and aggregate full changelogs.
      */
-    private fun fetchFromReleasesList(context: Context, currentVersion: String): UpdateInfo? {
+    private fun fetchFromReleasesList(currentVersion: String, useFallbackSsl: Boolean = false): UpdateInfo? {
         var connection: HttpURLConnection? = null
         try {
             val url = URL(GITHUB_RELEASES_URL)
-            connection = openGitHubConnection(context, url).apply {
+            connection = openGitHubConnection(url, useFallbackSsl).apply {
                 requestMethod = "GET"
                 connectTimeout = 10000
                 readTimeout = 10000
@@ -288,6 +262,14 @@ object AppUpdateManager {
                 downloadUrl = downloadUrl,
                 apkName = apkName
             )
+        } catch (e: SSLException) {
+            connection?.disconnect()
+            if (!useFallbackSsl) {
+                Log.w(TAG, "SSL error in fetchFromReleasesList, retrying with fallback SSL: ${e.message}")
+                return fetchFromReleasesList(currentVersion, useFallbackSsl = true)
+            }
+            Log.e(TAG, "Error in fetchFromReleasesList: ${e.message}", e)
+            return null
         } catch (e: Exception) {
             Log.e(TAG, "Error in fetchFromReleasesList: ${e.message}", e)
             return null
@@ -299,11 +281,11 @@ object AppUpdateManager {
     /**
      * Fallback to GitHub latest release endpoint if listing fails.
      */
-    private fun fetchFromLatestEndpoint(context: Context, currentVersion: String): UpdateInfo? {
+    private fun fetchFromLatestEndpoint(currentVersion: String, useFallbackSsl: Boolean = false): UpdateInfo? {
         var connection: HttpURLConnection? = null
         try {
             val url = URL(GITHUB_LATEST_RELEASE_URL)
-            connection = openGitHubConnection(context, url).apply {
+            connection = openGitHubConnection(url, useFallbackSsl).apply {
                 requestMethod = "GET"
                 connectTimeout = 10000
                 readTimeout = 10000
@@ -351,6 +333,14 @@ object AppUpdateManager {
                 downloadUrl = downloadUrl,
                 apkName = apkName
             )
+        } catch (e: SSLException) {
+            connection?.disconnect()
+            if (!useFallbackSsl) {
+                Log.w(TAG, "SSL error in fetchFromLatestEndpoint, retrying with fallback SSL: ${e.message}")
+                return fetchFromLatestEndpoint(currentVersion, useFallbackSsl = true)
+            }
+            Log.e(TAG, "Error in fetchFromLatestEndpoint: ${e.message}", e)
+            return null
         } catch (e: Exception) {
             Log.e(TAG, "Error in fetchFromLatestEndpoint: ${e.message}", e)
             return null
@@ -629,8 +619,6 @@ object AppUpdateManager {
             clearPendingUpdateInfo(context)
             clearPendingInstallApk(context)
             cleanupOldUpdateApks(context)
-            // پاک کردن هر دو اعلان آپدیت (یادآور ۱۸:۰۰ و اعلان انتشار نسخه) و لغو آلارم یادآور
-            UpdateReminderReceiver.cancelReminder(context)
         } else {
             cleanupOldUpdateApks(context)
         }
@@ -769,7 +757,8 @@ object AppUpdateManager {
         context: Context,
         downloadUrl: String,
         apkName: String,
-        onProgress: (progress: Float, downloadedBytes: Long, totalBytes: Long) -> Unit
+        onProgress: (progress: Float, downloadedBytes: Long, totalBytes: Long) -> Unit,
+        useFallbackSsl: Boolean = false
     ): Result<File> = withContext(Dispatchers.IO) {
         var connection: HttpURLConnection? = null
         var inputStream: InputStream? = null
@@ -782,15 +771,11 @@ object AppUpdateManager {
             var currentUrl = downloadUrl
             var redirects = 0
             val maxRedirects = 7
-            var reachedContent = false
 
             // Follow HTTP/HTTPS redirects manually so each hop receives headers and SSL config
             while (redirects < maxRedirects) {
                 val url = URL(currentUrl)
-                if (!url.protocol.equals("https", ignoreCase = true)) {
-                    return@withContext Result.failure(Exception("آدرس دانلود ناامن است (فقط HTTPS مجاز است)"))
-                }
-                connection = openGitHubConnection(context, url).apply {
+                connection = openGitHubConnection(url, useFallbackSsl).apply {
                     instanceFollowRedirects = false
                     connectTimeout = 15000
                     readTimeout = 30000
@@ -808,18 +793,13 @@ object AppUpdateManager {
                     currentUrl = URL(url, newUrl).toString()
                     redirects++
                 } else if (status == HttpURLConnection.HTTP_OK) {
-                    reachedContent = true
                     break
                 } else {
                     return@withContext Result.failure(Exception("خطای سرور دانلود: کد $status"))
                 }
             }
-            if (!reachedContent) {
-                return@withContext Result.failure(Exception("تعداد تغییر مسیرهای (Redirect) سرور دانلود بیش از حد مجاز است"))
-            }
 
-            // نکته: getContentLengthLong() از API 24 به بعد وجود دارد و روی اندروید ۶ باعث NoSuchMethodError می‌شود
-            val totalBytes = connection!!.getHeaderField("Content-Length")?.trim()?.toLongOrNull() ?: -1L
+            val totalBytes = connection!!.contentLengthLong
             inputStream = connection.inputStream
             outputStream = FileOutputStream(tempFile)
 
@@ -851,7 +831,7 @@ object AppUpdateManager {
             inputStream.close()
             connection.disconnect()
 
-            if (tempFile.length() < 100_000 || (totalBytes > 0 && tempFile.length() != totalBytes)) {
+            if (tempFile.length() < 100_000) {
                 tempFile.delete()
                 return@withContext Result.failure(Exception("فایل دانلود شده ناقص است"))
             }
@@ -868,9 +848,25 @@ object AppUpdateManager {
             }
 
             Result.success(targetFile)
+        } catch (e: SSLException) {
+            try { inputStream?.close() } catch (_: Exception) {}
+            try { outputStream?.close() } catch (_: Exception) {}
+            connection?.disconnect()
+            if (!useFallbackSsl) {
+                Log.w(TAG, "SSL error in downloadApkWithProgress, retrying with fallback SSL: ${e.message}")
+                return@withContext downloadApkWithProgress(
+                    context = context,
+                    downloadUrl = downloadUrl,
+                    apkName = apkName,
+                    onProgress = onProgress,
+                    useFallbackSsl = true
+                )
+            }
+            Log.e(TAG, "Download SSL failed: ${e.message}", e)
+            Result.failure(e)
         } catch (e: Exception) {
             Log.e(TAG, "Download failed: ${e.message}", e)
-            Result.failure(Exception(friendlyNetworkError(e), e))
+            Result.failure(e)
         } finally {
             try { inputStream?.close() } catch (_: Exception) {}
             try { outputStream?.close() } catch (_: Exception) {}
@@ -910,11 +906,7 @@ object AppUpdateManager {
 
     /**
      * Initiates the download of the APK file using Android's DownloadManager (Alternative/Legacy).
-     *
-     * هشدار: DownloadManager از مخزن گواهی سیستم استفاده می‌کند و گواهی‌های ریشه داخلی ([GitHubTrust]) را
-     * نمی‌شناسد؛ بنابراین روی اندروید ۶ و ۷.۰ دانلود از گیت‌هاب با آن شکست می‌خورد. از [downloadApkWithProgress] استفاده شود.
      */
-    @Deprecated("روی اندرویدهای قدیمی با خطای گواهی شکست می‌خورد؛ از downloadApkWithProgress استفاده کنید")
     fun startDownload(context: Context, downloadUrl: String, apkName: String): Long {
         val targetFile = getUpdateApkFile(context, apkName)
         if (targetFile.exists()) targetFile.delete()
