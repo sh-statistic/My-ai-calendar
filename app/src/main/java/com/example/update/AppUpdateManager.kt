@@ -532,6 +532,62 @@ object AppUpdateManager {
     }
 
     /**
+     * Copies a downloaded update APK into the public Downloads folder under a stable
+     * name, so the file survives an uninstall. This lets the user reinstall the new
+     * edition manually from Downloads when an in-place update is not possible
+     * (for example when the signing key changed). Best effort: failures are logged,
+     * never thrown, and the normal install flow continues either way.
+     */
+    fun copyApkToPublicDownloads(context: Context, apkFile: File): Boolean {
+        val publicName = "MyCalendar-NewVersion.apk"
+        return try {
+            if (!apkFile.exists() || apkFile.length() == 0L) return false
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+                val resolver = context.contentResolver
+                val collection = MediaStore.Downloads.EXTERNAL_CONTENT_URI
+                val projection = arrayOf(MediaStore.Downloads._ID)
+                val selection = "${MediaStore.Downloads.DISPLAY_NAME} = ?"
+                val selectionArgs = arrayOf(publicName)
+                var existingUri: Uri? = null
+                resolver.query(collection, projection, selection, selectionArgs, null)?.use { cursor ->
+                    if (cursor.moveToFirst()) {
+                        val id = cursor.getLong(cursor.getColumnIndexOrThrow(MediaStore.Downloads._ID))
+                        existingUri = android.content.ContentUris.withAppendedId(collection, id)
+                    }
+                }
+                val targetUri = existingUri ?: run {
+                    val values = ContentValues().apply {
+                        put(MediaStore.Downloads.DISPLAY_NAME, publicName)
+                        put(MediaStore.Downloads.MIME_TYPE, "application/vnd.android.package-archive")
+                        put(MediaStore.Downloads.RELATIVE_PATH, Environment.DIRECTORY_DOWNLOADS)
+                    }
+                    resolver.insert(collection, values)
+                }
+                if (targetUri != null) {
+                    resolver.openOutputStream(targetUri, "wt")?.use { out ->
+                        apkFile.inputStream().use { input -> input.copyTo(out) }
+                    } ?: return false
+                    Log.i(TAG, "Update APK copied to public Downloads as $publicName")
+                    true
+                } else {
+                    Log.w(TAG, "Failed to create or resolve MediaStore URI for $publicName")
+                    false
+                }
+            } else {
+                val downloadsDir = Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS)
+                if (!downloadsDir.exists()) downloadsDir.mkdirs()
+                val dest = File(downloadsDir, publicName)
+                apkFile.copyTo(dest, overwrite = true)
+                Log.i(TAG, "Update APK copied to public Downloads as $publicName")
+                true
+            }
+        } catch (e: Exception) {
+            Log.e(TAG, "Error copying update APK to Downloads: ${e.message}", e)
+            false
+        }
+    }
+
+    /**
      * Retrieves the latest non-empty safety backup JSON if available and directly readable.
      */
     fun getLatestSafetyBackup(context: Context): String? {

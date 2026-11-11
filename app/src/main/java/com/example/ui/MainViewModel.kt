@@ -1569,6 +1569,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             val existingApk = AppUpdateManager.getDownloadedApkIfReady(context, updateInfo.apkName)
             if (existingApk != null) {
                 logMessage("فایل نصبی نسخه جدید قبلاً آماده شده است. اجرای نصاب...")
+                AppUpdateManager.copyApkToPublicDownloads(context, existingApk)
                 installDownloadedUpdate(context, existingApk)
                 return@launch
             }
@@ -1591,6 +1592,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
 
                     result.onSuccess { apkFile ->
                         logMessage("دانلود نسخه جدید با موفقیت تکمیل شد.")
+                        AppUpdateManager.copyApkToPublicDownloads(context, apkFile)
                         installDownloadedUpdate(context, apkFile)
                     }.onFailure { error ->
                         val errText = error.message ?: "خطا در برقراری ارتباط با سرور دانلود"
