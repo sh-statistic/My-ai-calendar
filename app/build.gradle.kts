@@ -33,8 +33,12 @@ android {
 
       val envKeystorePath = System.getenv("KEYSTORE_PATH")
       val propKeystorePath = keystoreProps.getProperty("storeFile")
+      // NOTE: java.io.File must be used for the isAbsolute test here.
+      // Gradle's file(...) resolves relative paths against the module dir and
+      // always reports them as absolute, which previously made the decoded
+      // keystore in the project root impossible to find on CI.
       val keyPath: String = if (!envKeystorePath.isNullOrBlank()) {
-        if (file(envKeystorePath).isAbsolute) envKeystorePath else "${rootDir}/$envKeystorePath"
+        if (java.io.File(envKeystorePath).isAbsolute) envKeystorePath else "${rootDir}/$envKeystorePath"
       } else if (!propKeystorePath.isNullOrBlank()) {
         "${rootDir}/$propKeystorePath"
       } else {
@@ -42,17 +46,15 @@ android {
       }
       val keyFile = file(keyPath)
 
+      // No hard-coded passwords and no debug-key fallback: passwords come only
+      // from CI secrets or the local (gitignored) keystore.properties. If the
+      // private key or its passwords are missing, the release build fails
+      // loudly instead of silently signing with the public debug key.
       if (keyFile.exists()) {
         storeFile = keyFile
-        storePassword = System.getenv("STORE_PASSWORD").takeIf { !it.isNullOrBlank() } ?: keystoreProps.getProperty("storePassword") ?: "HamgamReleaseKey2026!"
-        keyAlias = System.getenv("KEY_ALIAS").takeIf { !it.isNullOrBlank() } ?: keystoreProps.getProperty("keyAlias") ?: "upload"
-        keyPassword = System.getenv("KEY_PASSWORD").takeIf { !it.isNullOrBlank() } ?: keystoreProps.getProperty("keyPassword") ?: "HamgamReleaseKey2026!"
-      } else {
-        val debugKey = file("${rootDir}/debug.keystore")
-        storeFile = if (debugKey.exists()) debugKey else null
-        storePassword = "android"
-        keyAlias = "androiddebugkey"
-        keyPassword = "android"
+        storePassword = System.getenv("STORE_PASSWORD").takeIf { !it.isNullOrBlank() } ?: keystoreProps.getProperty("storePassword")
+        keyAlias = System.getenv("KEY_ALIAS").takeIf { !it.isNullOrBlank() } ?: keystoreProps.getProperty("keyAlias")
+        keyPassword = System.getenv("KEY_PASSWORD").takeIf { !it.isNullOrBlank() } ?: keystoreProps.getProperty("keyPassword")
       }
     }
     getByName("debug") {
