@@ -33,12 +33,12 @@ android {
 
       val envKeystorePath = System.getenv("KEYSTORE_PATH")
       val propKeystorePath = keystoreProps.getProperty("storeFile")
-      // NOTE: java.io.File must be used for the isAbsolute test here.
-      // Gradle's file(...) resolves relative paths against the module dir and
-      // always reports them as absolute, which previously made the decoded
-      // keystore in the project root impossible to find on CI.
+      // NOTE: the plain File(...) constructor must be used for the isAbsolute
+      // test here. Gradle's file(...) resolves relative paths against the
+      // module dir and always reports them as absolute, which previously made
+      // the decoded keystore in the project root impossible to find on CI.
       val keyPath: String = if (!envKeystorePath.isNullOrBlank()) {
-        if (java.io.File(envKeystorePath).isAbsolute) envKeystorePath else "${rootDir}/$envKeystorePath"
+        if (File(envKeystorePath).isAbsolute) envKeystorePath else "${rootDir}/$envKeystorePath"
       } else if (!propKeystorePath.isNullOrBlank()) {
         "${rootDir}/$propKeystorePath"
       } else {
