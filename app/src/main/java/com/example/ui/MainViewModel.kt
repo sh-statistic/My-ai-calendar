@@ -1302,7 +1302,15 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         val app = getApplication<Application>()
         val p = app.getSharedPreferences(prefsName, android.content.Context.MODE_PRIVATE)
         val editor = p.edit()
+        // Keys that must stay Long: org.json returns Integer for small numbers,
+        // so a Long such as 0 round-trips as Int and a later getLong() throws
+        // ClassCastException ("Integer cannot be cast to Long").
+        val longKeys = setOf("fajr_alarm_next_timestamp")
         for ((key, value) in map) {
+            if (key in longKeys && value is Number) {
+                editor.putLong(key, value.toLong())
+                continue
+            }
             when (value) {
                 is Boolean -> editor.putBoolean(key, value)
                 is Int -> editor.putInt(key, value)
@@ -1351,6 +1359,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     fun importBackupJson(jsonStr: String, onComplete: (Boolean, String) -> Unit) {
         viewModelScope.launch(Dispatchers.IO) {
             val app = getApplication<Application>()
+            val warnings = mutableListOf<String>()
             try {
                 val rawSyncData = SyncData.fromJsonString(jsonStr)
 
@@ -1361,38 +1370,54 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 // 2. Merge database records
                 repository.mergeSyncData(syncData, "پشتیبان دستی JSON")
 
-                // 3. Restore Memento Mori
-                val restoredMemento = mementoManager.importFromJson(syncData.mementoMoriJson)
-                if (restoredMemento > 0) {
-                    _mementoRevision.value += 1
-                    checkMementoMonthAndYearStatus()
+                // 3. Restore Memento Mori (a failure here must not void the merge above)
+                try {
+                    val restoredMemento = mementoManager.importFromJson(syncData.mementoMoriJson)
+                    if (restoredMemento > 0) {
+                        _mementoRevision.value += 1
+                        checkMementoMonthAndYearStatus()
+                    }
+                } catch (e: Exception) {
+                    warnings.add("memento")
+                    e.printStackTrace()
                 }
 
                 // 4. Restore Custom Occasions
-                if (syncData.customOccasionsData != null || syncData.customOccasionsHiddenData != null) {
-                    PersianOccasionsHelper.importCustomOccasionsRaw(
-                        app,
-                        syncData.customOccasionsData,
-                        syncData.customOccasionsHiddenData
-                    )
-                    withContext(Dispatchers.Main) {
-                        refreshOccasions()
+                try {
+                    if (syncData.customOccasionsData != null || syncData.customOccasionsHiddenData != null) {
+                        PersianOccasionsHelper.importCustomOccasionsRaw(
+                            app,
+                            syncData.customOccasionsData,
+                            syncData.customOccasionsHiddenData
+                        )
+                        withContext(Dispatchers.Main) {
+                            refreshOccasions()
+                        }
                     }
+                } catch (e: Exception) {
+                    warnings.add("occasions")
+                    e.printStackTrace()
                 }
 
-                // 5. Restore Preferences
-                restorePreferencesMap("hamgam_app_preferences", syncData.appPreferences)
-                restorePreferencesMap("hamgam_prayer_prefs", syncData.prayerPreferences)
-                restorePreferencesMap("hijri_offset_prefs", syncData.hijriOffsetPreferences)
+                // 5. Restore Preferences + re-init (a prefs failure must never
+                // report the whole backup "invalid" once the data is merged)
+                try {
+                    restorePreferencesMap("hamgam_app_preferences", syncData.appPreferences)
+                    restorePreferencesMap("hamgam_prayer_prefs", syncData.prayerPreferences)
+                    restorePreferencesMap("hijri_offset_prefs", syncData.hijriOffsetPreferences)
 
-                // Re-initialize managers / state affected by restored preferences
-                com.example.calendar.HijriOffsetManager.init(app)
-                val updatedPrayerSettings = com.example.prayer.FajrAlarmManager.getSettings(app)
-                _fajrAlarmSettings.value = updatedPrayerSettings
-                _selectedCity.value = com.example.prayer.PrayerTimesCalculator.getCityByName(updatedPrayerSettings.cityName)
-                _appLanguage.value = com.example.settings.AppPreferences.getAppLanguage(app)
-                _isDarkMode.value = com.example.settings.AppPreferences.isDarkMode(app)
-                _calendarViewMode.value = if (com.example.settings.AppPreferences.getCalendarViewMode(app) == "WEEK") CalendarViewMode.WEEK else CalendarViewMode.MONTH
+                    // Re-initialize managers / state affected by restored preferences
+                    com.example.calendar.HijriOffsetManager.init(app)
+                    val updatedPrayerSettings = com.example.prayer.FajrAlarmManager.getSettings(app)
+                    _fajrAlarmSettings.value = updatedPrayerSettings
+                    _selectedCity.value = com.example.prayer.PrayerTimesCalculator.getCityByName(updatedPrayerSettings.cityName)
+                    _appLanguage.value = com.example.settings.AppPreferences.getAppLanguage(app)
+                    _isDarkMode.value = com.example.settings.AppPreferences.isDarkMode(app)
+                    _calendarViewMode.value = if (com.example.settings.AppPreferences.getCalendarViewMode(app) == "WEEK") CalendarViewMode.WEEK else CalendarViewMode.MONTH
+                } catch (e: Exception) {
+                    warnings.add("preferences")
+                    e.printStackTrace()
+                }
 
                 withContext(Dispatchers.Main) {
                     refreshPrayerTimes()
@@ -1401,7 +1426,12 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
 
                 logMessage("بازیابی موفقیت‌آمیز فایل پشتیبان (${syncData.events.size} رویداد، ${syncData.tasks.size} کار، ${syncData.notes.size} یادداشت)")
                 withContext(Dispatchers.Main) {
-                    onComplete(true, "داده‌ها با موفقیت بازیابی شدند")
+                    val message = if (warnings.isEmpty()) {
+                        "داده‌ها با موفقیت بازیابی شدند"
+                    } else {
+                        "داده‌ها بازیابی شدند، ولی این بخش‌ها کامل برنگشت: ${warnings.joinToString("، ")}"
+                    }
+                    onComplete(true, message)
                 }
             } catch (e: Exception) {
                 logMessage("خطا در پردازش فایل پشتیبان: ${e.localizedMessage}")
