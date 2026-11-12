@@ -541,6 +541,66 @@ object AppUpdateManager {
         }
     }
 
+    private val safetyBackupFileNameRegex = Regex("""^MyCalendar_SafetyBackup( \(\d+\))?\.json$""")
+
+    /**
+     * Finds every public Downloads safety backup candidate, newest first. Besides the exact
+     * name (MyCalendar_SafetyBackup.json), repeated saves through the system file picker
+     * create numbered variants (MyCalendar_SafetyBackup (1).json, ...) which must be
+     * detected as well. Each entry is a Uri (API 29+, via MediaStore) or a File (legacy).
+     */
+    private fun findPublicSafetyBackupCandidates(context: Context): List<Pair<Uri?, File?>> {
+        val found = mutableListOf<Triple<Long, Uri?, File?>>()
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+            try {
+                val collection = MediaStore.Downloads.EXTERNAL_CONTENT_URI
+                val projection = arrayOf(
+                    MediaStore.Downloads._ID,
+                    MediaStore.Downloads.DISPLAY_NAME,
+                    MediaStore.Downloads.DATE_MODIFIED
+                )
+                val selection = "${MediaStore.Downloads.DISPLAY_NAME} LIKE ?"
+                val selectionArgs = arrayOf("MyCalendar_SafetyBackup%")
+                context.contentResolver.query(
+                    collection, projection, selection, selectionArgs,
+                    "${MediaStore.Downloads.DATE_MODIFIED} DESC"
+                )?.use { cursor ->
+                    val idIdx = cursor.getColumnIndexOrThrow(MediaStore.Downloads._ID)
+                    val nameIdx = cursor.getColumnIndexOrThrow(MediaStore.Downloads.DISPLAY_NAME)
+                    val modIdx = cursor.getColumnIndexOrThrow(MediaStore.Downloads.DATE_MODIFIED)
+                    while (cursor.moveToNext()) {
+                        val name = cursor.getString(nameIdx) ?: continue
+                        if (!safetyBackupFileNameRegex.matches(name)) continue
+                        val uri = android.content.ContentUris.withAppendedId(collection, cursor.getLong(idIdx))
+                        found.add(Triple(cursor.getLong(modIdx), uri, null))
+                    }
+                }
+            } catch (e: Exception) {
+                Log.w(TAG, "MediaStore safety backup scan failed: ${e.message}")
+            }
+        }
+        try {
+            val downloadsDir = Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS)
+            downloadsDir.listFiles()?.forEach { f ->
+                if (f.isFile && safetyBackupFileNameRegex.matches(f.name)) {
+                    found.add(Triple(f.lastModified() / 1000, null, f))
+                }
+            }
+        } catch (_: Exception) { }
+        return found.sortedByDescending { it.first }.map { it.second to it.third }
+    }
+
+    private fun readPublicSafetyBackupCandidate(context: Context, candidate: Pair<Uri?, File?>): String? {
+        val (uri, file) = candidate
+        return try {
+            when {
+                uri != null -> context.contentResolver.openInputStream(uri)?.use { it.readBytes().toString(Charsets.UTF_8) }
+                file != null -> file.readText()
+                else -> null
+            }
+        } catch (_: Exception) { null }
+    }
+
     /**
      * Retrieves the latest non-empty safety backup JSON if available and directly readable.
      */
@@ -556,9 +616,8 @@ object AppUpdateManager {
             if (hasMeaningfulBackupContent(extText)) return extText
         }
 
-        val publicFile = File(Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS), "MyCalendar_SafetyBackup.json")
-        if (publicFile.exists() && publicFile.length() > 0) {
-            val pubText = try { publicFile.readText() } catch (_: Exception) { null }
+        for (candidate in findPublicSafetyBackupCandidates(context)) {
+            val pubText = readPublicSafetyBackupCandidate(context, candidate)
             if (hasMeaningfulBackupContent(pubText)) return pubText
         }
 
@@ -566,19 +625,15 @@ object AppUpdateManager {
     }
 
     /**
-     * بررسی می‌کند آیا فایل پشتیبان MyCalendar_SafetyBackup.json در پوشه Downloads وجود دارد،
+     * بررسی می‌کند آیا فایل پشتیبان MyCalendar_SafetyBackup.json (یا نسخه‌های شماره‌دار آن) در پوشه Downloads وجود دارد،
      * اما به دلیل محدودیت امنیتی اندروید ۱۰+ (Scoped Storage پس از حذف و نصب مجدد برنامه)
      * نیاز است که کاربر آن را از طریق فایل‌پیکر انتخاب کند.
      */
     fun hasUnreadablePublicSafetyBackup(context: Context): Boolean {
         return try {
-            val publicFile = File(
-                Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS),
-                "MyCalendar_SafetyBackup.json"
-            )
-            if (!publicFile.exists()) return false
-            val directRead = try { publicFile.readText() } catch (_: Exception) { null }
-            directRead.isNullOrBlank()
+            val candidates = findPublicSafetyBackupCandidates(context)
+            if (candidates.isEmpty()) return false
+            candidates.none { !readPublicSafetyBackupCandidate(context, it).isNullOrBlank() }
         } catch (_: Exception) {
             false
         }

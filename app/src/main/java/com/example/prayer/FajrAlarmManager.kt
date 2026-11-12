@@ -31,7 +31,10 @@ object FajrAlarmManager {
             isEnabled = prefs.getBoolean(KEY_ENABLED, false),
             cityName = prefs.getString(KEY_CITY, "تهران") ?: "تهران",
             offsetMinutesBefore = prefs.getInt(KEY_OFFSET, 5),
-            nextAlarmTimestamp = prefs.getLong(KEY_NEXT_TIMESTAMP, 0L)
+            // A backup restore can store this Long as an Int (JSON drops the
+            // type for small numbers); getLong() would then throw
+            // ClassCastException on every launch. Read it leniently instead.
+            nextAlarmTimestamp = (prefs.all[KEY_NEXT_TIMESTAMP] as? Number)?.toLong() ?: 0L
         )
     }
 
