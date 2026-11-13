@@ -1436,8 +1436,9 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             val app = getApplication<Application>()
             val baseSyncData = repository.getFullSyncData("Android-Backup")
 
-            // 1. Drawing Base64 for whiteboard notes
+            // 1. Drawing Base64 for whiteboard notes (+ فایل خط‌های نقاشی کنارش تا بعد از ریکاوری قابل ویرایش بماند)
             val drawingsMap = mutableMapOf<String, String>()
+            val drawingSidecarsMap = mutableMapOf<String, String>()
             for (note in baseSyncData.notes) {
                 if (!note.drawingPath.isNullOrBlank()) {
                     try {
@@ -1446,6 +1447,10 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                             val bytes = file.readBytes()
                             val b64 = android.util.Base64.encodeToString(bytes, android.util.Base64.NO_WRAP)
                             drawingsMap[note.id] = b64
+                            val jsonFile = File(note.drawingPath.replace(".png", ".json"))
+                            if (jsonFile.exists() && jsonFile.isFile) {
+                                drawingSidecarsMap[note.id] = jsonFile.readText()
+                            }
                         }
                     } catch (e: Exception) {
                         e.printStackTrace()
@@ -1485,6 +1490,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             val blockImagesMap = mutableMapOf<String, MutableMap<String, String>>()
             val blockDrawingsMap = mutableMapOf<String, MutableMap<String, String>>()
             val blockAudiosMap = mutableMapOf<String, MutableMap<String, String>>()
+            val blockDrawingSidecarsMap = mutableMapOf<String, MutableMap<String, String>>()
             for (note in baseSyncData.notes) {
                 for (media in com.example.data.extractNoteBlockMedia(note.blocksJson)) {
                     val mediaPath = media.path ?: continue
@@ -1498,6 +1504,13 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                                 else -> blockDrawingsMap
                             }
                             target.getOrPut(note.id) { mutableMapOf() }[mediaPath] = b64
+                            if (media.kind == "d") {
+                                val jsonFile = File(mediaPath.replace(".png", ".json"))
+                                if (jsonFile.exists() && jsonFile.isFile) {
+                                    blockDrawingSidecarsMap.getOrPut(note.id) { mutableMapOf() }[mediaPath] =
+                                        jsonFile.readText()
+                                }
+                            }
                         }
                     } catch (e: Exception) {
                         e.printStackTrace()
@@ -1527,6 +1540,8 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 noteBlockImagesBase64 = if (blockImagesMap.isNotEmpty()) blockImagesMap else null,
                 noteBlockDrawingsBase64 = if (blockDrawingsMap.isNotEmpty()) blockDrawingsMap else null,
                 noteBlockAudiosBase64 = if (blockAudiosMap.isNotEmpty()) blockAudiosMap else null,
+                noteDrawingSidecars = if (drawingSidecarsMap.isNotEmpty()) drawingSidecarsMap else null,
+                noteBlockDrawingSidecars = if (blockDrawingSidecarsMap.isNotEmpty()) blockDrawingSidecarsMap else null,
                 customOccasionsData = occData,
                 customOccasionsHiddenData = occHiddenData,
                 appPreferences = if (appPrefsMap.isNotEmpty()) appPrefsMap else null,
@@ -1589,6 +1604,14 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                         File(drawingsDir, "drawing_${note.id}.png")
                     }
                     targetFile.writeBytes(bytes)
+                    // فایل خط‌های نقاشی هم کنارش برمی‌گردد تا طرح دوباره قابل ویرایش باشد
+                    val sidecarText = syncData.noteDrawingSidecars?.get(note.id)
+                    if (!sidecarText.isNullOrBlank()) {
+                        try {
+                            File(targetFile.absolutePath.replace(".png", ".json")).writeText(sidecarText)
+                        } catch (_: Exception) {
+                        }
+                    }
                     note.copy(drawingPath = targetFile.absolutePath)
                 } catch (e: Exception) {
                     e.printStackTrace()
@@ -1681,6 +1704,15 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                         File(drawingsDir, "drawing_${note.id}_$idx.png")
                     }
                     targetFile.writeBytes(bytes)
+                    if (block.kind == "d") {
+                        val sidecarText = syncData.noteBlockDrawingSidecars?.get(note.id)?.get(path)
+                        if (!sidecarText.isNullOrBlank()) {
+                            try {
+                                File(targetFile.absolutePath.replace(".png", ".json")).writeText(sidecarText)
+                            } catch (_: Exception) {
+                            }
+                        }
+                    }
                     changed = true
                     block.copy(path = targetFile.absolutePath)
                 } catch (e: Exception) {
@@ -1837,6 +1869,16 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                         val notesWithBlocks = restoreBlockFiles(rawSyncData.copy(notes = notesWithAttachments))
                         val syncData = rawSyncData.copy(notes = notesWithBlocks)
                         repository.mergeSyncData(syncData, "پشتیبان اضطراری خودکار")
+                        // یادآورهای برگشته با بکاپ اضطراری هم دوباره فعال می‌شوند (مثل وارد کردن دستی)
+                        try {
+                            for (note in syncData.notes) {
+                                if (note.reminderAt > System.currentTimeMillis() && !note.isDeleted && !note.isArchived) {
+                                    com.example.alarm.NoteReminderScheduler.scheduleNoteReminder(app, note)
+                                }
+                            }
+                        } catch (e: Exception) {
+                            e.printStackTrace()
+                        }
                         val restoredMemento = mementoManager.importFromJson(syncData.mementoMoriJson)
                         if (restoredMemento > 0) {
                             _mementoRevision.value += 1

@@ -19,6 +19,8 @@ data class SyncData(
     val noteBlockImagesBase64: Map<String, Map<String, String>>? = null, // key: note id, then file path, value: base64
     val noteBlockDrawingsBase64: Map<String, Map<String, String>>? = null, // key: note id, then file path, value: base64
     val noteBlockAudiosBase64: Map<String, Map<String, String>>? = null, // key: note id, then file path, value: base64
+    val noteDrawingSidecars: Map<String, String>? = null, // key: note id, value: whiteboard strokes JSON text
+    val noteBlockDrawingSidecars: Map<String, Map<String, String>>? = null, // key: note id, then file path, value: strokes JSON text
     val customOccasionsData: String? = null,
     val customOccasionsHiddenData: String? = null,
     val appPreferences: Map<String, Any?>? = null,
@@ -113,6 +115,14 @@ data class SyncData(
             if (!blockAudios.isNullOrEmpty()) {
                 obj.put("blockAudios", JSONObject(blockAudios as Map<*, *>))
             }
+            val drawingSidecar = noteDrawingSidecars?.get(n.id)
+            if (!drawingSidecar.isNullOrBlank()) {
+                obj.put("drawingSidecar", drawingSidecar)
+            }
+            val blockDrawingSidecars = noteBlockDrawingSidecars?.get(n.id)
+            if (!blockDrawingSidecars.isNullOrEmpty()) {
+                obj.put("blockDrawingSidecars", JSONObject(blockDrawingSidecars as Map<*, *>))
+            }
             obj.put("reminderAt", n.reminderAt)
             obj.put("isArchived", n.isArchived)
             obj.put("deletedAt", n.deletedAt)
@@ -206,6 +216,8 @@ data class SyncData(
             val blockImagesMap = mutableMapOf<String, Map<String, String>>()
             val blockDrawingsMap = mutableMapOf<String, Map<String, String>>()
             val blockAudiosMap = mutableMapOf<String, Map<String, String>>()
+            val drawingSidecarsMap = mutableMapOf<String, String>()
+            val blockDrawingSidecarsMap = mutableMapOf<String, Map<String, String>>()
 
             fun readPathMap(obj: JSONObject, key: String): Map<String, String>? {
                 val sub = obj.optJSONObject(key) ?: return null
@@ -238,6 +250,10 @@ data class SyncData(
                     readPathMap(obj, "blockImages")?.let { blockImagesMap[noteId] = it }
                     readPathMap(obj, "blockDrawings")?.let { blockDrawingsMap[noteId] = it }
                     readPathMap(obj, "blockAudios")?.let { blockAudiosMap[noteId] = it }
+                    if (!obj.isNull("drawingSidecar")) {
+                        drawingSidecarsMap[noteId] = obj.optString("drawingSidecar")
+                    }
+                    readPathMap(obj, "blockDrawingSidecars")?.let { blockDrawingSidecarsMap[noteId] = it }
                     notes.add(
                         NoteEntity(
                             id = noteId,
@@ -300,6 +316,8 @@ data class SyncData(
                 noteBlockImagesBase64 = if (blockImagesMap.isNotEmpty()) blockImagesMap else null,
                 noteBlockDrawingsBase64 = if (blockDrawingsMap.isNotEmpty()) blockDrawingsMap else null,
                 noteBlockAudiosBase64 = if (blockAudiosMap.isNotEmpty()) blockAudiosMap else null,
+                noteDrawingSidecars = if (drawingSidecarsMap.isNotEmpty()) drawingSidecarsMap else null,
+                noteBlockDrawingSidecars = if (blockDrawingSidecarsMap.isNotEmpty()) blockDrawingSidecarsMap else null,
                 customOccasionsData = customOccasionsData,
                 customOccasionsHiddenData = customOccasionsHiddenData,
                 appPreferences = appPreferences,

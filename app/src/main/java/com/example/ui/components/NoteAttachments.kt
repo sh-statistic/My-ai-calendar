@@ -13,7 +13,9 @@ import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.defaultMinSize
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -32,6 +34,15 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.foundation.gestures.awaitEachGesture
+import androidx.compose.foundation.gestures.awaitFirstDown
+import androidx.compose.foundation.layout.offset
+import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.input.pointer.positionChange
+import androidx.compose.ui.layout.onSizeChanged
+import androidx.compose.ui.unit.IntOffset
+import androidx.compose.ui.unit.IntSize
+import kotlin.math.roundToInt
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Close
@@ -62,6 +73,8 @@ import androidx.compose.runtime.snapshots.SnapshotStateList
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.graphics.asImageBitmap
@@ -365,7 +378,8 @@ private fun NoteTextBlock(
     isFa: Boolean,
     showPlaceholder: Boolean,
     onChanged: () -> Unit,
-    onFocused: (String) -> Unit
+    onFocused: (String) -> Unit,
+    focusRequester: FocusRequester? = null
 ) {
     val bringIntoViewRequester = remember { BringIntoViewRequester() }
     var layoutResult by remember { mutableStateOf<TextLayoutResult?>(null) }
@@ -394,6 +408,8 @@ private fun NoteTextBlock(
         onTextLayout = { layoutResult = it },
         modifier = Modifier
             .fillMaxWidth()
+            .defaultMinSize(minHeight = 36.dp)
+            .then(if (focusRequester != null) Modifier.focusRequester(focusRequester) else Modifier)
             .bringIntoViewRequester(bringIntoViewRequester)
             .onFocusChanged { state ->
                 focused = state.isFocused
@@ -437,30 +453,77 @@ private fun NoteMediaBlock(
     }
     Box(modifier = Modifier.fillMaxWidth()) {
         if (bitmap != null) {
-            val ratio = (bitmap.width.toFloat() / bitmap.height.coerceAtLeast(1)).coerceIn(0.55f, 2.4f)
-            Image(
-                bitmap = bitmap,
-                contentDescription = if (isDrawing) {
-                    if (isFa) "طرح نقاشی" else "Drawing"
-                } else {
-                    if (isFa) "عکس" else "Photo"
-                },
-                contentScale = ContentScale.Crop,
+            // قاب جمع‌وجور داخل یادداشت ترکیبی: طرح با قد کامل باز نمی‌شود؛ با کشیدنِ دو انگشت
+            // داخل قاب می‌شود بقیه‌اش را دید، و کشیدنِ یک انگشت اسکرول خودِ یادداشت می‌ماند تا تداخل نشود
+            val trueRatio = bitmap.width.toFloat() / bitmap.height.coerceAtLeast(1)
+            val frameRatio = trueRatio.coerceIn(0.55f, 2.4f)
+            var frameSize by remember(block.path) { mutableStateOf(IntSize.Zero) }
+            var panY by remember(block.path) { mutableStateOf(0f) }
+            val maxPan = if (frameSize.width > 0 && trueRatio > 0f) {
+                (frameSize.width / trueRatio - frameSize.height).coerceAtLeast(0f)
+            } else {
+                0f
+            }
+            LaunchedEffect(maxPan) {
+                panY = panY.coerceIn(0f, maxPan)
+            }
+            Box(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .aspectRatio(ratio)
+                    .aspectRatio(frameRatio)
                     .heightIn(max = 430.dp)
                     .clip(RoundedCornerShape(14.dp))
+                    .onSizeChanged { frameSize = it }
                     .then(
                         if (isDrawing) {
-                            Modifier
-                                .border(1.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.35f), RoundedCornerShape(14.dp))
-                                .clickable { onOpenDrawing(block) }
+                            Modifier.border(1.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.35f), RoundedCornerShape(14.dp))
                         } else {
                             Modifier
                         }
                     )
-            )
+                    .pointerInput(block.path, maxPan) {
+                        if (maxPan <= 0f) return@pointerInput
+                        awaitEachGesture {
+                            awaitFirstDown(requireUnconsumed = false)
+                            var twoFinger = false
+                            while (true) {
+                                val event = awaitPointerEvent()
+                                val pressed = event.changes.filter { change -> change.pressed }
+                                if (pressed.size >= 2) {
+                                    twoFinger = true
+                                }
+                                if (twoFinger && pressed.isNotEmpty()) {
+                                    val dy = pressed.sumOf { change -> change.positionChange().y.toDouble() }.toFloat() / pressed.size
+                                    panY = (panY - dy).coerceIn(0f, maxPan)
+                                    event.changes.forEach { change -> change.consume() }
+                                }
+                                if (event.changes.all { change -> !change.pressed }) break
+                            }
+                        }
+                    }
+                    .then(
+                        if (isDrawing) {
+                            Modifier.clickable { onOpenDrawing(block) }
+                        } else {
+                            // ضربه روی عکس فقط مصرف می‌شود تا صفحه‌کلید الکی باز نشود
+                            Modifier.clickable { }
+                        }
+                    )
+            ) {
+                Image(
+                    bitmap = bitmap,
+                    contentDescription = if (isDrawing) {
+                        if (isFa) "طرح نقاشی" else "Drawing"
+                    } else {
+                        if (isFa) "عکس" else "Photo"
+                    },
+                    contentScale = ContentScale.FillWidth,
+                    alignment = Alignment.TopCenter,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .offset { IntOffset(0, -panY.roundToInt()) }
+                )
+            }
         } else {
             Box(
                 modifier = Modifier
@@ -531,11 +594,39 @@ fun NoteBlocksEditor(
     onOpenDrawing: (NoteBlockState) -> Unit,
     modifier: Modifier = Modifier
 ) {
-    val textBlockCount = blocks.count { it.kind == "t" }
+    val lastTextBlockId = blocks.lastOrNull { it.kind == "t" }?.id
+    val lastTextFocusRequester = remember { FocusRequester() }
+    var wantFocusLastText by remember { mutableStateOf(false) }
+    LaunchedEffect(blocks.size, wantFocusLastText) {
+        if (wantFocusLastText) {
+            wantFocusLastText = false
+            try {
+                lastTextFocusRequester.requestFocus()
+            } catch (_: Exception) {
+            }
+        }
+    }
+    // ضربه روی فضای خالیِ زیر بلوک‌ها = رفتن به حالت نوشتن در آخرین بلوک متن (یا ساختنش)
+    val focusWritingArea: () -> Unit = {
+        if (blocks.lastOrNull()?.kind == "t") {
+            try {
+                lastTextFocusRequester.requestFocus()
+            } catch (_: Exception) {
+            }
+        } else {
+            blocks.add(NoteBlockState(kind = "t"))
+            onChanged()
+            wantFocusLastText = true
+        }
+    }
     Column(
         modifier = modifier
             .fillMaxWidth()
-            .verticalScroll(rememberScrollState()),
+            .verticalScroll(rememberScrollState())
+            .clickable(
+                interactionSource = remember { MutableInteractionSource() },
+                indication = null
+            ) { focusWritingArea() },
         verticalArrangement = Arrangement.spacedBy(10.dp)
     ) {
         blocks.forEach { block ->
@@ -544,9 +635,10 @@ fun NoteBlocksEditor(
                     "t" -> NoteTextBlock(
                         block = block,
                         isFa = isFa,
-                        showPlaceholder = textBlockCount == 1,
+                        showPlaceholder = block.id == lastTextBlockId,
                         onChanged = onChanged,
-                        onFocused = onFocusedTextBlock
+                        onFocused = onFocusedTextBlock,
+                        focusRequester = if (block.id == lastTextBlockId) lastTextFocusRequester else null
                     )
                     "c" -> Column(modifier = Modifier.fillMaxWidth()) {
                         ChecklistEditorSection(
@@ -607,7 +699,16 @@ fun NoteBlocksEditor(
                 }
             }
         }
-        Spacer(modifier = Modifier.height(24.dp))
+        // فضای خالی پایانی: هم جای اسکرول بالای صفحه‌کلید، هم ناحیهٔ ضربه برای ادامهٔ نوشتن
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(120.dp)
+                .clickable(
+                    interactionSource = remember { MutableInteractionSource() },
+                    indication = null
+                ) { focusWritingArea() }
+        )
     }
 }
 
