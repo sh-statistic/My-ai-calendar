@@ -865,10 +865,21 @@ private fun saveStrokes(
     if (strokes.isEmpty() && legacyBitmap == null) return null
 
     return try {
+        // طرح قدیمی ممکن است حاشیه‌های شفافِ خالی داشته باشد؛ فقط بخشِ دارای محتوایش در قابِ فایل تازه حساب می‌شود
+        val legacyBounds = legacyBitmap?.let { nonTransparentBounds(it) }
         var minX = 0f
         var minY = 0f
-        var maxX = (legacyBitmap?.width?.toFloat() ?: 0f)
-        var maxY = (legacyBitmap?.height?.toFloat() ?: 0f)
+        var maxX = 0f
+        var maxY = 0f
+        if (legacyBounds != null) {
+            minX = legacyBounds.left.toFloat()
+            minY = legacyBounds.top.toFloat()
+            maxX = legacyBounds.right.toFloat()
+            maxY = legacyBounds.bottom.toFloat()
+        } else if (legacyBitmap != null) {
+            maxX = legacyBitmap.width.toFloat()
+            maxY = legacyBitmap.height.toFloat()
+        }
 
         if (strokes.isNotEmpty()) {
             var sMinX = Float.MAX_VALUE
@@ -885,8 +896,8 @@ private fun saveStrokes(
                 }
             }
 
-            minX = if (legacyBitmap != null) minOf(0f, sMinX) else sMinX
-            minY = if (legacyBitmap != null) minOf(0f, sMinY) else sMinY
+            minX = if (legacyBitmap != null) minOf(minX, sMinX) else sMinX
+            minY = if (legacyBitmap != null) minOf(minY, sMinY) else sMinY
             maxX = maxOf(maxX, sMaxX)
             maxY = maxOf(maxY, sMaxY)
         }
