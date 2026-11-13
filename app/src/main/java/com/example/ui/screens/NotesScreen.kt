@@ -110,12 +110,11 @@ import androidx.compose.ui.unit.sp
 import com.example.data.NoteEntity
 import com.example.sync.NoteShareHelper
 import com.example.ui.MainViewModel
+import com.example.ui.NoteEditorRequest
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.TextButton
-import com.example.ui.components.AddNoteDialog
 import com.example.ui.components.AddToCalendarFromNoteDialog
 import com.example.ui.components.ChecklistPreview
-import com.example.ui.components.EditNoteDialog
 import com.example.ui.components.WhiteboardDrawingDialog
 import com.example.ui.components.parseColor
 import com.example.ui.rememberAppStrings
@@ -139,10 +138,7 @@ fun NotesScreen(
         label = "fab_rotation"
     )
 
-    var showAddNoteDialog by remember { mutableStateOf(false) }
     var showWhiteboardDialog by remember { mutableStateOf(false) }
-    // قبلاً ضربه روی کارتِ دارای نقاشی مستقیم وایت‌بورد را باز می‌کرد؛ حالا نقاشی داخل ویرایشگر است
-    var noteToEdit by remember { mutableStateOf<NoteEntity?>(null) }
     var noteToAddToCalendar by remember { mutableStateOf<NoteEntity?>(null) }
     var selectionMode by remember { mutableStateOf(false) }
     var selectedNoteIds by remember { mutableStateOf<Set<String>>(emptySet()) }
@@ -171,7 +167,7 @@ fun NotesScreen(
         val id = openNoteRequest ?: return@LaunchedEffect
         val target = notes.find { it.id == id } ?: archivedNotes.find { it.id == id }
         if (target != null) {
-            noteToEdit = target
+            viewModel.openNoteEditor(NoteEditorRequest.Edit(target.id))
             viewModel.consumeOpenNoteRequest()
         }
     }
@@ -180,13 +176,6 @@ fun NotesScreen(
         1 -> archivedNotes
         2 -> trashedNotes
         else -> notes
-    }
-
-    // استخراج تمام تگ‌های یکتای موجود در یادداشت‌ها برای پیشنهاد داینامیک
-    val allExistingTags = remember(notes) {
-        notes.flatMap { it.tag.split(",").map { t -> t.trim() } }
-            .filter { it.isNotBlank() }
-            .distinct()
     }
 
     val filteredNotes = if (searchQuery.isBlank()) {
@@ -444,7 +433,7 @@ fun NotesScreen(
                                     // یادداشت‌های سطل زباله باز نمی‌شوند؛ از منوی کارت برگردان یا دائمی پاک کن
                                 } else {
                                     // همیشه ویرایشگر باز می‌شود؛ نقاشی هم داخل خود یادداشت است
-                                    noteToEdit = note
+                                    viewModel.openNoteEditor(NoteEditorRequest.Edit(note.id))
                                 }
                             },
                             onLongClick = {
@@ -553,7 +542,7 @@ fun NotesScreen(
                     Surface(
                         onClick = {
                             isFabExpanded = false
-                            showAddNoteDialog = true
+                            viewModel.openNoteEditor(NoteEditorRequest.Add)
                         },
                         shape = RoundedCornerShape(16.dp),
                         color = MaterialTheme.colorScheme.surface,
@@ -664,24 +653,6 @@ fun NotesScreen(
         )
     }
 
-    if (showAddNoteDialog) {
-        AddNoteDialog(
-            onDismiss = {
-                showAddNoteDialog = false
-            },
-            onConfirm = { title, content, colorHex, tag, isPinned, imagePath, checklistJson, audioPath, reminderAt, blocksJson ->
-                viewModel.addNote(
-                    title, content, colorHex,
-                    isPinned = isPinned, tag = tag, imagePath = imagePath,
-                    checklistJson = checklistJson, audioPath = audioPath, reminderAt = reminderAt,
-                    blocksJson = blocksJson
-                )
-                showAddNoteDialog = false
-            },
-            existingTags = allExistingTags
-        )
-    }
-
     if (showWhiteboardDialog) {
         WhiteboardDrawingDialog(
             onDismiss = { showWhiteboardDialog = false },
@@ -696,51 +667,6 @@ fun NotesScreen(
                 showWhiteboardDialog = false
                 Toast.makeText(context, if (strings.isFa) "طرح وایت‌برد با موفقیت ذخیره شد ✓" else "Drawing saved ✓", Toast.LENGTH_SHORT).show()
             }
-        )
-    }
-
-    noteToEdit?.let { note ->
-        EditNoteDialog(
-            initialNote = note,
-            onDismiss = { noteToEdit = null },
-            onConfirm = { title, content, colorHex, isPinned, drawingPath, tag, imagePath, checklistJson, audioPath, reminderAt, blocksJson ->
-                viewModel.updateNote(
-                    note.copy(
-                        title = title,
-                        content = content,
-                        colorHex = colorHex,
-                        isPinned = isPinned,
-                        drawingPath = drawingPath,
-                        tag = tag,
-                        imagePath = imagePath,
-                        checklistJson = checklistJson,
-                        audioPath = audioPath,
-                        reminderAt = reminderAt,
-                        blocksJson = blocksJson,
-                        updatedAt = System.currentTimeMillis()
-                    )
-                )
-                noteToEdit = null
-            },
-            onAutosave = { title, content, colorHex, isPinned, drawingPath, tag, imagePath, checklistJson, audioPath, reminderAt, blocksJson ->
-                viewModel.updateNote(
-                    note.copy(
-                        title = title,
-                        content = content,
-                        colorHex = colorHex,
-                        isPinned = isPinned,
-                        drawingPath = drawingPath,
-                        tag = tag,
-                        imagePath = imagePath,
-                        checklistJson = checklistJson,
-                        audioPath = audioPath,
-                        reminderAt = reminderAt,
-                        blocksJson = blocksJson,
-                        updatedAt = System.currentTimeMillis()
-                    )
-                )
-            },
-            existingTags = allExistingTags
         )
     }
 
