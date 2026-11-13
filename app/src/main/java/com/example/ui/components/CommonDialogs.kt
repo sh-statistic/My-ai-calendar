@@ -2220,13 +2220,21 @@ fun EditTaskDialog(
  * توابع کمکی هوشمند تشخیص برچسب با علامت # مشابه Google Keep
  */
 fun extractActiveHashtagQuery(text: String): String? {
-    val regex = Regex("""(?:^|\s)#([\p{L}\p{N}_]*)$""")
-    val match = regex.find(text) ?: return null
-    return match.groupValues.getOrNull(1) ?: ""
+    // آخرین # در متنِ قبل از نشانگر: اگر بعدش فقط حروف برچسب آمده باشد، کاربر دارد برچسب می‌نویسد.
+    // قبلاً # فقط اول خط یا بعد از فاصله قبول می‌شد و وسط متنِ آماده (یادداشت موجود) شناخته نمی‌شد.
+    val idx = text.lastIndexOf('#')
+    if (idx < 0) return null
+    val tail = text.substring(idx + 1)
+    if (tail.any { !(it.isLetterOrDigit() || it == '_' || it == '\u200C') }) return null
+    return tail
 }
 
 fun removeActiveHashtagFromContent(text: String): String {
-    return text.replace(Regex("""(?:^|\s)#[\p{L}\p{N}_]*$"""), "").trimEnd()
+    val idx = text.lastIndexOf('#')
+    if (idx < 0) return text
+    val tail = text.substring(idx + 1)
+    if (tail.any { !(it.isLetterOrDigit() || it == '_' || it == '\u200C') }) return text
+    return text.substring(0, idx).trimEnd()
 }
 
 @OptIn(ExperimentalLayoutApi::class)
@@ -2260,8 +2268,6 @@ fun AddNoteDialog(
         (defaultSuggestions + existingTags).distinct()
     }
 
-    var attachedAudioPath by remember { mutableStateOf<String?>(null) }
-    var showVoice by remember { mutableStateOf(false) }
     var reminderAt by remember { mutableStateOf(0L) }
     var showAddMenu by remember { mutableStateOf(false) }
 
@@ -2293,12 +2299,12 @@ fun AddNoteDialog(
     var savedOnce by remember { mutableStateOf(false) }
     val handleExit: () -> Unit = {
         val hasAnything = noteBlocksHaveContent(blocks) || title.isNotBlank() || tagsList.isNotEmpty() ||
-            !attachedAudioPath.isNullOrBlank() || reminderAt > 0
+            reminderAt > 0
         if (!savedOnce && hasAnything) {
             savedOnce = true
             onConfirm(
                 title.trim(), noteBlocksToContent(blocks), selectedColor, tagsList.joinToString(","), isPinned,
-                noteBlocksFirstPath(blocks, "i"), noteBlocksChecklistJson(blocks), attachedAudioPath,
+                noteBlocksFirstPath(blocks, "i"), noteBlocksChecklistJson(blocks), noteBlocksFirstPath(blocks, "a"),
                 reminderAt, noteBlocksToJson(blocks)
             )
         }
@@ -2567,14 +2573,6 @@ fun AddNoteDialog(
                     }
                 }
 
-                if (showVoice || !attachedAudioPath.isNullOrBlank()) {
-                    VoiceNoteRow(
-                        audioPath = attachedAudioPath,
-                        isFa = strings.isFa,
-                        onAudioChanged = { attachedAudioPath = it }
-                    )
-                }
-
                 }
                 Row(
                     modifier = Modifier
@@ -2645,10 +2643,10 @@ fun AddNoteDialog(
                                 }
                             )
                             DropdownMenuItem(
-                                text = { Text(if (strings.isFa) "ضبط صدا" else "Record voice", fontSize = 13.sp) },
+                                text = { Text(if (strings.isFa) "افزودن صدا" else "Add voice", fontSize = 13.sp) },
                                 onClick = {
                                     showAddMenu = false
-                                    showVoice = true
+                                    insertBlocksAtFocus(listOf(NoteBlockState(kind = "a")))
                                 }
                             )
                         }
@@ -2711,7 +2709,7 @@ fun EditNoteDialog(
             addAll(
                 buildInitialNoteBlocks(
                     initialNote.blocksJson, initialNote.content, initialNote.imagePath, initialNote.drawingPath,
-                    initialNote.checklistJson
+                    initialNote.checklistJson, initialNote.audioPath
                 )
             )
         }
@@ -2719,9 +2717,8 @@ fun EditNoteDialog(
     val initialBlocksSignature = remember { noteBlocksSignature(blocks) }
     var focusedTextBlockId by remember { mutableStateOf<String?>(null) }
     var drawingBlock by remember { mutableStateOf<NoteBlockState?>(null) }
-    var attachedAudioPath by remember { mutableStateOf(initialNote.audioPath) }
+    // صدا حالا بلوک درون‌خطی است (kind = "a")
     // چک‌لیست حالا بلوک درون‌خطی است و از buildInitialNoteBlocks می‌آید
-    var showVoice by remember { mutableStateOf(false) }
     var reminderAt by remember { mutableStateOf(initialNote.reminderAt) }
     var showAddMenu by remember { mutableStateOf(false) }
 
@@ -2762,12 +2759,11 @@ fun EditNoteDialog(
     val isDirty = title != initialNote.title || blocksSignature != initialBlocksSignature ||
         selectedColor != initialNote.colorHex || isPinned != initialNote.isPinned ||
         tagsList.toList() != initialTags ||
-        attachedAudioPath != initialNote.audioPath ||
         reminderAt != initialNote.reminderAt
 
     LaunchedEffect(
         title, blocksSignature, selectedColor, isPinned, tagsList.toList(),
-        attachedAudioPath, reminderAt
+        reminderAt
     ) {
         if (isDirty && onAutosave != null) {
             delay(800)
@@ -2775,7 +2771,7 @@ fun EditNoteDialog(
                 title, noteBlocksToContent(blocks), selectedColor, isPinned,
                 noteBlocksFirstPath(blocks, "d"), tagsList.joinToString(","),
                 noteBlocksFirstPath(blocks, "i"), noteBlocksChecklistJson(blocks),
-                attachedAudioPath, reminderAt, noteBlocksToJson(blocks)
+                noteBlocksFirstPath(blocks, "a"), reminderAt, noteBlocksToJson(blocks)
             )
         }
     }
@@ -2785,14 +2781,13 @@ fun EditNoteDialog(
         if (!exitSaved) {
             exitSaved = true
             if (isDirty) {
-                val canSave = noteBlocksHaveContent(blocks) || title.isNotBlank() ||
-                    !attachedAudioPath.isNullOrBlank()
+                val canSave = noteBlocksHaveContent(blocks) || title.isNotBlank()
                 if (canSave) {
                     onConfirm(
                         title.trim(), noteBlocksToContent(blocks), selectedColor, isPinned,
                         noteBlocksFirstPath(blocks, "d"),
                         tagsList.joinToString(","), noteBlocksFirstPath(blocks, "i"),
-                        noteBlocksChecklistJson(blocks), attachedAudioPath, reminderAt,
+                        noteBlocksChecklistJson(blocks), noteBlocksFirstPath(blocks, "a"), reminderAt,
                         noteBlocksToJson(blocks)
                     )
                 }
@@ -3054,14 +3049,6 @@ fun EditNoteDialog(
                     }
                 }
 
-                if (showVoice || !attachedAudioPath.isNullOrBlank()) {
-                    VoiceNoteRow(
-                        audioPath = attachedAudioPath,
-                        isFa = strings.isFa,
-                        onAudioChanged = { attachedAudioPath = it }
-                    )
-                }
-
                 }
                 Row(
                     modifier = Modifier
@@ -3131,10 +3118,10 @@ fun EditNoteDialog(
                                 }
                             )
                             DropdownMenuItem(
-                                text = { Text(if (strings.isFa) "ضبط صدا" else "Record voice", fontSize = 13.sp) },
+                                text = { Text(if (strings.isFa) "افزودن صدا" else "Add voice", fontSize = 13.sp) },
                                 onClick = {
                                     showAddMenu = false
-                                    showVoice = true
+                                    insertBlocksAtFocus(listOf(NoteBlockState(kind = "a")))
                                 }
                             )
                         }

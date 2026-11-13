@@ -121,7 +121,6 @@ class MainActivity : ComponentActivity() {
         )
 
         handleIntentForUpdate(intent)
-        handleShareIntent(intent)
         handleOpenNoteIntent(intent)
 
         // راه‌اندازی استعلام خودکار و دوره‌ای پس‌زمینه با WorkManager حتی در صورت بسته بودن برنامه
@@ -202,7 +201,6 @@ class MainActivity : ComponentActivity() {
                         }
 
                         var selectedTab by remember { mutableIntStateOf(0) }
-                        val sharedNoteSeed by viewModel.sharedNoteSeed.collectAsState()
                         val openNoteRequest by viewModel.openNoteRequest.collectAsState()
                         LaunchedEffect(openNoteRequest) {
                             if (openNoteRequest != null) {
@@ -247,41 +245,7 @@ class MainActivity : ComponentActivity() {
                             selectedTab = 0
                         }
 
-                        // اشتراک از برنامه‌های دیگر: کارت سریع و کوچک به سبک گوگل کیپ،
-                        // بدون باز شدن صفحهٔ تقویم و ویرایشگر بزرگ یادداشت
-                        val activityForShare = LocalContext.current as? android.app.Activity
-                        val launchedForShare = remember {
-                            intent.action == android.content.Intent.ACTION_SEND ||
-                                intent.action == android.content.Intent.ACTION_SEND_MULTIPLE
-                        }
-                        sharedNoteSeed?.let { seed ->
-                            QuickShareNoteDialog(
-                                seed = seed,
-                                isFa = strings.isFa,
-                                onDismiss = {
-                                    viewModel.consumeSharedNoteSeed()
-                                    if (launchedForShare) activityForShare?.finish()
-                                },
-                                onSave = { t, c, tag, img ->
-                                    val bj = if (!img.isNullOrBlank()) {
-                                        com.example.data.noteBlocksDataToJson(
-                                            listOf(
-                                                com.example.data.NoteBlockData("i", path = img),
-                                                com.example.data.NoteBlockData("t", text = c)
-                                            )
-                                        )
-                                    } else {
-                                        ""
-                                    }
-                                    viewModel.addNote(
-                                        title = t, content = c, colorHex = "#FEF3C7", tag = tag,
-                                        imagePath = img, blocksJson = bj
-                                    )
-                                    viewModel.consumeSharedNoteSeed()
-                                    if (launchedForShare) activityForShare?.finish()
-                                }
-                            )
-                        }
+                        // اشتراک از برنامه‌های دیگر دیگر اینجا نمی‌آید؛ روی صفحهٔ شفاف ShareNoteActivity باز می‌شود
 
                         Scaffold(
                         modifier = Modifier.fillMaxSize(),
@@ -782,7 +746,6 @@ class MainActivity : ComponentActivity() {
         super.onNewIntent(intent)
         setIntent(intent)
         handleIntentForUpdate(intent)
-        handleShareIntent(intent)
         handleOpenNoteIntent(intent)
     }
 
@@ -791,55 +754,6 @@ class MainActivity : ComponentActivity() {
             com.example.alarm.NoteReminderReceiver.EXTRA_OPEN_NOTE_ID
         ) ?: return
         viewModel.requestOpenNote(noteId)
-    }
-
-    private fun handleShareIntent(intent: Intent?) {
-        val action = intent?.action ?: return
-        val type = intent.type ?: return
-        when {
-            action == Intent.ACTION_SEND && type == "text/plain" -> {
-                val sharedText = intent.getStringExtra(Intent.EXTRA_TEXT) ?: return
-                val sharedTitle = intent.getStringExtra(Intent.EXTRA_SUBJECT) ?: ""
-                viewModel.onSharedContentReceived(
-                    MainViewModel.SharedNoteSeed(title = sharedTitle, content = sharedText)
-                )
-            }
-            action == Intent.ACTION_SEND && type.startsWith("image/") -> {
-                val uri = androidx.core.content.IntentCompat.getParcelableExtra(
-                    intent, Intent.EXTRA_STREAM, Uri::class.java
-                ) ?: return
-                copySharedImageToAppStorage(uri, intent.getStringExtra(Intent.EXTRA_SUBJECT) ?: "")
-            }
-            action == Intent.ACTION_SEND_MULTIPLE && type.startsWith("image/") -> {
-                val uris = androidx.core.content.IntentCompat.getParcelableArrayListExtra(
-                    intent, Intent.EXTRA_STREAM, Uri::class.java
-                )
-                val first = uris?.firstOrNull() ?: return
-                copySharedImageToAppStorage(first, intent.getStringExtra(Intent.EXTRA_SUBJECT) ?: "")
-            }
-        }
-    }
-
-    private fun copySharedImageToAppStorage(uri: Uri, sharedTitle: String) {
-        lifecycleScope.launch {
-            val savedPath = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
-                try {
-                    val dir = java.io.File(filesDir, "notes_images").apply { mkdirs() }
-                    val file = java.io.File(dir, "shared_" + java.util.UUID.randomUUID().toString() + ".jpg")
-                    contentResolver.openInputStream(uri)?.use { input ->
-                        file.outputStream().use { output -> input.copyTo(output) }
-                    }
-                    if (file.exists() && file.length() > 0) file.absolutePath else null
-                } catch (_: Exception) {
-                    null
-                }
-            }
-            if (savedPath != null) {
-                viewModel.onSharedContentReceived(
-                    MainViewModel.SharedNoteSeed(title = sharedTitle, imagePath = savedPath)
-                )
-            }
-        }
     }
 
     private fun handleIntentForUpdate(intent: Intent?) {

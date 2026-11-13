@@ -46,6 +46,16 @@
 
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
+        </activity>
+
+        <!-- اشتراک از برنامه‌های دیگر روی یک صفحهٔ شفاف و سبک باز می‌شود تا فقط کارت ذخیره دیده شود -->
+        <activity
+            android:name=".ShareNoteActivity"
+            android:exported="true"
+            android:excludeFromRecents="true"
+            android:label="@string/app_name"
+            android:windowSoftInputMode="adjustResize"
+            android:theme="@android:style/Theme.Translucent.NoTitleBar">
             <intent-filter>
                 <action android:name="android.intent.action.SEND" />
 

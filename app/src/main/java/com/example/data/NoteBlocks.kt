@@ -24,6 +24,7 @@ fun parseNoteBlocksData(blocksJson: String?): List<NoteBlockData> {
                 "c" -> result.add(NoteBlockData("c", text = obj.optString("x", "")))
                 "i" -> result.add(NoteBlockData("i", path = obj.optString("p").takeIf { it.isNotBlank() }))
                 "d" -> result.add(NoteBlockData("d", path = obj.optString("p").takeIf { it.isNotBlank() }))
+                "a" -> result.add(NoteBlockData("a", path = obj.optString("p").takeIf { it.isNotBlank() }))
             }
         }
         result

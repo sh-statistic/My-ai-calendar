@@ -48,6 +48,8 @@ import androidx.compose.material.icons.filled.Notifications
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Unarchive
 import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.DeleteForever
+import androidx.compose.material.icons.filled.RestoreFromTrash
 import androidx.compose.material.icons.filled.CloudSync
 import androidx.compose.material.icons.filled.ContentCopy
 import androidx.compose.material.icons.filled.Delete
@@ -131,7 +133,7 @@ fun NotesScreen(
 
     var showAddNoteDialog by remember { mutableStateOf(false) }
     var showWhiteboardDialog by remember { mutableStateOf(false) }
-    var drawingNoteToViewOrEdit by remember { mutableStateOf<NoteEntity?>(null) }
+    // قبلاً ضربه روی کارتِ دارای نقاشی مستقیم وایت‌بورد را باز می‌کرد؛ حالا نقاشی داخل ویرایشگر است
     var noteToEdit by remember { mutableStateOf<NoteEntity?>(null) }
     var noteToAddToCalendar by remember { mutableStateOf<NoteEntity?>(null) }
     var selectionMode by remember { mutableStateOf(false) }
@@ -141,6 +143,7 @@ fun NotesScreen(
     val trashedNotes by viewModel.trashedNotes.collectAsState()
     val openNoteRequest by viewModel.openNoteRequest.collectAsState()
     var showEmptyTrashConfirm by remember { mutableStateOf(false) }
+    var showHardDeleteSelectedConfirm by remember { mutableStateOf(false) }
 
     // دکمهٔ برگشت گوشی اول داخل همین صفحه یک قدم برمی‌گردد: لغو انتخاب چندتایی،
     // و در نمای بایگانی/سطل زباله برگشت به فهرست اصلی یادداشت‌ها.
@@ -304,24 +307,66 @@ fun NotesScreen(
                         fontWeight = FontWeight.Bold
                     )
                     Spacer(modifier = Modifier.weight(1f))
-                    IconButton(
-                        onClick = {
-                            val chosen = notes.filter { selectedNoteIds.contains(it.id) }
-                            com.example.sync.NoteShareHelper.shareAllNotes(context, chosen)
-                        },
-                        enabled = selectedNoteIds.isNotEmpty()
-                    ) {
-                        Icon(Icons.Default.Share, contentDescription = if (strings.isFa) "اشتراک‌گذاری" else "Share")
-                    }
-                    IconButton(
-                        onClick = {
-                            selectedNoteIds.forEach { id -> viewModel.deleteNote(id) }
-                            selectionMode = false
-                            selectedNoteIds = emptySet()
-                        },
-                        enabled = selectedNoteIds.isNotEmpty()
-                    ) {
-                        Icon(Icons.Default.Delete, contentDescription = if (strings.isFa) "حذف" else "Delete", tint = MaterialTheme.colorScheme.error)
+                    if (notesView == 2) {
+                        // انتخاب چندتایی در سطل زباله: برگرداندن یا حذف نهایی گروهی
+                        IconButton(
+                            onClick = {
+                                selectedNoteIds.forEach { id -> viewModel.restoreNote(id) }
+                                selectionMode = false
+                                selectedNoteIds = emptySet()
+                            },
+                            enabled = selectedNoteIds.isNotEmpty()
+                        ) {
+                            Icon(Icons.Default.RestoreFromTrash, contentDescription = if (strings.isFa) "برگرداندن" else "Restore")
+                        }
+                        IconButton(
+                            onClick = { showHardDeleteSelectedConfirm = true },
+                            enabled = selectedNoteIds.isNotEmpty()
+                        ) {
+                            Icon(Icons.Default.DeleteForever, contentDescription = if (strings.isFa) "حذف نهایی" else "Delete forever", tint = MaterialTheme.colorScheme.error)
+                        }
+                    } else if (notesView == 1) {
+                        // انتخاب چندتایی در بایگانی: برگرداندن به یادداشت‌ها یا فرستادن به سطل زباله
+                        IconButton(
+                            onClick = {
+                                selectedNoteIds.forEach { id -> viewModel.archiveNote(id, false) }
+                                selectionMode = false
+                                selectedNoteIds = emptySet()
+                            },
+                            enabled = selectedNoteIds.isNotEmpty()
+                        ) {
+                            Icon(Icons.Default.Unarchive, contentDescription = if (strings.isFa) "برگرداندن به یادداشت‌ها" else "Unarchive")
+                        }
+                        IconButton(
+                            onClick = {
+                                selectedNoteIds.forEach { id -> viewModel.deleteNote(id) }
+                                selectionMode = false
+                                selectedNoteIds = emptySet()
+                            },
+                            enabled = selectedNoteIds.isNotEmpty()
+                        ) {
+                            Icon(Icons.Default.Delete, contentDescription = if (strings.isFa) "حذف" else "Delete", tint = MaterialTheme.colorScheme.error)
+                        }
+                    } else {
+                        IconButton(
+                            onClick = {
+                                val chosen = notes.filter { selectedNoteIds.contains(it.id) }
+                                com.example.sync.NoteShareHelper.shareAllNotes(context, chosen)
+                            },
+                            enabled = selectedNoteIds.isNotEmpty()
+                        ) {
+                            Icon(Icons.Default.Share, contentDescription = if (strings.isFa) "اشتراک‌گذاری" else "Share")
+                        }
+                        IconButton(
+                            onClick = {
+                                selectedNoteIds.forEach { id -> viewModel.deleteNote(id) }
+                                selectionMode = false
+                                selectedNoteIds = emptySet()
+                            },
+                            enabled = selectedNoteIds.isNotEmpty()
+                        ) {
+                            Icon(Icons.Default.Delete, contentDescription = if (strings.isFa) "حذف" else "Delete", tint = MaterialTheme.colorScheme.error)
+                        }
                     }
                 }
             }
@@ -364,9 +409,7 @@ fun NotesScreen(
                             searchQuery = searchQuery,
                             isSelected = selectedNoteIds.contains(note.id),
                             onClick = {
-                                if (notesView == 2) {
-                                    // یادداشت‌های سطل زباله باز نمی‌شوند؛ از منوی کارت برگردان یا دائمی پاک کن
-                                } else if (selectionMode) {
+                                if (selectionMode) {
                                     selectedNoteIds = if (selectedNoteIds.contains(note.id)) {
                                         val next = selectedNoteIds - note.id
                                         if (next.isEmpty()) selectionMode = false
@@ -374,19 +417,20 @@ fun NotesScreen(
                                     } else {
                                         selectedNoteIds + note.id
                                     }
-                                } else if (!note.drawingPath.isNullOrBlank()) {
-                                    drawingNoteToViewOrEdit = note
+                                } else if (notesView == 2) {
+                                    // یادداشت‌های سطل زباله باز نمی‌شوند؛ از منوی کارت برگردان یا دائمی پاک کن
                                 } else {
+                                    // همیشه ویرایشگر باز می‌شود؛ نقاشی هم داخل خود یادداشت است
                                     noteToEdit = note
                                 }
                             },
                             onLongClick = {
-                                if (notesView == 0 && !selectionMode) {
+                                if (!selectionMode) {
                                     selectionMode = true
                                     selectedNoteIds = setOf(note.id)
                                 }
                             },
-                            onEdit = { noteToEdit = note },
+
                             onTagClick = { tag -> searchQuery = "#$tag" },
                             onAddToCalendar = { noteToAddToCalendar = note },
                             onSyncToGoogleCalendar = {
@@ -565,6 +609,38 @@ fun NotesScreen(
         )
     }
 
+    if (showHardDeleteSelectedConfirm) {
+        AlertDialog(
+            onDismissRequest = { showHardDeleteSelectedConfirm = false },
+            title = { Text(if (strings.isFa) "حذف نهایی" else "Delete forever") },
+            text = {
+                Text(
+                    if (strings.isFa) {
+                        "یادداشت‌های انتخاب‌شده برای همیشه پاک می‌شوند. ادامه می‌دهی؟"
+                    } else {
+                        "The selected notes will be deleted forever. Continue?"
+                    }
+                )
+            },
+            confirmButton = {
+                TextButton(onClick = {
+                    trashedNotes.filter { selectedNoteIds.contains(it.id) }
+                        .forEach { viewModel.hardDeleteNote(it) }
+                    showHardDeleteSelectedConfirm = false
+                    selectionMode = false
+                    selectedNoteIds = emptySet()
+                }) {
+                    Text(if (strings.isFa) "پاک کردن" else "Delete", color = MaterialTheme.colorScheme.error)
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showHardDeleteSelectedConfirm = false }) {
+                    Text(if (strings.isFa) "لغو" else "Cancel")
+                }
+            }
+        )
+    }
+
     if (showAddNoteDialog) {
         AddNoteDialog(
             onDismiss = {
@@ -596,27 +672,6 @@ fun NotesScreen(
                 )
                 showWhiteboardDialog = false
                 Toast.makeText(context, if (strings.isFa) "طرح وایت‌برد با موفقیت ذخیره شد ✓" else "Drawing saved ✓", Toast.LENGTH_SHORT).show()
-            }
-        )
-    }
-
-    drawingNoteToViewOrEdit?.let { note ->
-        WhiteboardDrawingDialog(
-            initialTitle = note.title,
-            initialDrawingPath = note.drawingPath,
-            onDismiss = { drawingNoteToViewOrEdit = null },
-            onSaveDrawing = { title, imagePath, colorHex ->
-                viewModel.updateNote(
-                    note.copy(
-                        title = title,
-                        drawingPath = imagePath,
-                        colorHex = colorHex,
-                        tag = note.tag,
-                        updatedAt = System.currentTimeMillis()
-                    )
-                )
-                drawingNoteToViewOrEdit = null
-                Toast.makeText(context, if (strings.isFa) "طرح با موفقیت به‌روزرسانی شد ✓" else "Drawing updated ✓", Toast.LENGTH_SHORT).show()
             }
         )
     }
@@ -735,7 +790,6 @@ fun NoteCard(
     isSelected: Boolean = false,
     onLongClick: () -> Unit = {},
     onClick: () -> Unit,
-    onEdit: () -> Unit,
     onTagClick: (String) -> Unit,
     onAddToCalendar: () -> Unit,
     onSyncToGoogleCalendar: () -> Unit,
@@ -987,18 +1041,7 @@ fun NoteCard(
                         )
                     }
 
-                    // Edit Icon
-                    IconButton(
-                        onClick = onEdit,
-                        modifier = Modifier.size(24.dp)
-                    ) {
-                        Icon(
-                            Icons.Default.Edit,
-                            contentDescription = strings.edit,
-                            tint = if (isDark) Color(0xFFA1A1AA) else Color(0xFF475569),
-                            modifier = Modifier.size(15.dp)
-                        )
-                    }
+                    // دکمهٔ مداد حذف شد: ضربه روی خود کارت ویرایشگر را باز می‌کند و دکمهٔ جدا زیادی بود
 
                     // More Menu for Keep, Google Calendar, Share, Calendar Add, Delete
                     Box {

@@ -18,6 +18,7 @@ data class SyncData(
     val noteAudiosBase64: Map<String, String>? = null, // key: note id, value: base64 voice content
     val noteBlockImagesBase64: Map<String, Map<String, String>>? = null, // key: note id, then file path, value: base64
     val noteBlockDrawingsBase64: Map<String, Map<String, String>>? = null, // key: note id, then file path, value: base64
+    val noteBlockAudiosBase64: Map<String, Map<String, String>>? = null, // key: note id, then file path, value: base64
     val customOccasionsData: String? = null,
     val customOccasionsHiddenData: String? = null,
     val appPreferences: Map<String, Any?>? = null,
@@ -107,6 +108,10 @@ data class SyncData(
             val blockDrawings = noteBlockDrawingsBase64?.get(n.id)
             if (!blockDrawings.isNullOrEmpty()) {
                 obj.put("blockDrawings", JSONObject(blockDrawings as Map<*, *>))
+            }
+            val blockAudios = noteBlockAudiosBase64?.get(n.id)
+            if (!blockAudios.isNullOrEmpty()) {
+                obj.put("blockAudios", JSONObject(blockAudios as Map<*, *>))
             }
             obj.put("reminderAt", n.reminderAt)
             obj.put("isArchived", n.isArchived)
@@ -200,6 +205,7 @@ data class SyncData(
             val audiosMap = mutableMapOf<String, String>()
             val blockImagesMap = mutableMapOf<String, Map<String, String>>()
             val blockDrawingsMap = mutableMapOf<String, Map<String, String>>()
+            val blockAudiosMap = mutableMapOf<String, Map<String, String>>()
 
             fun readPathMap(obj: JSONObject, key: String): Map<String, String>? {
                 val sub = obj.optJSONObject(key) ?: return null
@@ -231,6 +237,7 @@ data class SyncData(
                     }
                     readPathMap(obj, "blockImages")?.let { blockImagesMap[noteId] = it }
                     readPathMap(obj, "blockDrawings")?.let { blockDrawingsMap[noteId] = it }
+                    readPathMap(obj, "blockAudios")?.let { blockAudiosMap[noteId] = it }
                     notes.add(
                         NoteEntity(
                             id = noteId,
@@ -292,6 +299,7 @@ data class SyncData(
                 noteAudiosBase64 = if (audiosMap.isNotEmpty()) audiosMap else null,
                 noteBlockImagesBase64 = if (blockImagesMap.isNotEmpty()) blockImagesMap else null,
                 noteBlockDrawingsBase64 = if (blockDrawingsMap.isNotEmpty()) blockDrawingsMap else null,
+                noteBlockAudiosBase64 = if (blockAudiosMap.isNotEmpty()) blockAudiosMap else null,
                 customOccasionsData = customOccasionsData,
                 customOccasionsHiddenData = customOccasionsHiddenData,
                 appPreferences = appPreferences,
