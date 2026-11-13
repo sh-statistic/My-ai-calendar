@@ -1244,7 +1244,8 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         imagePath: String? = null,
         checklistJson: String = "",
         audioPath: String? = null,
-        reminderAt: Long = 0
+        reminderAt: Long = 0,
+        blocksJson: String = ""
     ) {
         val note = NoteEntity(
             title = title.ifBlank { if (drawingPath != null) "طرح وایت‌برد" else "یادداشت جدید" },
@@ -1257,7 +1258,8 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             imagePath = imagePath,
             audioPath = audioPath,
             checklistJson = checklistJson,
-            reminderAt = reminderAt
+            reminderAt = reminderAt,
+            blocksJson = blocksJson
         )
         viewModelScope.launch {
             repository.insertNote(note)
@@ -1314,12 +1316,51 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                     newDrawingPath = srcPath
                 }
             }
+            // بلوک‌های درون‌خطی: فایل هر عکس/نقاشی جدا کپی و نشانی‌ها در blocksJson بازنویسی می‌شوند
+            var newBlocksJson = ""
+            var blockDrawingPath: String? = null
+            var blockImagePath: String? = null
+            if (note.blocksJson.isNotBlank()) {
+                val copiedBlocks = com.example.data.parseNoteBlocksData(note.blocksJson).map { block ->
+                    when (block.kind) {
+                        "i" -> block.copy(path = copyAttachmentFile(block.path, "img_", ".jpg"))
+                        "d" -> {
+                            val sp = block.path
+                            if (sp.isNullOrBlank()) {
+                                block
+                            } else {
+                                try {
+                                    val srcFile = File(sp)
+                                    if (!srcFile.exists()) {
+                                        block
+                                    } else {
+                                        val dstFile = File(srcFile.parentFile, "drawing_" + java.util.UUID.randomUUID().toString() + ".png")
+                                        srcFile.copyTo(dstFile, overwrite = true)
+                                        val srcJson = File(sp.replace(".png", ".json"))
+                                        if (srcJson.exists()) {
+                                            srcJson.copyTo(File(dstFile.absolutePath.replace(".png", ".json")), overwrite = true)
+                                        }
+                                        block.copy(path = dstFile.absolutePath)
+                                    }
+                                } catch (_: Exception) {
+                                    block
+                                }
+                            }
+                        }
+                        else -> block
+                    }
+                }
+                newBlocksJson = com.example.data.noteBlocksDataToJson(copiedBlocks)
+                blockDrawingPath = copiedBlocks.firstOrNull { it.kind == "d" && !it.path.isNullOrBlank() }?.path
+                blockImagePath = copiedBlocks.firstOrNull { it.kind == "i" && !it.path.isNullOrBlank() }?.path
+            }
             repository.insertNote(
                 note.copy(
                     id = java.util.UUID.randomUUID().toString(),
-                    drawingPath = newDrawingPath,
-                    imagePath = copyAttachmentFile(note.imagePath, "img_", ".jpg"),
+                    drawingPath = blockDrawingPath ?: newDrawingPath,
+                    imagePath = blockImagePath ?: copyAttachmentFile(note.imagePath, "img_", ".jpg"),
                     audioPath = copyAttachmentFile(note.audioPath, "voice_", ".m4a"),
+                    blocksJson = newBlocksJson,
                     reminderAt = 0,
                     isArchived = false,
                     isDeleted = false,
@@ -1357,17 +1398,22 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     fun hardDeleteNote(note: NoteEntity) {
         viewModelScope.launch {
             com.example.alarm.NoteReminderScheduler.cancelNoteReminder(getApplication(), note.id)
-            listOf(note.drawingPath, note.imagePath, note.audioPath).forEach { path ->
-                if (!path.isNullOrBlank()) {
-                    try {
-                        val file = File(path)
-                        if (file.exists()) file.delete()
-                        if (path == note.drawingPath) {
-                            val jsonFile = File(path.replace(".png", ".json"))
-                            if (jsonFile.exists()) jsonFile.delete()
-                        }
-                    } catch (_: Exception) {}
-                }
+            val blockMedia = com.example.data.extractNoteBlockMedia(note.blocksJson)
+            val drawingPaths = mutableSetOf<String>()
+            if (!note.drawingPath.isNullOrBlank()) drawingPaths.add(note.drawingPath)
+            blockMedia.filter { it.kind == "d" }.forEach { if (!it.path.isNullOrBlank()) drawingPaths.add(it.path) }
+            val allPaths = mutableListOf<String>()
+            listOf(note.drawingPath, note.imagePath, note.audioPath).forEach { if (!it.isNullOrBlank()) allPaths.add(it) }
+            blockMedia.forEach { if (!it.path.isNullOrBlank()) allPaths.add(it.path) }
+            allPaths.distinct().forEach { path ->
+                try {
+                    val file = File(path)
+                    if (file.exists()) file.delete()
+                    if (path in drawingPaths) {
+                        val jsonFile = File(path.replace(".png", ".json"))
+                        if (jsonFile.exists()) jsonFile.delete()
+                    }
+                } catch (_: Exception) {}
             }
             repository.hardDeleteNote(note.id)
         }
@@ -1432,6 +1478,25 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 }
             }
 
+            // 1c. Base64 for inline block media (photos/drawings inside the note text flow)
+            val blockImagesMap = mutableMapOf<String, MutableMap<String, String>>()
+            val blockDrawingsMap = mutableMapOf<String, MutableMap<String, String>>()
+            for (note in baseSyncData.notes) {
+                for (media in com.example.data.extractNoteBlockMedia(note.blocksJson)) {
+                    val mediaPath = media.path ?: continue
+                    try {
+                        val file = File(mediaPath)
+                        if (file.exists() && file.isFile) {
+                            val b64 = android.util.Base64.encodeToString(file.readBytes(), android.util.Base64.NO_WRAP)
+                            val target = if (media.kind == "i") blockImagesMap else blockDrawingsMap
+                            target.getOrPut(note.id) { mutableMapOf() }[mediaPath] = b64
+                        }
+                    } catch (e: Exception) {
+                        e.printStackTrace()
+                    }
+                }
+            }
+
             // 2. Custom Occasions
             val (occData, occHiddenData) = PersianOccasionsHelper.exportCustomOccasionsRaw(app)
 
@@ -1451,6 +1516,8 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 noteDrawingsBase64 = if (drawingsMap.isNotEmpty()) drawingsMap else null,
                 noteImagesBase64 = if (imagesMap.isNotEmpty()) imagesMap else null,
                 noteAudiosBase64 = if (audiosMap.isNotEmpty()) audiosMap else null,
+                noteBlockImagesBase64 = if (blockImagesMap.isNotEmpty()) blockImagesMap else null,
+                noteBlockDrawingsBase64 = if (blockDrawingsMap.isNotEmpty()) blockDrawingsMap else null,
                 customOccasionsData = occData,
                 customOccasionsHiddenData = occHiddenData,
                 appPreferences = if (appPrefsMap.isNotEmpty()) appPrefsMap else null,
@@ -1569,6 +1636,54 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         }
     }
 
+    // بازگردانی فایل‌های رسانه‌ای بلوک‌های درون‌خطی (عکس/نقاشی وسط متن) از نسخه پشتیبان
+    private fun restoreBlockFiles(syncData: SyncData): List<NoteEntity> {
+        val imgMaps = syncData.noteBlockImagesBase64
+        val drawMaps = syncData.noteBlockDrawingsBase64
+        if (imgMaps.isNullOrEmpty() && drawMaps.isNullOrEmpty()) return syncData.notes
+        val app = getApplication<Application>()
+        val imagesDir = File(app.filesDir, "notes_images").apply { mkdirs() }
+        val drawingsDir = File(app.filesDir, "drawings").apply { mkdirs() }
+        return syncData.notes.map { note ->
+            if (note.blocksJson.isBlank()) return@map note
+            val blocks = com.example.data.parseNoteBlocksData(note.blocksJson)
+            if (blocks.none { it.kind != "t" }) return@map note
+            var changed = false
+            val newBlocks = blocks.mapIndexed { idx, block ->
+                val path = block.path
+                if (block.kind == "t" || path.isNullOrBlank()) return@mapIndexed block
+                val b64 = (if (block.kind == "i") imgMaps?.get(note.id)?.get(path) else drawMaps?.get(note.id)?.get(path))
+                    ?: return@mapIndexed block
+                try {
+                    val bytes = android.util.Base64.decode(b64, android.util.Base64.DEFAULT)
+                    val existingFile = File(path)
+                    val targetFile = if (existingFile.parentFile?.exists() == true) {
+                        existingFile
+                    } else if (block.kind == "i") {
+                        File(imagesDir, "img_${note.id}_$idx.jpg")
+                    } else {
+                        File(drawingsDir, "drawing_${note.id}_$idx.png")
+                    }
+                    targetFile.writeBytes(bytes)
+                    changed = true
+                    block.copy(path = targetFile.absolutePath)
+                } catch (e: Exception) {
+                    e.printStackTrace()
+                    block
+                }
+            }
+            if (!changed) {
+                note
+            } else {
+                note.copy(
+                    blocksJson = com.example.data.noteBlocksDataToJson(newBlocks),
+                    imagePath = newBlocks.firstOrNull { it.kind == "i" && !it.path.isNullOrBlank() }?.path ?: note.imagePath,
+                    drawingPath = newBlocks.firstOrNull { it.kind == "d" && !it.path.isNullOrBlank() }?.path ?: note.drawingPath
+                )
+            }
+        }
+    }
+
     fun importBackupJson(jsonStr: String, onComplete: (Boolean, String) -> Unit) {
         viewModelScope.launch(Dispatchers.IO) {
             val app = getApplication<Application>()
@@ -1579,7 +1694,8 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 // 1. Restore drawing files and connect drawingPath
                 val updatedNotes = restoreDrawingFiles(rawSyncData)
                 val notesWithAttachments = restoreAttachmentFiles(rawSyncData.copy(notes = updatedNotes))
-                val syncData = rawSyncData.copy(notes = notesWithAttachments)
+                val notesWithBlocks = restoreBlockFiles(rawSyncData.copy(notes = notesWithAttachments))
+                val syncData = rawSyncData.copy(notes = notesWithBlocks)
 
                 // 2. Merge database records
                 repository.mergeSyncData(syncData, "پشتیبان دستی JSON")
@@ -1700,7 +1816,9 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                     try {
                         val rawSyncData = SyncData.fromJsonString(safetyBackup)
                         val updatedNotes = restoreDrawingFiles(rawSyncData)
-                        val syncData = rawSyncData.copy(notes = updatedNotes)
+                        val notesWithAttachments = restoreAttachmentFiles(rawSyncData.copy(notes = updatedNotes))
+                        val notesWithBlocks = restoreBlockFiles(rawSyncData.copy(notes = notesWithAttachments))
+                        val syncData = rawSyncData.copy(notes = notesWithBlocks)
                         repository.mergeSyncData(syncData, "پشتیبان اضطراری خودکار")
                         val restoredMemento = mementoManager.importFromJson(syncData.mementoMoriJson)
                         if (restoredMemento > 0) {

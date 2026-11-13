@@ -16,6 +16,8 @@ data class SyncData(
     val noteDrawingsBase64: Map<String, String>? = null, // key: note id, value: base64 drawing content
     val noteImagesBase64: Map<String, String>? = null, // key: note id, value: base64 photo content
     val noteAudiosBase64: Map<String, String>? = null, // key: note id, value: base64 voice content
+    val noteBlockImagesBase64: Map<String, Map<String, String>>? = null, // key: note id, then file path, value: base64
+    val noteBlockDrawingsBase64: Map<String, Map<String, String>>? = null, // key: note id, then file path, value: base64
     val customOccasionsData: String? = null,
     val customOccasionsHiddenData: String? = null,
     val appPreferences: Map<String, Any?>? = null,
@@ -95,6 +97,17 @@ data class SyncData(
                 obj.put("audioBase64", audioB64)
             }
             obj.put("checklistJson", n.checklistJson)
+            if (n.blocksJson.isNotBlank()) {
+                obj.put("blocksJson", n.blocksJson)
+            }
+            val blockImages = noteBlockImagesBase64?.get(n.id)
+            if (!blockImages.isNullOrEmpty()) {
+                obj.put("blockImages", JSONObject(blockImages as Map<*, *>))
+            }
+            val blockDrawings = noteBlockDrawingsBase64?.get(n.id)
+            if (!blockDrawings.isNullOrEmpty()) {
+                obj.put("blockDrawings", JSONObject(blockDrawings as Map<*, *>))
+            }
             obj.put("reminderAt", n.reminderAt)
             obj.put("isArchived", n.isArchived)
             obj.put("deletedAt", n.deletedAt)
@@ -185,6 +198,20 @@ data class SyncData(
             val drawingsMap = mutableMapOf<String, String>()
             val imagesMap = mutableMapOf<String, String>()
             val audiosMap = mutableMapOf<String, String>()
+            val blockImagesMap = mutableMapOf<String, Map<String, String>>()
+            val blockDrawingsMap = mutableMapOf<String, Map<String, String>>()
+
+            fun readPathMap(obj: JSONObject, key: String): Map<String, String>? {
+                val sub = obj.optJSONObject(key) ?: return null
+                val map = mutableMapOf<String, String>()
+                val keys = sub.keys()
+                while (keys.hasNext()) {
+                    val k = keys.next()
+                    val v = sub.optString(k).takeIf { it.isNotBlank() }
+                    if (v != null) map[k] = v
+                }
+                return if (map.isEmpty()) null else map
+            }
             val notesArray = root.optJSONArray("notes")
             if (notesArray != null) {
                 for (i in 0 until notesArray.length()) {
@@ -202,6 +229,8 @@ data class SyncData(
                     if (audioB64 != null) {
                         audiosMap[noteId] = audioB64
                     }
+                    readPathMap(obj, "blockImages")?.let { blockImagesMap[noteId] = it }
+                    readPathMap(obj, "blockDrawings")?.let { blockDrawingsMap[noteId] = it }
                     notes.add(
                         NoteEntity(
                             id = noteId,
@@ -217,6 +246,7 @@ data class SyncData(
                             imagePath = if (obj.isNull("imagePath")) null else obj.optString("imagePath").takeIf { it.isNotBlank() },
                             audioPath = if (obj.isNull("audioPath")) null else obj.optString("audioPath").takeIf { it.isNotBlank() },
                             checklistJson = obj.optString("checklistJson", ""),
+                            blocksJson = obj.optString("blocksJson", ""),
                             reminderAt = obj.optLong("reminderAt", 0),
                             isArchived = obj.optBoolean("isArchived", false),
                             deletedAt = obj.optLong("deletedAt", 0)
@@ -260,6 +290,8 @@ data class SyncData(
                 noteDrawingsBase64 = if (drawingsMap.isNotEmpty()) drawingsMap else null,
                 noteImagesBase64 = if (imagesMap.isNotEmpty()) imagesMap else null,
                 noteAudiosBase64 = if (audiosMap.isNotEmpty()) audiosMap else null,
+                noteBlockImagesBase64 = if (blockImagesMap.isNotEmpty()) blockImagesMap else null,
+                noteBlockDrawingsBase64 = if (blockDrawingsMap.isNotEmpty()) blockDrawingsMap else null,
                 customOccasionsData = customOccasionsData,
                 customOccasionsHiddenData = customOccasionsHiddenData,
                 appPreferences = appPreferences,

@@ -536,13 +536,6 @@ fun NotesScreen(
         }
     }
 
-    val sharedSeed by viewModel.sharedNoteSeed.collectAsState()
-    LaunchedEffect(sharedSeed) {
-        if (sharedSeed != null) {
-            showAddNoteDialog = true
-        }
-    }
-
     if (showEmptyTrashConfirm) {
         AlertDialog(
             onDismissRequest = { showEmptyTrashConfirm = false },
@@ -576,21 +569,17 @@ fun NotesScreen(
         AddNoteDialog(
             onDismiss = {
                 showAddNoteDialog = false
-                viewModel.consumeSharedNoteSeed()
             },
-            onConfirm = { title, content, colorHex, tag, isPinned, imagePath, checklistJson, audioPath, reminderAt ->
+            onConfirm = { title, content, colorHex, tag, isPinned, imagePath, checklistJson, audioPath, reminderAt, blocksJson ->
                 viewModel.addNote(
                     title, content, colorHex,
                     isPinned = isPinned, tag = tag, imagePath = imagePath,
-                    checklistJson = checklistJson, audioPath = audioPath, reminderAt = reminderAt
+                    checklistJson = checklistJson, audioPath = audioPath, reminderAt = reminderAt,
+                    blocksJson = blocksJson
                 )
                 showAddNoteDialog = false
-                viewModel.consumeSharedNoteSeed()
             },
-            existingTags = allExistingTags,
-            initialTitle = sharedSeed?.title ?: "",
-            initialContent = sharedSeed?.content ?: "",
-            initialImagePath = sharedSeed?.imagePath
+            existingTags = allExistingTags
         )
     }
 
@@ -636,11 +625,7 @@ fun NotesScreen(
         EditNoteDialog(
             initialNote = note,
             onDismiss = { noteToEdit = null },
-            onOpenDrawingFullScreen = { noteWithDrawing ->
-                noteToEdit = null
-                drawingNoteToViewOrEdit = noteWithDrawing
-            },
-            onConfirm = { title, content, colorHex, isPinned, drawingPath, tag, imagePath, checklistJson, audioPath, reminderAt ->
+            onConfirm = { title, content, colorHex, isPinned, drawingPath, tag, imagePath, checklistJson, audioPath, reminderAt, blocksJson ->
                 viewModel.updateNote(
                     note.copy(
                         title = title,
@@ -653,12 +638,13 @@ fun NotesScreen(
                         checklistJson = checklistJson,
                         audioPath = audioPath,
                         reminderAt = reminderAt,
+                        blocksJson = blocksJson,
                         updatedAt = System.currentTimeMillis()
                     )
                 )
                 noteToEdit = null
             },
-            onAutosave = { title, content, colorHex, isPinned, drawingPath, tag, imagePath, checklistJson, audioPath, reminderAt ->
+            onAutosave = { title, content, colorHex, isPinned, drawingPath, tag, imagePath, checklistJson, audioPath, reminderAt, blocksJson ->
                 viewModel.updateNote(
                     note.copy(
                         title = title,
@@ -671,6 +657,7 @@ fun NotesScreen(
                         checklistJson = checklistJson,
                         audioPath = audioPath,
                         reminderAt = reminderAt,
+                        blocksJson = blocksJson,
                         updatedAt = System.currentTimeMillis()
                     )
                 )

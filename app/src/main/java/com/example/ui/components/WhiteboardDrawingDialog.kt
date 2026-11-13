@@ -188,6 +188,19 @@ val BoardThemes = listOf(
     )
 )
 
+// اثر انگشت وضعیت بوم برای تشخیص تغییر هنگام خروج (ذخیرهٔ خودکار با دکمهٔ برگشت)
+private fun drawingSnapshot(title: String, themeId: String, strokes: List<DrawStroke>, hasLegacy: Boolean): String {
+    val sb = StringBuilder()
+    sb.append(title).append('#').append(themeId).append('#').append(hasLegacy)
+    for (s in strokes) {
+        sb.append('|').append(s.color.value).append(',').append(s.strokeWidth).append(',').append(s.isEraser)
+        for (p in s.points) {
+            sb.append(',').append(p.x).append(':').append(p.y)
+        }
+    }
+    return sb.toString()
+}
+
 @Composable
 fun WhiteboardDrawingDialog(
     initialTitle: String = "",
@@ -207,6 +220,9 @@ fun WhiteboardDrawingDialog(
     // تصویر قدیمی به عنوان فال‌بک (فقط در صورتی که فایل JSON وجود نداشته باشد)
     var legacyBitmap by remember { mutableStateOf<Bitmap?>(null) }
     var legacyBitmapVersion by remember { mutableIntStateOf(0) }
+
+    // وضعیت اولیهٔ بوم بعد از بارگذاری؛ هنگام خروج با وضعیت فعلی مقایسه می‌شود
+    var initialSnapshot by remember { mutableStateOf<String?>(null) }
 
     // بارگذاری هوشمند اطلاعات خطوط برداری و تم قبلی از فایل JSON
     LaunchedEffect(initialDrawingPath) {
@@ -258,6 +274,7 @@ fun WhiteboardDrawingDialog(
                 }
             }
         }
+        initialSnapshot = drawingSnapshot(title, selectedBoardTheme.id, strokes, legacyBitmap != null)
     }
 
     // اسکرول عمودی پیوسته و نامحدود به سبک گوگل کیپ
@@ -276,8 +293,35 @@ fun WhiteboardDrawingDialog(
 
     val viewportHeight = canvasSize.height.toFloat().coerceAtLeast(300f)
 
+    // خروج از بوم: دکمهٔ ذخیره جدا نداریم؛ اگر چیزی کشیده یا عوض شده باشد،
+    // با همان دکمهٔ برگشت/بستن به صورت خودکار ذخیره می‌شود (به خواست صدرا).
+    val handleExit: () -> Unit = {
+        val snap = initialSnapshot
+        val changed = snap != null &&
+            drawingSnapshot(title, selectedBoardTheme.id, strokes, legacyBitmap != null) != snap
+        if (changed && (strokes.isNotEmpty() || legacyBitmap != null)) {
+            val filePath = saveStrokes(
+                context = context,
+                strokes = strokes,
+                themeId = selectedBoardTheme.id,
+                bgColor = selectedBoardTheme.bgColor,
+                initialPath = initialDrawingPath,
+                legacyBitmap = legacyBitmap
+            )
+            if (filePath != null) {
+                val finalTitle = title.trim().ifBlank { "طرح ${selectedBoardTheme.name}" }
+                onSaveDrawing(finalTitle, filePath, selectedBoardTheme.noteBgHex)
+            } else {
+                Toast.makeText(context, "خطا در ذخیره تصویر تخته", Toast.LENGTH_SHORT).show()
+                onDismiss()
+            }
+        } else {
+            onDismiss()
+        }
+    }
+
     Dialog(
-        onDismissRequest = onDismiss,
+        onDismissRequest = handleExit,
         properties = DialogProperties(
             usePlatformDefaultWidth = false,
             dismissOnBackPress = true
@@ -302,7 +346,7 @@ fun WhiteboardDrawingDialog(
                     horizontalArrangement = Arrangement.SpaceBetween,
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    IconButton(onClick = onDismiss) {
+                    IconButton(onClick = handleExit) {
                         Icon(
                             Icons.Default.Close,
                             contentDescription = "بستن",
@@ -363,39 +407,7 @@ fun WhiteboardDrawingDialog(
                             )
                         }
 
-                        Spacer(modifier = Modifier.width(4.dp))
-
-                        // دکمه ذخیره طرح (Save)
-                        Button(
-                            onClick = {
-                                if (strokes.isEmpty() && legacyBitmap == null) {
-                                    Toast.makeText(context, "ابتدا چیزی روی تخته بنویسید یا بکشید", Toast.LENGTH_SHORT).show()
-                                    return@Button
-                                }
-                                val filePath = saveStrokes(
-                                    context = context,
-                                    strokes = strokes,
-                                    themeId = selectedBoardTheme.id,
-                                    bgColor = selectedBoardTheme.bgColor,
-                                    initialPath = initialDrawingPath,
-                                    legacyBitmap = legacyBitmap
-                                )
-                                if (filePath != null) {
-                                    val finalTitle = title.trim().ifBlank { "طرح ${selectedBoardTheme.name}" }
-                                    onSaveDrawing(finalTitle, filePath, selectedBoardTheme.noteBgHex)
-                                } else {
-                                    Toast.makeText(context, "خطا در ذخیره تصویر تخته", Toast.LENGTH_SHORT).show()
-                                }
-                            },
-                            colors = ButtonDefaults.buttonColors(
-                                containerColor = MaterialTheme.colorScheme.primary
-                            ),
-                            shape = RoundedCornerShape(12.dp)
-                        ) {
-                            Icon(Icons.Default.Save, contentDescription = null, modifier = Modifier.size(16.dp))
-                            Spacer(modifier = Modifier.width(4.dp))
-                            Text("ذخیره", fontSize = 12.sp, fontWeight = FontWeight.Bold)
-                        }
+                        // دکمهٔ ذخیره حذف شده است؛ ذخیره با برگشت/بستن به صورت خودکار انجام می‌شود
                     }
                 }
 
