@@ -70,8 +70,12 @@ import androidx.compose.material3.RadioButton
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Switch
 import android.view.WindowManager
-import androidx.compose.foundation.layout.imePadding
-import androidx.compose.foundation.layout.navigationBarsPadding
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.ime
+import androidx.compose.foundation.layout.navigationBars
+import androidx.compose.foundation.layout.union
+import androidx.compose.foundation.layout.windowInsetsPadding
+import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.material.icons.filled.PushPin
 import androidx.compose.material.icons.filled.Share
@@ -2336,11 +2340,11 @@ fun AddNoteDialog(
         properties = DialogProperties(usePlatformDefaultWidth = false, decorFitsSystemWindows = false)
     ) {
         Surface(modifier = Modifier.fillMaxSize(), color = editorBgAdd) {
-            Column(modifier = Modifier.fillMaxSize().statusBarsPadding().imePadding().navigationBarsPadding()) {
+            Column(modifier = Modifier.fillMaxSize().statusBarsPadding().windowInsetsPadding(WindowInsets.ime.union(WindowInsets.navigationBars))) {
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(horizontal = 8.dp, vertical = 8.dp),
+                        .padding(horizontal = 8.dp, vertical = 4.dp),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     IconButton(onClick = handleExit) {
@@ -2366,7 +2370,7 @@ fun AddNoteDialog(
                     modifier = Modifier
                         .fillMaxWidth()
                         .weight(1f)
-                        .padding(horizontal = 16.dp, vertical = 8.dp),
+                        .padding(start = 16.dp, end = 16.dp, top = 2.dp, bottom = 8.dp),
                     verticalArrangement = Arrangement.spacedBy(6.dp)
                 ) {
                 TextField(
@@ -2388,8 +2392,9 @@ fun AddNoteDialog(
 
                 Box(
                     modifier = Modifier
-                        .width(56.dp)
+                        .width(84.dp)
                         .height(2.dp)
+                        .offset(y = (-3).dp)
                         .clip(RoundedCornerShape(1.dp))
                         .background(MaterialTheme.colorScheme.onSurface.copy(alpha = 0.18f))
                 )
@@ -2821,11 +2826,11 @@ fun EditNoteDialog(
         properties = DialogProperties(usePlatformDefaultWidth = false, decorFitsSystemWindows = false)
     ) {
         Surface(modifier = Modifier.fillMaxSize(), color = editorBgEdit) {
-            Column(modifier = Modifier.fillMaxSize().statusBarsPadding().imePadding().navigationBarsPadding()) {
+            Column(modifier = Modifier.fillMaxSize().statusBarsPadding().windowInsetsPadding(WindowInsets.ime.union(WindowInsets.navigationBars))) {
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(horizontal = 8.dp, vertical = 8.dp),
+                        .padding(horizontal = 8.dp, vertical = 4.dp),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     IconButton(onClick = handleExit) {
@@ -2851,7 +2856,7 @@ fun EditNoteDialog(
                     modifier = Modifier
                         .fillMaxWidth()
                         .weight(1f)
-                        .padding(horizontal = 16.dp, vertical = 8.dp),
+                        .padding(start = 16.dp, end = 16.dp, top = 2.dp, bottom = 8.dp),
                     verticalArrangement = Arrangement.spacedBy(6.dp)
                 ) {
                 TextField(
@@ -2871,8 +2876,9 @@ fun EditNoteDialog(
 
                 Box(
                     modifier = Modifier
-                        .width(56.dp)
+                        .width(84.dp)
                         .height(2.dp)
+                        .offset(y = (-3).dp)
                         .clip(RoundedCornerShape(1.dp))
                         .background(MaterialTheme.colorScheme.onSurface.copy(alpha = 0.18f))
                 )

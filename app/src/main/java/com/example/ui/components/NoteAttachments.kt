@@ -34,11 +34,9 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.foundation.gestures.awaitEachGesture
-import androidx.compose.foundation.gestures.awaitFirstDown
+import androidx.compose.foundation.gestures.detectDragGesturesAfterLongPress
 import androidx.compose.foundation.layout.offset
 import androidx.compose.ui.input.pointer.pointerInput
-import androidx.compose.ui.input.pointer.positionChange
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.IntSize
@@ -386,9 +384,21 @@ private fun NoteTextBlock(
     var focused by remember { mutableStateOf(false) }
     val scope = rememberCoroutineScope()
 
+    // موقع تایپ سریع، چیدمانِ متن ممکن است از جای نشانگر عقب بماند؛ بدون این محافظ
+    // خواندن جای نشانگر از چیدمان قدیمی استثنا می‌داد و برنامه می‌پرید بیرون
+    fun safeCursorRect(): androidx.compose.ui.geometry.Rect? {
+        val lr = layoutResult ?: return null
+        val safeOffset = block.tfv.selection.start.coerceIn(0, lr.layoutInput.text.length)
+        return try {
+            lr.getCursorRect(safeOffset)
+        } catch (_: Exception) {
+            null
+        }
+    }
+
     LaunchedEffect(block.tfv.selection, focused) {
         if (focused) {
-            val cursor = layoutResult?.getCursorRect(block.tfv.selection.start)
+            val cursor = safeCursorRect()
             if (cursor != null) {
                 bringIntoViewRequester.bringIntoView(cursor)
             }
@@ -416,7 +426,7 @@ private fun NoteTextBlock(
                 if (state.isFocused) {
                     onFocused(block.id)
                     scope.launch {
-                        val cursor = layoutResult?.getCursorRect(block.tfv.selection.start)
+                        val cursor = safeCursorRect()
                         if (cursor != null) bringIntoViewRequester.bringIntoView(cursor)
                     }
                 }
@@ -453,8 +463,8 @@ private fun NoteMediaBlock(
     }
     Box(modifier = Modifier.fillMaxWidth()) {
         if (bitmap != null) {
-            // قاب جمع‌وجور داخل یادداشت ترکیبی: طرح با قد کامل باز نمی‌شود؛ با کشیدنِ دو انگشت
-            // داخل قاب می‌شود بقیه‌اش را دید، و کشیدنِ یک انگشت اسکرول خودِ یادداشت می‌ماند تا تداخل نشود
+            // قاب جمع‌وجور داخل یادداشت ترکیبی: کشیدنِ عادی = اسکرول خودِ یادداشت؛
+            // نگه‌داشتن و بعد کشیدن روی طرح = جابه‌جا کردن طرح داخل قاب برای دیدن بقیه‌اش
             val trueRatio = bitmap.width.toFloat() / bitmap.height.coerceAtLeast(1)
             val frameRatio = trueRatio.coerceIn(0.55f, 2.4f)
             var frameSize by remember(block.path) { mutableStateOf(IntSize.Zero) }
@@ -481,26 +491,20 @@ private fun NoteMediaBlock(
                             Modifier
                         }
                     )
-                    .pointerInput(block.path, maxPan) {
-                        if (maxPan <= 0f) return@pointerInput
-                        awaitEachGesture {
-                            awaitFirstDown(requireUnconsumed = false)
-                            var twoFinger = false
-                            while (true) {
-                                val event = awaitPointerEvent()
-                                val pressed = event.changes.filter { change -> change.pressed }
-                                if (pressed.size >= 2) {
-                                    twoFinger = true
-                                }
-                                if (twoFinger && pressed.isNotEmpty()) {
-                                    val dy = pressed.sumOf { change -> change.positionChange().y.toDouble() }.toFloat() / pressed.size
-                                    panY = (panY - dy).coerceIn(0f, maxPan)
-                                    event.changes.forEach { change -> change.consume() }
-                                }
-                                if (event.changes.all { change -> !change.pressed }) break
+                    .then(
+                        if (isDrawing && maxPan > 0f) {
+                            Modifier.pointerInput(block.path, maxPan) {
+                                detectDragGesturesAfterLongPress(
+                                    onDrag = { change, dragAmount ->
+                                        panY = (panY - dragAmount.y).coerceIn(0f, maxPan)
+                                        change.consume()
+                                    }
+                                )
                             }
+                        } else {
+                            Modifier
                         }
-                    }
+                    )
                     .then(
                         if (isDrawing) {
                             Modifier.clickable { onOpenDrawing(block) }
