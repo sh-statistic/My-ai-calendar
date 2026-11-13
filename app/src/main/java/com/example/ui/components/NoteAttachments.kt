@@ -52,6 +52,7 @@ import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
+import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
@@ -475,31 +476,44 @@ fun formatNoteReminderLabel(millis: Long): String {
 
 class NoteBlockState(
     val id: String = UUID.randomUUID().toString(),
-    val kind: String, // "t" text, "i" image, "d" drawing
+    val kind: String, // "t" text, "i" image, "d" drawing, "c" checklist
     text: String = "",
-    path: String? = null
+    path: String? = null,
+    checklistJson: String = ""
 ) {
     var tfv by mutableStateOf(TextFieldValue(text))
     var path by mutableStateOf(path)
+    val checklistItems: SnapshotStateList<ChecklistItem> =
+        mutableStateListOf<ChecklistItem>().apply { addAll(parseChecklistItems(checklistJson)) }
 }
 
 fun buildInitialNoteBlocks(
     blocksJson: String?,
     content: String,
     imagePath: String?,
-    drawingPath: String?
+    drawingPath: String?,
+    checklistJson: String = ""
 ): MutableList<NoteBlockState> {
     val parsed = parseNoteBlocksData(blocksJson)
     val blocks = mutableListOf<NoteBlockState>()
     if (parsed.isNotEmpty()) {
         for (b in parsed) {
-            blocks.add(NoteBlockState(kind = b.kind, text = b.text, path = b.path))
+            blocks.add(
+                NoteBlockState(
+                    kind = b.kind, text = b.text, path = b.path,
+                    checklistJson = if (b.kind == "c") b.text else ""
+                )
+            )
         }
     } else {
         // یادداشت قدیمی بدون بلوک: متن، بعد پیوست‌های قدیمی به همان ترتیب نمایشی قبلی
         blocks.add(NoteBlockState(kind = "t", text = content))
         if (!drawingPath.isNullOrBlank()) blocks.add(NoteBlockState(kind = "d", path = drawingPath))
         if (!imagePath.isNullOrBlank()) blocks.add(NoteBlockState(kind = "i", path = imagePath))
+    }
+    // چک‌لیست قدیمی (ستون جدا) اگر هنوز بلوک چک‌لیست ندارد، یک بلوک در انتها می‌شود
+    if (checklistJson.isNotBlank() && blocks.none { it.kind == "c" }) {
+        blocks.add(NoteBlockState(kind = "c", checklistJson = checklistJson))
     }
     if (blocks.none { it.kind == "t" }) {
         blocks.add(0, NoteBlockState(kind = "t", text = content))
@@ -510,15 +524,24 @@ fun buildInitialNoteBlocks(
     return blocks
 }
 
-// نسخهٔ ذخیره‌شدنی بلوک‌ها: بلوک رسانه‌ای بی‌فایل و متن‌های خالی دو سر حذف می‌شوند؛
-// اگر هیچ رسانه‌ای نیست، رشتهٔ خالی برمی‌گردد تا یادداشت متنی ساده بماند.
+// نسخهٔ ذخیره‌شدنی بلوک‌ها: بلوک رسانه‌ای بی‌فایل، چک‌لیست خالی و متن‌های خالی دو سر حذف می‌شوند؛
+// اگر فقط متن ساده است، رشتهٔ خالی برمی‌گردد تا یادداشت متنی ساده بماند.
 fun noteBlocksToJson(blocks: List<NoteBlockState>): String {
-    val kept = blocks.filter { it.kind == "t" || !it.path.isNullOrBlank() }.toMutableList()
-    while (kept.isNotEmpty() && kept.first().kind == "t" && kept.first().tfv.text.isBlank()) kept.removeAt(0)
-    while (kept.isNotEmpty() && kept.last().kind == "t" && kept.last().tfv.text.isBlank()) kept.removeAt(kept.lastIndex)
-    if (kept.isEmpty()) return ""
-    if (kept.all { it.kind == "t" }) return ""
-    return noteBlocksDataToJson(kept.map { NoteBlockData(it.kind, it.tfv.text, it.path) })
+    val data = blocks.mapNotNull { block ->
+        when (block.kind) {
+            "t" -> NoteBlockData("t", text = block.tfv.text)
+            "c" -> {
+                val json = checklistItemsToJson(block.checklistItems.toList())
+                if (json.isBlank()) null else NoteBlockData("c", text = json)
+            }
+            else -> if (block.path.isNullOrBlank()) null else NoteBlockData(block.kind, path = block.path)
+        }
+    }.toMutableList()
+    while (data.isNotEmpty() && data.first().kind == "t" && data.first().text.isBlank()) data.removeAt(0)
+    while (data.isNotEmpty() && data.last().kind == "t" && data.last().text.isBlank()) data.removeAt(data.lastIndex)
+    if (data.isEmpty()) return ""
+    if (data.all { it.kind == "t" }) return ""
+    return noteBlocksDataToJson(data)
 }
 
 fun noteBlocksToContent(blocks: List<NoteBlockState>): String =
@@ -528,10 +551,26 @@ fun noteBlocksFirstPath(blocks: List<NoteBlockState>, kind: String): String? =
     blocks.firstOrNull { it.kind == kind && !it.path.isNullOrBlank() }?.path
 
 fun noteBlocksSignature(blocks: List<NoteBlockState>): String =
-    blocks.joinToString("|") { it.kind + ":" + (if (it.kind == "t") it.tfv.text else (it.path ?: "")) }
+    blocks.joinToString("|") { block ->
+        block.kind + ":" + when (block.kind) {
+            "t" -> block.tfv.text
+            "c" -> checklistItemsToJson(block.checklistItems.toList())
+            else -> block.path ?: ""
+        }
+    }
 
 fun noteBlocksHaveContent(blocks: List<NoteBlockState>): Boolean =
-    blocks.any { (it.kind == "t" && it.tfv.text.isNotBlank()) || (it.kind != "t" && !it.path.isNullOrBlank()) }
+    blocks.any {
+        (it.kind == "t" && it.tfv.text.isNotBlank()) ||
+            (it.kind == "c" && it.checklistItems.any { item -> item.text.isNotBlank() }) ||
+            ((it.kind == "i" || it.kind == "d") && !it.path.isNullOrBlank())
+    }
+
+// چک‌لیست یکپارچهٔ همهٔ بلوک‌های چک‌لیست، برای ستون قدیمی checklistJson (کارت یادداشت و بکاپ)
+fun noteBlocksChecklistJson(blocks: List<NoteBlockState>): String {
+    val all = blocks.filter { it.kind == "c" }.flatMap { it.checklistItems.toList() }
+    return checklistItemsToJson(all)
+}
 
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
@@ -723,6 +762,27 @@ fun NoteBlocksEditor(
                         onChanged = onChanged,
                         onFocused = onFocusedTextBlock
                     )
+                    "c" -> Column(modifier = Modifier.fillMaxWidth()) {
+                        ChecklistEditorSection(
+                            items = block.checklistItems,
+                            isFa = isFa,
+                            onChanged = onChanged
+                        )
+                        TextButton(onClick = { blocks.remove(block); onChanged() }) {
+                            Icon(
+                                Icons.Default.Delete,
+                                contentDescription = null,
+                                modifier = Modifier.size(14.dp),
+                                tint = MaterialTheme.colorScheme.error
+                            )
+                            Spacer(modifier = Modifier.width(4.dp))
+                            Text(
+                                if (isFa) "حذف چک‌لیست" else "Remove checklist",
+                                fontSize = 11.sp,
+                                color = MaterialTheme.colorScheme.error
+                            )
+                        }
+                    }
                     "i" -> NoteMediaBlock(
                         block = block,
                         isFa = isFa,

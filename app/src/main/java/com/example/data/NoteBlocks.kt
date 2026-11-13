@@ -3,8 +3,9 @@ package com.example.data
 import org.json.JSONArray
 import org.json.JSONObject
 
-// یک بلوک از محتوای درون‌خطی یادداشت: متن، عکس یا نقاشی — به همان ترتیبی که کاربر چیده است.
-// kind: "t" = text (uses text), "i" = image (uses path), "d" = drawing (uses path)
+// یک بلوک از محتوای درون‌خطی یادداشت: متن، عکس، نقاشی یا چک‌لیست — به همان ترتیبی که کاربر چیده است.
+// kind: "t" = text (uses text), "i" = image (uses path), "d" = drawing (uses path),
+//       "c" = checklist (uses text as the checklist JSON payload)
 data class NoteBlockData(
     val kind: String,
     val text: String = "",
@@ -20,6 +21,7 @@ fun parseNoteBlocksData(blocksJson: String?): List<NoteBlockData> {
             val obj = arr.getJSONObject(i)
             when (obj.optString("k")) {
                 "t" -> result.add(NoteBlockData("t", text = obj.optString("x", "")))
+                "c" -> result.add(NoteBlockData("c", text = obj.optString("x", "")))
                 "i" -> result.add(NoteBlockData("i", path = obj.optString("p").takeIf { it.isNotBlank() }))
                 "d" -> result.add(NoteBlockData("d", path = obj.optString("p").takeIf { it.isNotBlank() }))
             }
@@ -36,7 +38,7 @@ fun noteBlocksDataToJson(blocks: List<NoteBlockData>): String {
     for (b in blocks) {
         val obj = JSONObject()
         obj.put("k", b.kind)
-        if (b.kind == "t") {
+        if (b.kind == "t" || b.kind == "c") {
             obj.put("x", b.text)
         } else {
             obj.put("p", b.path ?: "")

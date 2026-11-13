@@ -2260,8 +2260,6 @@ fun AddNoteDialog(
         (defaultSuggestions + existingTags).distinct()
     }
 
-    val checklistItems = remember { mutableStateListOf<ChecklistItem>() }
-    var showChecklist by remember { mutableStateOf(false) }
     var attachedAudioPath by remember { mutableStateOf<String?>(null) }
     var showVoice by remember { mutableStateOf(false) }
     var reminderAt by remember { mutableStateOf(0L) }
@@ -2295,13 +2293,12 @@ fun AddNoteDialog(
     var savedOnce by remember { mutableStateOf(false) }
     val handleExit: () -> Unit = {
         val hasAnything = noteBlocksHaveContent(blocks) || title.isNotBlank() || tagsList.isNotEmpty() ||
-            !attachedAudioPath.isNullOrBlank() ||
-            checklistItems.any { it.text.isNotBlank() } || reminderAt > 0
+            !attachedAudioPath.isNullOrBlank() || reminderAt > 0
         if (!savedOnce && hasAnything) {
             savedOnce = true
             onConfirm(
                 title.trim(), noteBlocksToContent(blocks), selectedColor, tagsList.joinToString(","), isPinned,
-                noteBlocksFirstPath(blocks, "i"), checklistItemsToJson(checklistItems.toList()), attachedAudioPath,
+                noteBlocksFirstPath(blocks, "i"), noteBlocksChecklistJson(blocks), attachedAudioPath,
                 reminderAt, noteBlocksToJson(blocks)
             )
         }
@@ -2570,14 +2567,6 @@ fun AddNoteDialog(
                     }
                 }
 
-                if (showChecklist || checklistItems.isNotEmpty()) {
-                    ChecklistEditorSection(
-                        items = checklistItems,
-                        isFa = strings.isFa,
-                        onChanged = {}
-                    )
-                }
-
                 if (showVoice || !attachedAudioPath.isNullOrBlank()) {
                     VoiceNoteRow(
                         audioPath = attachedAudioPath,
@@ -2650,8 +2639,9 @@ fun AddNoteDialog(
                                 text = { Text(if (strings.isFa) "افزودن چک‌لیست" else "Add checklist", fontSize = 13.sp) },
                                 onClick = {
                                     showAddMenu = false
-                                    showChecklist = true
-                                    if (checklistItems.isEmpty()) checklistItems.add(ChecklistItem("", false))
+                                    val nb = NoteBlockState(kind = "c")
+                                    nb.checklistItems.add(ChecklistItem("", false))
+                                    insertBlocksAtFocus(listOf(nb))
                                 }
                             )
                             DropdownMenuItem(
@@ -2720,7 +2710,8 @@ fun EditNoteDialog(
         mutableStateListOf<NoteBlockState>().apply {
             addAll(
                 buildInitialNoteBlocks(
-                    initialNote.blocksJson, initialNote.content, initialNote.imagePath, initialNote.drawingPath
+                    initialNote.blocksJson, initialNote.content, initialNote.imagePath, initialNote.drawingPath,
+                    initialNote.checklistJson
                 )
             )
         }
@@ -2729,9 +2720,7 @@ fun EditNoteDialog(
     var focusedTextBlockId by remember { mutableStateOf<String?>(null) }
     var drawingBlock by remember { mutableStateOf<NoteBlockState?>(null) }
     var attachedAudioPath by remember { mutableStateOf(initialNote.audioPath) }
-    val initialChecklist = remember(initialNote.checklistJson) { parseChecklistItems(initialNote.checklistJson) }
-    val checklistItems = remember { mutableStateListOf<ChecklistItem>().apply { addAll(initialChecklist) } }
-    var showChecklist by remember { mutableStateOf(false) }
+    // چک‌لیست حالا بلوک درون‌خطی است و از buildInitialNoteBlocks می‌آید
     var showVoice by remember { mutableStateOf(false) }
     var reminderAt by remember { mutableStateOf(initialNote.reminderAt) }
     var showAddMenu by remember { mutableStateOf(false) }
@@ -2774,19 +2763,18 @@ fun EditNoteDialog(
         selectedColor != initialNote.colorHex || isPinned != initialNote.isPinned ||
         tagsList.toList() != initialTags ||
         attachedAudioPath != initialNote.audioPath ||
-        checklistItemsToJson(checklistItems.toList()) != initialNote.checklistJson ||
         reminderAt != initialNote.reminderAt
 
     LaunchedEffect(
         title, blocksSignature, selectedColor, isPinned, tagsList.toList(),
-        attachedAudioPath, checklistItems.toList(), reminderAt
+        attachedAudioPath, reminderAt
     ) {
         if (isDirty && onAutosave != null) {
             delay(800)
             onAutosave(
                 title, noteBlocksToContent(blocks), selectedColor, isPinned,
                 noteBlocksFirstPath(blocks, "d"), tagsList.joinToString(","),
-                noteBlocksFirstPath(blocks, "i"), checklistItemsToJson(checklistItems.toList()),
+                noteBlocksFirstPath(blocks, "i"), noteBlocksChecklistJson(blocks),
                 attachedAudioPath, reminderAt, noteBlocksToJson(blocks)
             )
         }
@@ -2798,14 +2786,13 @@ fun EditNoteDialog(
             exitSaved = true
             if (isDirty) {
                 val canSave = noteBlocksHaveContent(blocks) || title.isNotBlank() ||
-                    !attachedAudioPath.isNullOrBlank() ||
-                    checklistItems.any { it.text.isNotBlank() }
+                    !attachedAudioPath.isNullOrBlank()
                 if (canSave) {
                     onConfirm(
                         title.trim(), noteBlocksToContent(blocks), selectedColor, isPinned,
                         noteBlocksFirstPath(blocks, "d"),
                         tagsList.joinToString(","), noteBlocksFirstPath(blocks, "i"),
-                        checklistItemsToJson(checklistItems.toList()), attachedAudioPath, reminderAt,
+                        noteBlocksChecklistJson(blocks), attachedAudioPath, reminderAt,
                         noteBlocksToJson(blocks)
                     )
                 }
@@ -3067,14 +3054,6 @@ fun EditNoteDialog(
                     }
                 }
 
-                if (showChecklist || checklistItems.isNotEmpty()) {
-                    ChecklistEditorSection(
-                        items = checklistItems,
-                        isFa = strings.isFa,
-                        onChanged = {}
-                    )
-                }
-
                 if (showVoice || !attachedAudioPath.isNullOrBlank()) {
                     VoiceNoteRow(
                         audioPath = attachedAudioPath,
@@ -3146,8 +3125,9 @@ fun EditNoteDialog(
                                 text = { Text(if (strings.isFa) "افزودن چک‌لیست" else "Add checklist", fontSize = 13.sp) },
                                 onClick = {
                                     showAddMenu = false
-                                    showChecklist = true
-                                    if (checklistItems.isEmpty()) checklistItems.add(ChecklistItem("", false))
+                                    val nb = NoteBlockState(kind = "c")
+                                    nb.checklistItems.add(ChecklistItem("", false))
+                                    insertBlocksAtFocus(listOf(nb))
                                 }
                             )
                             DropdownMenuItem(
