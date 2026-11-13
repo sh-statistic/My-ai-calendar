@@ -223,6 +223,13 @@ object NoteShareHelper {
         }
     }
 
+    /**
+     * اشتراک‌گذاری مستقیم یک متن دلخواه (مثلاً متن در حال ویرایش یک یادداشت)
+     */
+    fun shareText(context: Context, subject: String, body: String) {
+        fallbackShare(context, subject, body)
+    }
+
     private fun fallbackShare(context: Context, subject: String, body: String) {
         val shareIntent = Intent(Intent.ACTION_SEND).apply {
             type = "text/plain"

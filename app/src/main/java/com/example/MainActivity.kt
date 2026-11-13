@@ -1,7 +1,10 @@
 package com.example
 
 import android.content.Intent
+import android.net.Uri
 import android.os.Bundle
+import androidx.lifecycle.lifecycleScope
+import kotlinx.coroutines.launch
 import android.widget.Toast
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.BackHandler
@@ -112,6 +115,7 @@ class MainActivity : ComponentActivity() {
         )
 
         handleIntentForUpdate(intent)
+        handleShareIntent(intent)
 
         // راه‌اندازی استعلام خودکار و دوره‌ای پس‌زمینه با WorkManager حتی در صورت بسته بودن برنامه
         com.example.update.UpdateWorkScheduler.schedulePeriodicCheck(this)
@@ -191,6 +195,12 @@ class MainActivity : ComponentActivity() {
                         }
 
                         var selectedTab by remember { mutableIntStateOf(0) }
+                        val sharedNoteSeed by viewModel.sharedNoteSeed.collectAsState()
+                        LaunchedEffect(sharedNoteSeed) {
+                            if (sharedNoteSeed != null) {
+                                selectedTab = 2
+                            }
+                        }
                         val todayJalali = remember { PersianCalendarHelper.getCurrentJalaliDate() }
                         val selectedDate by viewModel.selectedDate.collectAsState()
                         val viewYear by viewModel.currentViewYear.collectAsState()
@@ -728,6 +738,56 @@ class MainActivity : ComponentActivity() {
         super.onNewIntent(intent)
         setIntent(intent)
         handleIntentForUpdate(intent)
+        handleShareIntent(intent)
+    }
+
+    private fun handleShareIntent(intent: Intent?) {
+        val action = intent?.action ?: return
+        val type = intent.type ?: return
+        when {
+            action == Intent.ACTION_SEND && type == "text/plain" -> {
+                val sharedText = intent.getStringExtra(Intent.EXTRA_TEXT) ?: return
+                val sharedTitle = intent.getStringExtra(Intent.EXTRA_SUBJECT) ?: ""
+                viewModel.onSharedContentReceived(
+                    MainViewModel.SharedNoteSeed(title = sharedTitle, content = sharedText)
+                )
+            }
+            action == Intent.ACTION_SEND && type.startsWith("image/") -> {
+                val uri = androidx.core.content.IntentCompat.getParcelableExtra(
+                    intent, Intent.EXTRA_STREAM, Uri::class.java
+                ) ?: return
+                copySharedImageToAppStorage(uri, intent.getStringExtra(Intent.EXTRA_SUBJECT) ?: "")
+            }
+            action == Intent.ACTION_SEND_MULTIPLE && type.startsWith("image/") -> {
+                val uris = androidx.core.content.IntentCompat.getParcelableArrayListExtra(
+                    intent, Intent.EXTRA_STREAM, Uri::class.java
+                )
+                val first = uris?.firstOrNull() ?: return
+                copySharedImageToAppStorage(first, intent.getStringExtra(Intent.EXTRA_SUBJECT) ?: "")
+            }
+        }
+    }
+
+    private fun copySharedImageToAppStorage(uri: Uri, sharedTitle: String) {
+        lifecycleScope.launch {
+            val savedPath = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+                try {
+                    val dir = java.io.File(filesDir, "notes_images").apply { mkdirs() }
+                    val file = java.io.File(dir, "shared_" + java.util.UUID.randomUUID().toString() + ".jpg")
+                    contentResolver.openInputStream(uri)?.use { input ->
+                        file.outputStream().use { output -> input.copyTo(output) }
+                    }
+                    if (file.exists() && file.length() > 0) file.absolutePath else null
+                } catch (_: Exception) {
+                    null
+                }
+            }
+            if (savedPath != null) {
+                viewModel.onSharedContentReceived(
+                    MainViewModel.SharedNoteSeed(title = sharedTitle, imagePath = savedPath)
+                )
+            }
+        }
     }
 
     private fun handleIntentForUpdate(intent: Intent?) {
