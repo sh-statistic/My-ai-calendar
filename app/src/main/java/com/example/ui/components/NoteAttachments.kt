@@ -17,6 +17,7 @@ import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.defaultMinSize
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -78,6 +79,7 @@ import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.TextLayoutResult
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.TextFieldValue
@@ -464,70 +466,69 @@ private fun NoteMediaBlock(
     Box(modifier = Modifier.fillMaxWidth()) {
         if (bitmap != null) {
             // قاب جمع‌وجور داخل یادداشت ترکیبی: کشیدنِ عادی = اسکرول خودِ یادداشت؛
-            // نگه‌داشتن و بعد کشیدن روی طرح = جابه‌جا کردن طرح داخل قاب برای دیدن بقیه‌اش
+            // نگه‌داشتن و بعد کشیدن روی طرح = جابه‌جا کردن طرح داخل قاب برای دیدن بقیه‌اش.
+            // ارتفاع قاب و عکس هر دو مستقیم از اندازهٔ واقعی عکس حساب می‌شوند؛ با نسبتِ قاب و سقفِ ارتفاع
+            // قاب از عکس بلندتر درمی‌آمد و جابه‌جایی هم کامل نمی‌رسید، برای همین آن روش کنار گذاشته شد.
             val trueRatio = bitmap.width.toFloat() / bitmap.height.coerceAtLeast(1)
-            // سقف ۲٫۴ حذف شد: طرح‌های پهن (مثلاً کمان پهن) قابشان بلندتر از خود طرح می‌شد و زیر طرح پس‌زمینهٔ صفحه دیده می‌شد
-            val frameRatio = trueRatio.coerceAtLeast(0.55f)
-            var frameSize by remember(block.path) { mutableStateOf(IntSize.Zero) }
-            var panY by remember(block.path) { mutableStateOf(0f) }
-            val maxPan = if (frameSize.width > 0 && trueRatio > 0f) {
-                (frameSize.width / trueRatio - frameSize.height).coerceAtLeast(0f)
-            } else {
-                0f
-            }
-            LaunchedEffect(maxPan) {
-                panY = panY.coerceIn(0f, maxPan)
-            }
-            Box(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .aspectRatio(frameRatio)
-                    .heightIn(max = 430.dp)
-                    .clip(RoundedCornerShape(14.dp))
-                    .onSizeChanged { frameSize = it }
-                    .then(
-                        if (isDrawing) {
-                            Modifier.border(1.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.35f), RoundedCornerShape(14.dp))
-                        } else {
-                            Modifier
-                        }
-                    )
-                    .then(
-                        if (isDrawing && maxPan > 0f) {
-                            Modifier.pointerInput(block.path, maxPan) {
-                                detectDragGesturesAfterLongPress(
-                                    onDrag = { change, dragAmount ->
-                                        panY = (panY - dragAmount.y).coerceIn(0f, maxPan)
-                                        change.consume()
-                                    }
-                                )
-                            }
-                        } else {
-                            Modifier
-                        }
-                    )
-                    .then(
-                        if (isDrawing) {
-                            Modifier.clickable { onOpenDrawing(block) }
-                        } else {
-                            // ضربه روی عکس فقط مصرف می‌شود تا صفحه‌کلید الکی باز نشود
-                            Modifier.clickable { }
-                        }
-                    )
-            ) {
-                Image(
-                    bitmap = bitmap,
-                    contentDescription = if (isDrawing) {
-                        if (isFa) "طرح نقاشی" else "Drawing"
-                    } else {
-                        if (isFa) "عکس" else "Photo"
-                    },
-                    contentScale = ContentScale.FillWidth,
-                    alignment = Alignment.TopCenter,
+            BoxWithConstraints(modifier = Modifier.fillMaxWidth()) {
+                val density = LocalDensity.current
+                val imageH = maxWidth / trueRatio
+                val frameH = minOf(imageH, 430.dp)
+                val maxPanDp = imageH - frameH
+                var panDp by remember(block.path) { mutableStateOf(0.dp) }
+                LaunchedEffect(maxPanDp) {
+                    panDp = panDp.coerceIn(0.dp, maxPanDp)
+                }
+                Box(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .offset { IntOffset(0, -panY.roundToInt()) }
-                )
+                        .height(frameH)
+                        .clip(RoundedCornerShape(14.dp))
+                        .then(
+                            if (isDrawing) {
+                                Modifier.border(1.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.35f), RoundedCornerShape(14.dp))
+                            } else {
+                                Modifier
+                            }
+                        )
+                        .then(
+                            if (isDrawing && maxPanDp > 0.dp) {
+                                Modifier.pointerInput(block.path, maxPanDp) {
+                                    detectDragGesturesAfterLongPress(
+                                        onDrag = { change, dragAmount ->
+                                            panDp = (panDp - with(density) { dragAmount.y.toDp() }).coerceIn(0.dp, maxPanDp)
+                                            change.consume()
+                                        }
+                                    )
+                                }
+                            } else {
+                                Modifier
+                            }
+                        )
+                        .then(
+                            if (isDrawing) {
+                                Modifier.clickable { onOpenDrawing(block) }
+                            } else {
+                                // ضربه روی عکس فقط مصرف می‌شود تا صفحه‌کلید الکی باز نشود
+                                Modifier.clickable { }
+                            }
+                        )
+                ) {
+                    Image(
+                        bitmap = bitmap,
+                        contentDescription = if (isDrawing) {
+                            if (isFa) "طرح نقاشی" else "Drawing"
+                        } else {
+                            if (isFa) "عکس" else "Photo"
+                        },
+                        contentScale = ContentScale.FillWidth,
+                        alignment = Alignment.TopCenter,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(imageH)
+                            .offset { IntOffset(0, -panDp.roundToPx()) }
+                    )
+                }
             }
         } else {
             Box(

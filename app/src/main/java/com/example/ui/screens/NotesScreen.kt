@@ -66,6 +66,7 @@ import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Share
 import androidx.compose.material.icons.filled.Sync
 import androidx.compose.material3.Card
+import androidx.compose.material3.LocalMinimumInteractiveComponentSize
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
@@ -83,6 +84,7 @@ import androidx.compose.material3.SmallFloatingActionButton
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -102,6 +104,7 @@ import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.withStyle
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.data.NoteEntity
@@ -212,7 +215,7 @@ fun NotesScreen(
         }
     }
 
-    Box(modifier = modifier.fillMaxSize().statusBarsPadding()) {
+    Box(modifier = modifier.fillMaxSize()) {
         Column(
             modifier = Modifier.fillMaxSize()
         ) {
@@ -220,7 +223,7 @@ fun NotesScreen(
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(start = 14.dp, end = 4.dp, top = 6.dp, bottom = 6.dp),
+                    .padding(start = 14.dp, end = 4.dp, top = 2.dp, bottom = 6.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 OutlinedTextField(
@@ -1013,6 +1016,7 @@ fun NoteCard(
 
             val tags = note.tag.split(",").map { it.trim() }.filter { it.isNotBlank() }
             if (tags.isNotEmpty()) {
+                CompositionLocalProvider(LocalMinimumInteractiveComponentSize provides Dp.Unspecified) {
                 FlowRow(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.spacedBy(4.dp),
@@ -1065,6 +1069,7 @@ fun NoteCard(
                             )
                         }
                     }
+                }
                 }
                 Spacer(modifier = Modifier.height(8.dp))
             }
