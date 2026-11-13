@@ -14,6 +14,8 @@ data class SyncData(
     val notes: List<NoteEntity>,
     val mementoMoriJson: JSONObject? = null,
     val noteDrawingsBase64: Map<String, String>? = null, // key: note id, value: base64 drawing content
+    val noteImagesBase64: Map<String, String>? = null, // key: note id, value: base64 photo content
+    val noteAudiosBase64: Map<String, String>? = null, // key: note id, value: base64 voice content
     val customOccasionsData: String? = null,
     val customOccasionsHiddenData: String? = null,
     val appPreferences: Map<String, Any?>? = null,
@@ -78,6 +80,24 @@ data class SyncData(
             if (!drawingB64.isNullOrBlank()) {
                 obj.put("drawingBase64", drawingB64)
             }
+            if (n.imagePath != null) {
+                obj.put("imagePath", n.imagePath)
+            }
+            val imageB64 = noteImagesBase64?.get(n.id)
+            if (!imageB64.isNullOrBlank()) {
+                obj.put("imageBase64", imageB64)
+            }
+            if (n.audioPath != null) {
+                obj.put("audioPath", n.audioPath)
+            }
+            val audioB64 = noteAudiosBase64?.get(n.id)
+            if (!audioB64.isNullOrBlank()) {
+                obj.put("audioBase64", audioB64)
+            }
+            obj.put("checklistJson", n.checklistJson)
+            obj.put("reminderAt", n.reminderAt)
+            obj.put("isArchived", n.isArchived)
+            obj.put("deletedAt", n.deletedAt)
             obj.put("updatedAt", n.updatedAt)
             obj.put("isDeleted", n.isDeleted)
             notesArray.put(obj)
@@ -163,6 +183,8 @@ data class SyncData(
 
             val notes = mutableListOf<NoteEntity>()
             val drawingsMap = mutableMapOf<String, String>()
+            val imagesMap = mutableMapOf<String, String>()
+            val audiosMap = mutableMapOf<String, String>()
             val notesArray = root.optJSONArray("notes")
             if (notesArray != null) {
                 for (i in 0 until notesArray.length()) {
@@ -171,6 +193,14 @@ data class SyncData(
                     val drawingB64 = if (obj.isNull("drawingBase64")) null else obj.optString("drawingBase64").takeIf { it.isNotBlank() }
                     if (drawingB64 != null) {
                         drawingsMap[noteId] = drawingB64
+                    }
+                    val imageB64 = if (obj.isNull("imageBase64")) null else obj.optString("imageBase64").takeIf { it.isNotBlank() }
+                    if (imageB64 != null) {
+                        imagesMap[noteId] = imageB64
+                    }
+                    val audioB64 = if (obj.isNull("audioBase64")) null else obj.optString("audioBase64").takeIf { it.isNotBlank() }
+                    if (audioB64 != null) {
+                        audiosMap[noteId] = audioB64
                     }
                     notes.add(
                         NoteEntity(
@@ -183,7 +213,13 @@ data class SyncData(
                             drawingPath = if (obj.isNull("drawingPath")) null else obj.optString("drawingPath").takeIf { it.isNotBlank() },
                             tag = obj.optString("tag", ""),
                             updatedAt = obj.optLong("updatedAt", System.currentTimeMillis()),
-                            isDeleted = obj.optBoolean("isDeleted", false)
+                            isDeleted = obj.optBoolean("isDeleted", false),
+                            imagePath = if (obj.isNull("imagePath")) null else obj.optString("imagePath").takeIf { it.isNotBlank() },
+                            audioPath = if (obj.isNull("audioPath")) null else obj.optString("audioPath").takeIf { it.isNotBlank() },
+                            checklistJson = obj.optString("checklistJson", ""),
+                            reminderAt = obj.optLong("reminderAt", 0),
+                            isArchived = obj.optBoolean("isArchived", false),
+                            deletedAt = obj.optLong("deletedAt", 0)
                         )
                     )
                 }
@@ -222,6 +258,8 @@ data class SyncData(
                 notes = notes,
                 mementoMoriJson = mementoMoriJson,
                 noteDrawingsBase64 = if (drawingsMap.isNotEmpty()) drawingsMap else null,
+                noteImagesBase64 = if (imagesMap.isNotEmpty()) imagesMap else null,
+                noteAudiosBase64 = if (audiosMap.isNotEmpty()) audiosMap else null,
                 customOccasionsData = customOccasionsData,
                 customOccasionsHiddenData = customOccasionsHiddenData,
                 appPreferences = appPreferences,

@@ -37,6 +37,7 @@ import androidx.compose.material.icons.filled.DeleteSweep
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.EventBusy
 import androidx.compose.material.icons.filled.Flag
+import androidx.compose.material.icons.filled.Notifications
 import androidx.compose.material.icons.filled.NotificationsActive
 import androidx.compose.material.icons.filled.Palette
 import androidx.compose.material.icons.filled.Remove
@@ -49,6 +50,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
@@ -2229,7 +2231,7 @@ fun removeActiveHashtagFromContent(text: String): String {
 @Composable
 fun AddNoteDialog(
     onDismiss: () -> Unit,
-    onConfirm: (title: String, content: String, colorHex: String, tag: String, isPinned: Boolean, imagePath: String?) -> Unit,
+    onConfirm: (title: String, content: String, colorHex: String, tag: String, isPinned: Boolean, imagePath: String?, checklistJson: String, audioPath: String?, reminderAt: Long) -> Unit,
     existingTags: List<String> = emptyList(),
     initialTitle: String = "",
     initialContent: String = "",
@@ -2250,12 +2252,24 @@ fun AddNoteDialog(
         (defaultSuggestions + existingTags).distinct()
     }
 
+    val checklistItems = remember { mutableStateListOf<ChecklistItem>() }
+    var showChecklist by remember { mutableStateOf(false) }
+    var attachedAudioPath by remember { mutableStateOf<String?>(null) }
+    var showVoice by remember { mutableStateOf(false) }
+    var reminderAt by remember { mutableStateOf(0L) }
+    var showAddMenu by remember { mutableStateOf(false) }
+
     var savedOnce by remember { mutableStateOf(false) }
     val handleExit: () -> Unit = {
-        val hasAnything = content.isNotBlank() || title.isNotBlank() || tagsList.isNotEmpty() || !attachedImagePath.isNullOrBlank()
+        val hasAnything = content.isNotBlank() || title.isNotBlank() || tagsList.isNotEmpty() ||
+            !attachedImagePath.isNullOrBlank() || !attachedAudioPath.isNullOrBlank() ||
+            checklistItems.any { it.text.isNotBlank() } || reminderAt > 0
         if (!savedOnce && hasAnything) {
             savedOnce = true
-            onConfirm(title.trim(), content.trim(), selectedColor, tagsList.joinToString(","), isPinned, attachedImagePath)
+            onConfirm(
+                title.trim(), content.trim(), selectedColor, tagsList.joinToString(","), isPinned,
+                attachedImagePath, checklistItemsToJson(checklistItems.toList()), attachedAudioPath, reminderAt
+            )
         }
         onDismiss()
     }
@@ -2275,6 +2289,18 @@ fun AddNoteDialog(
         onDispose {
             if (window != null && previousMode != null) {
                 window.setSoftInputMode(previousMode)
+            }
+        }
+    }
+
+    val scopeAdd = androidx.compose.runtime.rememberCoroutineScope()
+    val photoPickerAdd = androidx.activity.compose.rememberLauncherForActivityResult(
+        contract = androidx.activity.result.contract.ActivityResultContracts.PickVisualMedia()
+    ) { uri ->
+        if (uri != null) {
+            scopeAdd.launch {
+                val path = copyUriToNotesImages(contextAdd, uri)
+                if (path != null) attachedImagePath = path
             }
         }
     }
@@ -2545,6 +2571,42 @@ fun AddNoteDialog(
                         .testTag("note_content_input")
                 )
 
+                if (reminderAt > 0) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Icon(
+                            Icons.Default.Notifications,
+                            contentDescription = null,
+                            tint = MaterialTheme.colorScheme.primary,
+                            modifier = Modifier.size(16.dp)
+                        )
+                        Spacer(modifier = Modifier.width(6.dp))
+                        Text(
+                            text = if (strings.isFa) "یادآور: ${formatNoteReminderLabel(reminderAt)}" else "Reminder: ${formatNoteReminderLabel(reminderAt)}",
+                            fontSize = 12.sp,
+                            color = MaterialTheme.colorScheme.primary
+                        )
+                        IconButton(onClick = { reminderAt = 0L }) {
+                            Icon(Icons.Default.Close, contentDescription = null, modifier = Modifier.size(14.dp))
+                        }
+                    }
+                }
+
+                if (showChecklist || checklistItems.isNotEmpty()) {
+                    ChecklistEditorSection(
+                        items = checklistItems,
+                        isFa = strings.isFa,
+                        onChanged = {}
+                    )
+                }
+
+                if (showVoice || !attachedAudioPath.isNullOrBlank()) {
+                    VoiceNoteRow(
+                        audioPath = attachedAudioPath,
+                        isFa = strings.isFa,
+                        onAudioChanged = { attachedAudioPath = it }
+                    )
+                }
+
                 }
                 Row(
                     modifier = Modifier
@@ -2576,6 +2638,52 @@ fun AddNoteDialog(
                         }
                     }
                     Spacer(modifier = Modifier.weight(1f))
+                    Box {
+                        IconButton(onClick = { showAddMenu = true }) {
+                            Icon(
+                                Icons.Default.Add,
+                                contentDescription = if (strings.isFa) "افزودن به یادداشت" else "Add to note",
+                                tint = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+                        DropdownMenu(expanded = showAddMenu, onDismissRequest = { showAddMenu = false }) {
+                            DropdownMenuItem(
+                                text = { Text(if (strings.isFa) "افزودن عکس" else "Add photo", fontSize = 13.sp) },
+                                onClick = {
+                                    showAddMenu = false
+                                    photoPickerAdd.launch(
+                                        androidx.activity.result.PickVisualMediaRequest(
+                                            androidx.activity.result.contract.ActivityResultContracts.PickVisualMedia.ImageOnly
+                                        )
+                                    )
+                                }
+                            )
+                            DropdownMenuItem(
+                                text = { Text(if (strings.isFa) "افزودن چک‌لیست" else "Add checklist", fontSize = 13.sp) },
+                                onClick = {
+                                    showAddMenu = false
+                                    showChecklist = true
+                                    if (checklistItems.isEmpty()) checklistItems.add(ChecklistItem("", false))
+                                }
+                            )
+                            DropdownMenuItem(
+                                text = { Text(if (strings.isFa) "ضبط صدا" else "Record voice", fontSize = 13.sp) },
+                                onClick = {
+                                    showAddMenu = false
+                                    showVoice = true
+                                }
+                            )
+                        }
+                    }
+                    IconButton(onClick = {
+                        showNoteReminderPicker(contextAdd, reminderAt) { picked -> reminderAt = picked }
+                    }) {
+                        Icon(
+                            Icons.Default.Notifications,
+                            contentDescription = if (strings.isFa) "یادآور" else "Reminder",
+                            tint = if (reminderAt > 0) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
                     IconButton(onClick = { isPinned = !isPinned }) {
                         Icon(
                             Icons.Default.PushPin,
@@ -2595,8 +2703,8 @@ fun EditNoteDialog(
     initialNote: NoteEntity,
     onDismiss: () -> Unit,
     onOpenDrawingFullScreen: ((NoteEntity) -> Unit)? = null,
-    onConfirm: (title: String, content: String, colorHex: String, isPinned: Boolean, drawingPath: String?, tag: String) -> Unit,
-    onAutosave: ((title: String, content: String, colorHex: String, isPinned: Boolean, drawingPath: String?, tag: String) -> Unit)? = null,
+    onConfirm: (title: String, content: String, colorHex: String, isPinned: Boolean, drawingPath: String?, tag: String, imagePath: String?, checklistJson: String, audioPath: String?, reminderAt: Long) -> Unit,
+    onAutosave: ((title: String, content: String, colorHex: String, isPinned: Boolean, drawingPath: String?, tag: String, imagePath: String?, checklistJson: String, audioPath: String?, reminderAt: Long) -> Unit)? = null,
     existingTags: List<String> = emptyList()
 ) {
     val strings = rememberAppStrings()
@@ -2609,6 +2717,14 @@ fun EditNoteDialog(
     val tagsList = remember { mutableStateListOf<String>().apply { addAll(initialTags) } }
     var isPinned by remember { mutableStateOf(initialNote.isPinned) }
     var currentDrawingPath by remember { mutableStateOf(initialNote.drawingPath) }
+    var attachedImagePath by remember { mutableStateOf(initialNote.imagePath) }
+    var attachedAudioPath by remember { mutableStateOf(initialNote.audioPath) }
+    val initialChecklist = remember(initialNote.checklistJson) { parseChecklistItems(initialNote.checklistJson) }
+    val checklistItems = remember { mutableStateListOf<ChecklistItem>().apply { addAll(initialChecklist) } }
+    var showChecklist by remember { mutableStateOf(false) }
+    var showVoice by remember { mutableStateOf(false) }
+    var reminderAt by remember { mutableStateOf(initialNote.reminderAt) }
+    var showAddMenu by remember { mutableStateOf(false) }
 
     val isDark = MaterialTheme.colorScheme.background.luminance() < 0.5f
     val noteColors = listOf("#FEF3C7", "#DCFCE7", "#E0F2FE", "#FCE7F3", "#F3E8FF", "#F1F5F9")
@@ -2620,12 +2736,21 @@ fun EditNoteDialog(
 
     val isDirty = title != initialNote.title || content != initialNote.content ||
         selectedColor != initialNote.colorHex || isPinned != initialNote.isPinned ||
-        currentDrawingPath != initialNote.drawingPath || tagsList.toList() != initialTags
+        currentDrawingPath != initialNote.drawingPath || tagsList.toList() != initialTags ||
+        attachedImagePath != initialNote.imagePath || attachedAudioPath != initialNote.audioPath ||
+        checklistItemsToJson(checklistItems.toList()) != initialNote.checklistJson ||
+        reminderAt != initialNote.reminderAt
 
-    LaunchedEffect(title, content, selectedColor, isPinned, currentDrawingPath, tagsList.toList()) {
+    LaunchedEffect(
+        title, content, selectedColor, isPinned, currentDrawingPath, tagsList.toList(),
+        attachedImagePath, attachedAudioPath, checklistItems.toList(), reminderAt
+    ) {
         if (isDirty && onAutosave != null) {
             delay(800)
-            onAutosave(title, content, selectedColor, isPinned, currentDrawingPath, tagsList.joinToString(","))
+            onAutosave(
+                title, content, selectedColor, isPinned, currentDrawingPath, tagsList.joinToString(","),
+                attachedImagePath, checklistItemsToJson(checklistItems.toList()), attachedAudioPath, reminderAt
+            )
         }
     }
 
@@ -2634,9 +2759,15 @@ fun EditNoteDialog(
         if (!exitSaved) {
             exitSaved = true
             if (isDirty) {
-                val canSave = content.isNotBlank() || !currentDrawingPath.isNullOrBlank() || title.isNotBlank()
+                val canSave = content.isNotBlank() || !currentDrawingPath.isNullOrBlank() || title.isNotBlank() ||
+                    !attachedImagePath.isNullOrBlank() || !attachedAudioPath.isNullOrBlank() ||
+                    checklistItems.any { it.text.isNotBlank() }
                 if (canSave) {
-                    onConfirm(title.trim(), content.trim(), selectedColor, isPinned, currentDrawingPath, tagsList.joinToString(","))
+                    onConfirm(
+                        title.trim(), content.trim(), selectedColor, isPinned, currentDrawingPath,
+                        tagsList.joinToString(","), attachedImagePath,
+                        checklistItemsToJson(checklistItems.toList()), attachedAudioPath, reminderAt
+                    )
                 }
             }
         }
@@ -2654,6 +2785,18 @@ fun EditNoteDialog(
         onDispose {
             if (window != null && previousMode != null) {
                 window.setSoftInputMode(previousMode)
+            }
+        }
+    }
+
+    val scopeEdit = androidx.compose.runtime.rememberCoroutineScope()
+    val photoPickerEdit = androidx.activity.compose.rememberLauncherForActivityResult(
+        contract = androidx.activity.result.contract.ActivityResultContracts.PickVisualMedia()
+    ) { uri ->
+        if (uri != null) {
+            scopeEdit.launch {
+                val path = copyUriToNotesImages(contextEdit, uri)
+                if (path != null) attachedImagePath = path
             }
         }
     }
@@ -2938,6 +3081,91 @@ fun EditNoteDialog(
                     }
                 }
 
+                if (!attachedImagePath.isNullOrBlank()) {
+                    val photoBitmap = remember(attachedImagePath) {
+                        val file = File(attachedImagePath!!)
+                        if (file.exists()) BitmapFactory.decodeFile(attachedImagePath)?.asImageBitmap() else null
+                    }
+                    if (photoBitmap != null) {
+                        Column(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f), RoundedCornerShape(12.dp))
+                                .border(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f), RoundedCornerShape(12.dp))
+                                .padding(8.dp)
+                        ) {
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Text(
+                                    text = if (strings.isFa) "عکس پیوست شده:" else "Attached photo:",
+                                    fontSize = 11.sp,
+                                    fontWeight = FontWeight.SemiBold,
+                                    color = MaterialTheme.colorScheme.primary
+                                )
+                                TextButton(
+                                    onClick = { attachedImagePath = null },
+                                    colors = androidx.compose.material3.ButtonDefaults.textButtonColors(
+                                        contentColor = MaterialTheme.colorScheme.error
+                                    )
+                                ) {
+                                    Icon(Icons.Default.Delete, contentDescription = null, modifier = Modifier.size(16.dp))
+                                    Spacer(modifier = Modifier.width(4.dp))
+                                    Text(if (strings.isFa) "حذف عکس" else "Remove", fontSize = 11.sp)
+                                }
+                            }
+                            Spacer(modifier = Modifier.height(4.dp))
+                            Image(
+                                bitmap = photoBitmap,
+                                contentDescription = if (strings.isFa) "عکس پیوست" else "Attached photo",
+                                contentScale = ContentScale.Fit,
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .height(150.dp)
+                                    .clip(RoundedCornerShape(8.dp))
+                            )
+                        }
+                    }
+                }
+
+                if (reminderAt > 0) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Icon(
+                            Icons.Default.Notifications,
+                            contentDescription = null,
+                            tint = MaterialTheme.colorScheme.primary,
+                            modifier = Modifier.size(16.dp)
+                        )
+                        Spacer(modifier = Modifier.width(6.dp))
+                        Text(
+                            text = if (strings.isFa) "یادآور: ${formatNoteReminderLabel(reminderAt)}" else "Reminder: ${formatNoteReminderLabel(reminderAt)}",
+                            fontSize = 12.sp,
+                            color = MaterialTheme.colorScheme.primary
+                        )
+                        IconButton(onClick = { reminderAt = 0L }) {
+                            Icon(Icons.Default.Close, contentDescription = null, modifier = Modifier.size(14.dp))
+                        }
+                    }
+                }
+
+                if (showChecklist || checklistItems.isNotEmpty()) {
+                    ChecklistEditorSection(
+                        items = checklistItems,
+                        isFa = strings.isFa,
+                        onChanged = {}
+                    )
+                }
+
+                if (showVoice || !attachedAudioPath.isNullOrBlank()) {
+                    VoiceNoteRow(
+                        audioPath = attachedAudioPath,
+                        isFa = strings.isFa,
+                        onAudioChanged = { attachedAudioPath = it }
+                    )
+                }
+
                 }
                 Row(
                     modifier = Modifier
@@ -2968,6 +3196,72 @@ fun EditNoteDialog(
                         }
                     }
                     Spacer(modifier = Modifier.weight(1f))
+                    Box {
+                        IconButton(onClick = { showAddMenu = true }) {
+                            Icon(
+                                Icons.Default.Add,
+                                contentDescription = if (strings.isFa) "افزودن به یادداشت" else "Add to note",
+                                tint = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+                        DropdownMenu(expanded = showAddMenu, onDismissRequest = { showAddMenu = false }) {
+                            DropdownMenuItem(
+                                text = { Text(if (strings.isFa) "افزودن طرح وایت‌برد" else "Add drawing", fontSize = 13.sp) },
+                                onClick = {
+                                    showAddMenu = false
+                                    onOpenDrawingFullScreen?.invoke(
+                                        initialNote.copy(
+                                            title = title,
+                                            content = content,
+                                            colorHex = selectedColor,
+                                            isPinned = isPinned,
+                                            drawingPath = currentDrawingPath,
+                                            tag = tagsList.joinToString(","),
+                                            imagePath = attachedImagePath,
+                                            audioPath = attachedAudioPath,
+                                            checklistJson = checklistItemsToJson(checklistItems.toList()),
+                                            reminderAt = reminderAt
+                                        )
+                                    )
+                                }
+                            )
+                            DropdownMenuItem(
+                                text = { Text(if (strings.isFa) "افزودن عکس" else "Add photo", fontSize = 13.sp) },
+                                onClick = {
+                                    showAddMenu = false
+                                    photoPickerEdit.launch(
+                                        androidx.activity.result.PickVisualMediaRequest(
+                                            androidx.activity.result.contract.ActivityResultContracts.PickVisualMedia.ImageOnly
+                                        )
+                                    )
+                                }
+                            )
+                            DropdownMenuItem(
+                                text = { Text(if (strings.isFa) "افزودن چک‌لیست" else "Add checklist", fontSize = 13.sp) },
+                                onClick = {
+                                    showAddMenu = false
+                                    showChecklist = true
+                                    if (checklistItems.isEmpty()) checklistItems.add(ChecklistItem("", false))
+                                }
+                            )
+                            DropdownMenuItem(
+                                text = { Text(if (strings.isFa) "ضبط صدا" else "Record voice", fontSize = 13.sp) },
+                                onClick = {
+                                    showAddMenu = false
+                                    showVoice = true
+                                }
+                            )
+                        }
+                    }
+                    IconButton(onClick = {
+                        showNoteReminderPicker(contextEdit, reminderAt) { picked -> reminderAt = picked }
+                    }) {
+                        Icon(
+                            Icons.Default.Notifications,
+                            contentDescription = if (strings.isFa) "یادآور" else "Reminder",
+                            tint = if (reminderAt > 0) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
                     IconButton(onClick = { isPinned = !isPinned }) {
                         Icon(
                             Icons.Default.PushPin,

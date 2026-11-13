@@ -119,6 +119,26 @@ class AppRepository(private val database: AppDatabase) {
         noteDao.softDeleteNote(id, System.currentTimeMillis())
     }
 
+    val archivedNotes: Flow<List<NoteEntity>> = noteDao.getArchivedNotes()
+
+    val trashedNotes: Flow<List<NoteEntity>> = noteDao.getTrashedNotes()
+
+    suspend fun restoreNote(id: String) = withContext(Dispatchers.IO) {
+        noteDao.restoreNote(id, System.currentTimeMillis())
+    }
+
+    suspend fun setNoteArchived(id: String, archived: Boolean) = withContext(Dispatchers.IO) {
+        noteDao.setNoteArchived(id, archived, System.currentTimeMillis())
+    }
+
+    suspend fun hardDeleteNote(id: String) = withContext(Dispatchers.IO) {
+        noteDao.hardDeleteNote(id)
+    }
+
+    suspend fun purgeOldTrashedNotes(cutoff: Long) = withContext(Dispatchers.IO) {
+        noteDao.purgeOldTrashedNotes(cutoff)
+    }
+
     // Export local state to SyncData
     suspend fun getFullSyncData(deviceId: String = "Android-Device"): SyncData = withContext(Dispatchers.IO) {
         val events = eventDao.getAllEventsForSync()

@@ -78,6 +78,11 @@
             android:theme="@style/Theme.MyApplication" />
 
         <receiver
+            android:name=".alarm.NoteReminderReceiver"
+            android:enabled="true"
+            android:exported="false" />
+
+        <receiver
             android:name=".prayer.FajrAlarmReceiver"
             android:enabled="true"
             android:exported="true">
