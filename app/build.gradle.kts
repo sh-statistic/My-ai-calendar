@@ -17,7 +17,7 @@ android {
     applicationId = "com.aistudio.localsync.pkwnvt"
     minSdk = 23
     targetSdk = 36
-    versionCode = 10
+    versionCode = 15
     versionName = "1.0.3"
 
     testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
