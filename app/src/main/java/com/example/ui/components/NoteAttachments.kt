@@ -7,6 +7,7 @@ import android.media.MediaRecorder
 import android.net.Uri
 import android.os.Build
 import android.widget.Toast
+import android.graphics.Bitmap
 import android.graphics.BitmapFactory
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.Image
@@ -446,6 +447,67 @@ private fun NoteTextBlock(
     )
 }
 
+// کادرِ بخشِ غیرشفافِ یک بیت‌مپ؛ فایل‌های طرح قدیمی ممکن است حاشیه‌های شفافِ خالی داشته باشند
+// (فقط بالای فایل نقاشی است و بقیه‌اش خالیِ شفاف)، و همین قابِ یادداشت را الکی بلند می‌کرد.
+internal fun nonTransparentBounds(src: Bitmap): android.graphics.Rect? {
+    val maxDim = 512
+    val biggest = maxOf(src.width, src.height)
+    val tw: Int
+    val th: Int
+    if (biggest > maxDim) {
+        tw = (src.width * maxDim / biggest).coerceAtLeast(1)
+        th = (src.height * maxDim / biggest).coerceAtLeast(1)
+    } else {
+        tw = src.width
+        th = src.height
+    }
+    val thumb = if (tw != src.width || th != src.height) Bitmap.createScaledBitmap(src, tw, th, true) else src
+    var l = tw
+    var t = th
+    var r = -1
+    var b = -1
+    val row = IntArray(tw)
+    for (y in 0 until th) {
+        thumb.getPixels(row, 0, tw, 0, y, tw, 1)
+        for (x in 0 until tw) {
+            if ((row[x] ushr 24) != 0) {
+                if (x < l) l = x
+                if (x > r) r = x
+                if (y < t) t = y
+                if (y > b) b = y
+            }
+        }
+    }
+    if (thumb !== src) thumb.recycle()
+    if (r < 0) return null
+    if (tw == src.width && th == src.height) {
+        return android.graphics.Rect(l, t, r + 1, b + 1)
+    }
+    val mx = 2 * (src.width / tw) + 2
+    val my = 2 * (src.height / th) + 2
+    var fl = (l * src.width / tw - mx).coerceAtLeast(0)
+    var ft = (t * src.height / th - my).coerceAtLeast(0)
+    var fr = ((r + 1) * src.width / tw + mx).coerceAtMost(src.width)
+    var fb = ((b + 1) * src.height / th + my).coerceAtMost(src.height)
+    // پالایش در وضوح کامل: اگر درست بیرونِ کادرِ تقریبی هنوز محتوای غیرشفاف هست، کادر تا همان‌جا باز می‌شود
+    // تا هیچ خط باریکی که در نمونهٔ کوچک از قلم افتاده، بریده نشود.
+    fun rowHasContent(y: Int): Boolean {
+        val rowPx = IntArray(src.width)
+        src.getPixels(rowPx, 0, src.width, 0, y, src.width, 1)
+        return rowPx.any { (it ushr 24) != 0 }
+    }
+    fun colHasContent(x: Int): Boolean {
+        val colPx = IntArray(src.height)
+        src.getPixels(colPx, 0, 1, x, 0, 1, src.height)
+        return colPx.any { (it ushr 24) != 0 }
+    }
+    while (ft > 0 && rowHasContent(ft - 1)) ft--
+    while (fb < src.height && rowHasContent(fb)) fb++
+    while (fl > 0 && colHasContent(fl - 1)) fl--
+    while (fr < src.width && colHasContent(fr)) fr++
+    return android.graphics.Rect(fl, ft, fr, fb)
+}
+
 @Composable
 private fun NoteMediaBlock(
     block: NoteBlockState,
@@ -458,7 +520,28 @@ private fun NoteMediaBlock(
         val p = block.path
         if (p.isNullOrBlank()) null else try {
             val f = File(p)
-            if (f.exists()) BitmapFactory.decodeFile(p)?.asImageBitmap() else null
+            if (!f.exists()) {
+                null
+            } else {
+                val raw = BitmapFactory.decodeFile(p)
+                if (raw == null) {
+                    null
+                } else if (isDrawing) {
+                    // فایل‌های طرح قدیمی حاشیهٔ شفافِ خالی دارند؛ فقط بخشِ نقاشی‌دار نمایش داده می‌شود
+                    val b = nonTransparentBounds(raw)
+                    if (b != null && (b.left > 0 || b.top > 0 || b.right < raw.width || b.bottom < raw.height)) {
+                        try {
+                            Bitmap.createBitmap(raw, b.left, b.top, b.width(), b.height()).asImageBitmap()
+                        } catch (_: Exception) {
+                            raw.asImageBitmap()
+                        }
+                    } else {
+                        raw.asImageBitmap()
+                    }
+                } else {
+                    raw.asImageBitmap()
+                }
+            }
         } catch (_: Exception) {
             null
         }
