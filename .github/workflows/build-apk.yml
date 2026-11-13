@@ -52,10 +52,24 @@ jobs:
           KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
         run: ./gradlew assembleRelease --stacktrace
 
+      - name: Name APK with version
+        id: apkname
+        run: |
+          VERSION_NAME=$(grep -E 'versionName[[:space:]]*=' app/build.gradle.kts | head -1 | sed -E 's/.*"([^"]+)".*/\1/')
+          VERSION_CODE=$(grep -E 'versionCode[[:space:]]*=' app/build.gradle.kts | head -1 | sed -E 's/.*=[[:space:]]*([0-9]+).*/\1/')
+          if [[ "$GITHUB_REF" == refs/tags/* ]]; then
+            NEW_NAME="MyCalendar-${GITHUB_REF_NAME}.apk"
+          else
+            NEW_NAME="MyCalendar-v${VERSION_NAME}-code${VERSION_CODE}.apk"
+          fi
+          mv app/build/outputs/apk/release/app-release.apk "app/build/outputs/apk/release/${NEW_NAME}"
+          echo "artifact_name=${NEW_NAME%.apk}" >> "$GITHUB_OUTPUT"
+          echo "Renamed APK to ${NEW_NAME}"
+
       - name: Upload APK Artifact
         uses: actions/upload-artifact@v4
         with:
-          name: app-release
+          name: ${{ steps.apkname.outputs.artifact_name }}
           path: app/build/outputs/apk/release/*.apk
 
       - name: Create Release and Upload APK
