@@ -137,13 +137,13 @@ fun TasksScreen(
     val totalCount = if (statusFilter == 3) tasks.size else currentScopeTasks.size
     val progress = if (totalCount > 0) (completedCount.toFloat() / totalCount).coerceIn(0f, 1f) else 0f
 
-    Box(modifier = modifier.fillMaxSize().statusBarsPadding()) {
+    Box(modifier = modifier.fillMaxSize()) {
         Column(
             modifier = Modifier.fillMaxSize()
         ) {
             // Header 1: Time scope & Interactive Calendar Date Bar
             Surface(
-                color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.6f),
+                color = MaterialTheme.colorScheme.surface,
                 modifier = Modifier.fillMaxWidth()
             ) {
                 Row(
@@ -334,7 +334,7 @@ fun TasksScreen(
 
             // Header 2: Task Status Filters (Distinct from time scope)
             Card(
-                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.6f)),
                 shape = RoundedCornerShape(bottomStart = 16.dp, bottomEnd = 16.dp),
                 elevation = CardDefaults.cardElevation(defaultElevation = 1.dp),
                 modifier = Modifier.fillMaxWidth()

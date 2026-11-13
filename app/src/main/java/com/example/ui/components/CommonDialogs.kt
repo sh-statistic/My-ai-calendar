@@ -8,6 +8,7 @@ import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ColumnScope
@@ -71,17 +72,12 @@ import androidx.compose.material3.RadioButton
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Switch
 import android.view.WindowManager
-import androidx.compose.foundation.layout.WindowInsets
-import androidx.compose.foundation.layout.navigationBars
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.material.icons.filled.PushPin
 import androidx.compose.material.icons.filled.Share
-import androidx.compose.runtime.DisposableEffect
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalView
-import android.view.ViewTreeObserver
 import androidx.compose.ui.window.DialogWindowProvider
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -116,7 +112,6 @@ import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.calendar.JalaliDate
@@ -2242,36 +2237,6 @@ fun removeActiveHashtagFromContent(text: String): String {
     return text.substring(0, idx).trimEnd()
 }
 
-// ارتفاع واقعی صفحه‌کلید را مستقیم از قاب قابل‌مشاهدهٔ پنجره می‌خوانیم.
-// روی بعضی گوشی‌ها inset صفحه‌کلید به پنجرهٔ دیالوگ نمی‌رسد و نوار ابزار از صفحه‌کلید فاصله می‌گرفت؛
-// این اندازه‌گیری روی همهٔ دستگاه‌ها درست جواب می‌دهد و وقتی پنجره خودش resize شود صفر می‌شود.
-@Composable
-private fun rememberKeyboardHeightDp(): Dp {
-    val view = LocalView.current
-    val density = LocalDensity.current
-    var height by remember { mutableStateOf(0.dp) }
-    DisposableEffect(view) {
-        val root = view.rootView
-        val listener = ViewTreeObserver.OnGlobalLayoutListener {
-            val rect = android.graphics.Rect()
-            root.getWindowVisibleDisplayFrame(rect)
-            val hidden = root.height - rect.bottom
-            height = if (hidden > root.height * 0.15) with(density) { hidden.toDp() } else 0.dp
-        }
-        root.viewTreeObserver.addOnGlobalLayoutListener(listener)
-        onDispose { root.viewTreeObserver.removeOnGlobalLayoutListener(listener) }
-    }
-    return height
-}
-
-@Composable
-private fun rememberEditorBottomPadding(): Dp {
-    val keyboardHeight = rememberKeyboardHeightDp()
-    val density = LocalDensity.current
-    val navBottom = with(density) { WindowInsets.navigationBars.getBottom(density).toDp() }
-    return if (keyboardHeight > 0.dp) keyboardHeight else navBottom
-}
-
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
 fun AddNoteDialog(
@@ -2371,8 +2336,13 @@ fun AddNoteDialog(
         onDismissRequest = handleExit,
         properties = DialogProperties(usePlatformDefaultWidth = false, decorFitsSystemWindows = false)
     ) {
+        // نوار ابزار ذاتاً به ته پنجره می‌چسبد؛ پنجره با باز شدن صفحه‌کلید خودش کوچک می‌شود تا نوار بالای صفحه‌کلید بنشیند
+        val dialogWindow = (LocalView.current.parent as? DialogWindowProvider)?.window
+        LaunchedEffect(dialogWindow) {
+            dialogWindow?.setSoftInputMode(WindowManager.LayoutParams.SOFT_INPUT_ADJUST_RESIZE)
+        }
         Surface(modifier = Modifier.fillMaxSize(), color = editorBgAdd) {
-            Column(modifier = Modifier.fillMaxSize().statusBarsPadding().padding(bottom = rememberEditorBottomPadding())) {
+            Column(modifier = Modifier.fillMaxSize().statusBarsPadding().navigationBarsPadding()) {
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
@@ -2866,8 +2836,13 @@ fun EditNoteDialog(
         onDismissRequest = handleExit,
         properties = DialogProperties(usePlatformDefaultWidth = false, decorFitsSystemWindows = false)
     ) {
+        // نوار ابزار ذاتاً به ته پنجره می‌چسبد؛ پنجره با باز شدن صفحه‌کلید خودش کوچک می‌شود تا نوار بالای صفحه‌کلید بنشیند
+        val dialogWindow = (LocalView.current.parent as? DialogWindowProvider)?.window
+        LaunchedEffect(dialogWindow) {
+            dialogWindow?.setSoftInputMode(WindowManager.LayoutParams.SOFT_INPUT_ADJUST_RESIZE)
+        }
         Surface(modifier = Modifier.fillMaxSize(), color = editorBgEdit) {
-            Column(modifier = Modifier.fillMaxSize().statusBarsPadding().padding(bottom = rememberEditorBottomPadding())) {
+            Column(modifier = Modifier.fillMaxSize().statusBarsPadding().navigationBarsPadding()) {
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
