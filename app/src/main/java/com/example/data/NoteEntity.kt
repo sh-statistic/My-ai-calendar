@@ -22,5 +22,7 @@ data class NoteEntity(
     val checklistJson: String = "",
     val reminderAt: Long = 0,
     val isArchived: Boolean = false,
-    val deletedAt: Long = 0
+    val deletedAt: Long = 0,
+    // محتوای درون‌خطی یادداشت (متن/عکس/نقاشی به ترتیب) به صورت JSON؛ خالی یعنی یادداشت متنی ساده
+    val blocksJson: String = ""
 )

@@ -71,6 +71,8 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Switch
 import android.view.WindowManager
 import androidx.compose.foundation.layout.imePadding
+import androidx.compose.foundation.layout.navigationBarsPadding
+import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.material.icons.filled.PushPin
 import androidx.compose.material.icons.filled.Share
 import androidx.compose.runtime.DisposableEffect
@@ -2231,7 +2233,7 @@ fun removeActiveHashtagFromContent(text: String): String {
 @Composable
 fun AddNoteDialog(
     onDismiss: () -> Unit,
-    onConfirm: (title: String, content: String, colorHex: String, tag: String, isPinned: Boolean, imagePath: String?, checklistJson: String, audioPath: String?, reminderAt: Long) -> Unit,
+    onConfirm: (title: String, content: String, colorHex: String, tag: String, isPinned: Boolean, imagePath: String?, checklistJson: String, audioPath: String?, reminderAt: Long, blocksJson: String) -> Unit,
     existingTags: List<String> = emptyList(),
     initialTitle: String = "",
     initialContent: String = "",
@@ -2239,10 +2241,16 @@ fun AddNoteDialog(
 ) {
     val strings = rememberAppStrings()
     var title by remember { mutableStateOf(initialTitle) }
-    var content by remember { mutableStateOf(initialContent) }
     var selectedColor by remember { mutableStateOf("#FEF3C7") }
     var isPinned by remember { mutableStateOf(false) }
-    var attachedImagePath by remember { mutableStateOf(initialImagePath) }
+    // محتوای سندمحور: متن/عکس/نقاشی در یک جریان (مثل ورد و مقالهٔ تلگرام)
+    val blocks = remember {
+        mutableStateListOf<NoteBlockState>().apply {
+            addAll(buildInitialNoteBlocks("", initialContent, initialImagePath, null))
+        }
+    }
+    var focusedTextBlockId by remember { mutableStateOf<String?>(null) }
+    var drawingBlock by remember { mutableStateOf<NoteBlockState?>(null) }
     val tagsList = remember { mutableStateListOf<String>() }
 
     val noteColors = listOf("#FEF3C7", "#DCFCE7", "#E0F2FE", "#FCE7F3", "#F3E8FF", "#F1F5F9")
@@ -2259,16 +2267,42 @@ fun AddNoteDialog(
     var reminderAt by remember { mutableStateOf(0L) }
     var showAddMenu by remember { mutableStateOf(false) }
 
+    // درج بلوک تازه (عکس/نقاشی) دقیقاً در جای نشانگر متن فعال؛ متن از همان نقطه دو تکه می‌شود
+    fun insertBlocksAtFocus(newBlocks: List<NoteBlockState>) {
+        if (newBlocks.isEmpty()) return
+        val focusIdx = blocks.indexOfFirst { it.id == focusedTextBlockId && it.kind == "t" }
+        if (focusIdx >= 0) {
+            val fb = blocks[focusIdx]
+            val sel = fb.tfv.selection.start.coerceIn(0, fb.tfv.text.length)
+            val before = fb.tfv.text.substring(0, sel)
+            val after = fb.tfv.text.substring(sel)
+            fb.tfv = androidx.compose.ui.text.input.TextFieldValue(
+                before,
+                androidx.compose.ui.text.TextRange(before.length)
+            )
+            var insertAt = focusIdx + 1
+            for (nb in newBlocks) {
+                blocks.add(insertAt, nb)
+                insertAt++
+            }
+            blocks.add(insertAt, NoteBlockState(kind = "t", text = after))
+        } else {
+            for (nb in newBlocks) blocks.add(nb)
+            blocks.add(NoteBlockState(kind = "t"))
+        }
+    }
+
     var savedOnce by remember { mutableStateOf(false) }
     val handleExit: () -> Unit = {
-        val hasAnything = content.isNotBlank() || title.isNotBlank() || tagsList.isNotEmpty() ||
-            !attachedImagePath.isNullOrBlank() || !attachedAudioPath.isNullOrBlank() ||
+        val hasAnything = noteBlocksHaveContent(blocks) || title.isNotBlank() || tagsList.isNotEmpty() ||
+            !attachedAudioPath.isNullOrBlank() ||
             checklistItems.any { it.text.isNotBlank() } || reminderAt > 0
         if (!savedOnce && hasAnything) {
             savedOnce = true
             onConfirm(
-                title.trim(), content.trim(), selectedColor, tagsList.joinToString(","), isPinned,
-                attachedImagePath, checklistItemsToJson(checklistItems.toList()), attachedAudioPath, reminderAt
+                title.trim(), noteBlocksToContent(blocks), selectedColor, tagsList.joinToString(","), isPinned,
+                noteBlocksFirstPath(blocks, "i"), checklistItemsToJson(checklistItems.toList()), attachedAudioPath,
+                reminderAt, noteBlocksToJson(blocks)
             )
         }
         onDismiss()
@@ -2281,36 +2315,27 @@ fun AddNoteDialog(
     }
 
     val contextAdd = LocalContext.current
-    val dialogViewAdd = LocalView.current
-    DisposableEffect(Unit) {
-        val window = (dialogViewAdd.parent as? DialogWindowProvider)?.window
-        val previousMode = window?.attributes?.softInputMode
-        window?.setSoftInputMode(WindowManager.LayoutParams.SOFT_INPUT_ADJUST_RESIZE)
-        onDispose {
-            if (window != null && previousMode != null) {
-                window.setSoftInputMode(previousMode)
-            }
-        }
-    }
 
     val scopeAdd = androidx.compose.runtime.rememberCoroutineScope()
     val photoPickerAdd = androidx.activity.compose.rememberLauncherForActivityResult(
-        contract = androidx.activity.result.contract.ActivityResultContracts.PickVisualMedia()
-    ) { uri ->
-        if (uri != null) {
+        contract = androidx.activity.result.contract.ActivityResultContracts.PickMultipleVisualMedia(6)
+    ) { uris ->
+        if (uris.isNotEmpty()) {
             scopeAdd.launch {
-                val path = copyUriToNotesImages(contextAdd, uri)
-                if (path != null) attachedImagePath = path
+                val paths = uris.mapNotNull { copyUriToNotesImages(contextAdd, it) }
+                if (paths.isNotEmpty()) {
+                    insertBlocksAtFocus(paths.map { NoteBlockState(kind = "i", path = it) })
+                }
             }
         }
     }
 
     Dialog(
         onDismissRequest = handleExit,
-        properties = DialogProperties(usePlatformDefaultWidth = false)
+        properties = DialogProperties(usePlatformDefaultWidth = false, decorFitsSystemWindows = false)
     ) {
         Surface(modifier = Modifier.fillMaxSize(), color = editorBgAdd) {
-            Column(modifier = Modifier.fillMaxSize().imePadding()) {
+            Column(modifier = Modifier.fillMaxSize().statusBarsPadding().imePadding().navigationBarsPadding()) {
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
@@ -2329,7 +2354,7 @@ fun AddNoteDialog(
                                     appendLine(title.trim())
                                     appendLine()
                                 }
-                                append(content.trim())
+                                append(noteBlocksToContent(blocks))
                             }
                             com.example.sync.NoteShareHelper.shareText(contextAdd, title.trim(), shareBody)
                         }
@@ -2370,7 +2395,10 @@ fun AddNoteDialog(
                 )
 
                 // پاپ‌آپ هوشمند ایجاد و انتخاب برچسب با # (دقیقاً مشابه Google Keep)
-                val activeHashtag = extractActiveHashtagQuery(content)
+                val focusBlock = blocks.firstOrNull { it.id == focusedTextBlockId && it.kind == "t" } ?: blocks.lastOrNull { it.kind == "t" }
+                val focusCursor = focusBlock?.tfv?.selection?.start?.coerceIn(0, focusBlock.tfv.text.length) ?: 0
+                val focusPrefix = focusBlock?.tfv?.text?.substring(0, focusCursor) ?: ""
+                val activeHashtag = extractActiveHashtagQuery(focusPrefix)
                 if (activeHashtag != null) {
                     Surface(
                         modifier = Modifier.fillMaxWidth(),
@@ -2390,7 +2418,11 @@ fun AddNoteDialog(
                                         if (newTag.isNotBlank() && !tagsList.contains(newTag)) {
                                             tagsList.add(newTag)
                                         }
-                                        content = removeActiveHashtagFromContent(content)
+                                        if (focusBlock != null) {
+                                            val cleanedPrefix = removeActiveHashtagFromContent(focusPrefix)
+                                            val suffix = focusBlock.tfv.text.substring(focusCursor)
+                                            focusBlock.tfv = androidx.compose.ui.text.input.TextFieldValue(cleanedPrefix + suffix, androidx.compose.ui.text.TextRange(cleanedPrefix.length))
+                                        }
                                     },
                                     shape = RoundedCornerShape(8.dp),
                                     color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.5f),
@@ -2426,7 +2458,11 @@ fun AddNoteDialog(
                                         if (!tagsList.contains(cand)) {
                                             tagsList.add(cand)
                                         }
-                                        content = removeActiveHashtagFromContent(content)
+                                        if (focusBlock != null) {
+                                            val cleanedPrefix = removeActiveHashtagFromContent(focusPrefix)
+                                            val suffix = focusBlock.tfv.text.substring(focusCursor)
+                                            focusBlock.tfv = androidx.compose.ui.text.input.TextFieldValue(cleanedPrefix + suffix, androidx.compose.ui.text.TextRange(cleanedPrefix.length))
+                                        }
                                     },
                                     shape = RoundedCornerShape(8.dp),
                                     color = Color.Transparent,
@@ -2505,70 +2541,13 @@ fun AddNoteDialog(
                     }
                 }
 
-                if (!attachedImagePath.isNullOrBlank()) {
-                    val photoBitmap = remember(attachedImagePath) {
-                        val file = File(attachedImagePath!!)
-                        if (file.exists()) BitmapFactory.decodeFile(attachedImagePath)?.asImageBitmap() else null
-                    }
-                    if (photoBitmap != null) {
-                        Column(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f), RoundedCornerShape(12.dp))
-                                .border(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f), RoundedCornerShape(12.dp))
-                                .padding(8.dp)
-                        ) {
-                            Row(
-                                modifier = Modifier.fillMaxWidth(),
-                                horizontalArrangement = Arrangement.SpaceBetween,
-                                verticalAlignment = Alignment.CenterVertically
-                            ) {
-                                Text(
-                                    text = if (strings.isFa) "عکس پیوست شده:" else "Attached photo:",
-                                    fontSize = 11.sp,
-                                    fontWeight = FontWeight.SemiBold,
-                                    color = MaterialTheme.colorScheme.primary
-                                )
-                                TextButton(
-                                    onClick = { attachedImagePath = null },
-                                    colors = androidx.compose.material3.ButtonDefaults.textButtonColors(
-                                        contentColor = MaterialTheme.colorScheme.error
-                                    )
-                                ) {
-                                    Icon(Icons.Default.Delete, contentDescription = null, modifier = Modifier.size(16.dp))
-                                    Spacer(modifier = Modifier.width(4.dp))
-                                    Text(if (strings.isFa) "حذف عکس" else "Remove", fontSize = 11.sp)
-                                }
-                            }
-                            Spacer(modifier = Modifier.height(4.dp))
-                            Image(
-                                bitmap = photoBitmap,
-                                contentDescription = if (strings.isFa) "عکس پیوست" else "Attached photo",
-                                contentScale = ContentScale.Fit,
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .height(150.dp)
-                                    .clip(RoundedCornerShape(8.dp))
-                            )
-                        }
-                    }
-                }
-
-                TextField(
-                    value = content,
-                    onValueChange = { content = it },
-                    placeholder = { Text(if (strings.isFa) "متن یادداشت (برای برچسب # بنویسید)" else "Note Content (use # for label)") },
-                    textStyle = MaterialTheme.typography.bodyLarge,
-                    colors = TextFieldDefaults.colors(
-                        focusedContainerColor = Color.Transparent,
-                        unfocusedContainerColor = Color.Transparent,
-                        focusedIndicatorColor = Color.Transparent,
-                        unfocusedIndicatorColor = Color.Transparent
-                    ),
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .weight(1f)
-                        .testTag("note_content_input")
+                NoteBlocksEditor(
+                    blocks = blocks,
+                    isFa = strings.isFa,
+                    onChanged = {},
+                    onFocusedTextBlock = { focusedTextBlockId = it },
+                    onOpenDrawing = { drawingBlock = it },
+                    modifier = Modifier.weight(1f)
                 )
 
                 if (reminderAt > 0) {
@@ -2648,6 +2627,15 @@ fun AddNoteDialog(
                         }
                         DropdownMenu(expanded = showAddMenu, onDismissRequest = { showAddMenu = false }) {
                             DropdownMenuItem(
+                                text = { Text(if (strings.isFa) "افزودن نقاشی" else "Add drawing", fontSize = 13.sp) },
+                                onClick = {
+                                    showAddMenu = false
+                                    val nb = NoteBlockState(kind = "d")
+                                    insertBlocksAtFocus(listOf(nb))
+                                    drawingBlock = nb
+                                }
+                            )
+                            DropdownMenuItem(
                                 text = { Text(if (strings.isFa) "افزودن عکس" else "Add photo", fontSize = 13.sp) },
                                 onClick = {
                                     showAddMenu = false
@@ -2695,6 +2683,19 @@ fun AddNoteDialog(
             }
         }
     }
+
+    // بوم نقاشی روی خود ویرایشگر باز می‌شود؛ با برگشت، کاربر به همین یادداشت برمی‌گردد
+    drawingBlock?.let { block ->
+        WhiteboardDrawingDialog(
+            initialTitle = title,
+            initialDrawingPath = block.path,
+            onDismiss = { drawingBlock = null },
+            onSaveDrawing = { _, path, _ ->
+                block.path = path
+                drawingBlock = null
+            }
+        )
+    }
 }
 
 @OptIn(ExperimentalLayoutApi::class)
@@ -2702,22 +2703,31 @@ fun AddNoteDialog(
 fun EditNoteDialog(
     initialNote: NoteEntity,
     onDismiss: () -> Unit,
-    onOpenDrawingFullScreen: ((NoteEntity) -> Unit)? = null,
-    onConfirm: (title: String, content: String, colorHex: String, isPinned: Boolean, drawingPath: String?, tag: String, imagePath: String?, checklistJson: String, audioPath: String?, reminderAt: Long) -> Unit,
-    onAutosave: ((title: String, content: String, colorHex: String, isPinned: Boolean, drawingPath: String?, tag: String, imagePath: String?, checklistJson: String, audioPath: String?, reminderAt: Long) -> Unit)? = null,
+    onConfirm: (title: String, content: String, colorHex: String, isPinned: Boolean, drawingPath: String?, tag: String, imagePath: String?, checklistJson: String, audioPath: String?, reminderAt: Long, blocksJson: String) -> Unit,
+    onAutosave: ((title: String, content: String, colorHex: String, isPinned: Boolean, drawingPath: String?, tag: String, imagePath: String?, checklistJson: String, audioPath: String?, reminderAt: Long, blocksJson: String) -> Unit)? = null,
     existingTags: List<String> = emptyList()
 ) {
     val strings = rememberAppStrings()
     var title by remember { mutableStateOf(initialNote.title) }
-    var content by remember { mutableStateOf(initialNote.content) }
     var selectedColor by remember { mutableStateOf(initialNote.colorHex) }
     val initialTags = remember(initialNote.tag) {
         initialNote.tag.split(",").map { it.trim() }.filter { it.isNotBlank() }
     }
     val tagsList = remember { mutableStateListOf<String>().apply { addAll(initialTags) } }
     var isPinned by remember { mutableStateOf(initialNote.isPinned) }
-    var currentDrawingPath by remember { mutableStateOf(initialNote.drawingPath) }
-    var attachedImagePath by remember { mutableStateOf(initialNote.imagePath) }
+    // محتوای سندمحور: متن/عکس/نقاشی در یک جریان (مثل ورد و مقالهٔ تلگرام)
+    val blocks = remember {
+        mutableStateListOf<NoteBlockState>().apply {
+            addAll(
+                buildInitialNoteBlocks(
+                    initialNote.blocksJson, initialNote.content, initialNote.imagePath, initialNote.drawingPath
+                )
+            )
+        }
+    }
+    val initialBlocksSignature = remember { noteBlocksSignature(blocks) }
+    var focusedTextBlockId by remember { mutableStateOf<String?>(null) }
+    var drawingBlock by remember { mutableStateOf<NoteBlockState?>(null) }
     var attachedAudioPath by remember { mutableStateOf(initialNote.audioPath) }
     val initialChecklist = remember(initialNote.checklistJson) { parseChecklistItems(initialNote.checklistJson) }
     val checklistItems = remember { mutableStateListOf<ChecklistItem>().apply { addAll(initialChecklist) } }
@@ -2734,22 +2744,50 @@ fun EditNoteDialog(
         (defaultSuggestions + existingTags).distinct()
     }
 
-    val isDirty = title != initialNote.title || content != initialNote.content ||
+    // درج بلوک تازه (عکس/نقاشی) دقیقاً در جای نشانگر متن فعال؛ متن از همان نقطه دو تکه می‌شود
+    fun insertBlocksAtFocus(newBlocks: List<NoteBlockState>) {
+        if (newBlocks.isEmpty()) return
+        val focusIdx = blocks.indexOfFirst { it.id == focusedTextBlockId && it.kind == "t" }
+        if (focusIdx >= 0) {
+            val fb = blocks[focusIdx]
+            val sel = fb.tfv.selection.start.coerceIn(0, fb.tfv.text.length)
+            val before = fb.tfv.text.substring(0, sel)
+            val after = fb.tfv.text.substring(sel)
+            fb.tfv = androidx.compose.ui.text.input.TextFieldValue(
+                before,
+                androidx.compose.ui.text.TextRange(before.length)
+            )
+            var insertAt = focusIdx + 1
+            for (nb in newBlocks) {
+                blocks.add(insertAt, nb)
+                insertAt++
+            }
+            blocks.add(insertAt, NoteBlockState(kind = "t", text = after))
+        } else {
+            for (nb in newBlocks) blocks.add(nb)
+            blocks.add(NoteBlockState(kind = "t"))
+        }
+    }
+
+    val blocksSignature = noteBlocksSignature(blocks)
+    val isDirty = title != initialNote.title || blocksSignature != initialBlocksSignature ||
         selectedColor != initialNote.colorHex || isPinned != initialNote.isPinned ||
-        currentDrawingPath != initialNote.drawingPath || tagsList.toList() != initialTags ||
-        attachedImagePath != initialNote.imagePath || attachedAudioPath != initialNote.audioPath ||
+        tagsList.toList() != initialTags ||
+        attachedAudioPath != initialNote.audioPath ||
         checklistItemsToJson(checklistItems.toList()) != initialNote.checklistJson ||
         reminderAt != initialNote.reminderAt
 
     LaunchedEffect(
-        title, content, selectedColor, isPinned, currentDrawingPath, tagsList.toList(),
-        attachedImagePath, attachedAudioPath, checklistItems.toList(), reminderAt
+        title, blocksSignature, selectedColor, isPinned, tagsList.toList(),
+        attachedAudioPath, checklistItems.toList(), reminderAt
     ) {
         if (isDirty && onAutosave != null) {
             delay(800)
             onAutosave(
-                title, content, selectedColor, isPinned, currentDrawingPath, tagsList.joinToString(","),
-                attachedImagePath, checklistItemsToJson(checklistItems.toList()), attachedAudioPath, reminderAt
+                title, noteBlocksToContent(blocks), selectedColor, isPinned,
+                noteBlocksFirstPath(blocks, "d"), tagsList.joinToString(","),
+                noteBlocksFirstPath(blocks, "i"), checklistItemsToJson(checklistItems.toList()),
+                attachedAudioPath, reminderAt, noteBlocksToJson(blocks)
             )
         }
     }
@@ -2759,14 +2797,16 @@ fun EditNoteDialog(
         if (!exitSaved) {
             exitSaved = true
             if (isDirty) {
-                val canSave = content.isNotBlank() || !currentDrawingPath.isNullOrBlank() || title.isNotBlank() ||
-                    !attachedImagePath.isNullOrBlank() || !attachedAudioPath.isNullOrBlank() ||
+                val canSave = noteBlocksHaveContent(blocks) || title.isNotBlank() ||
+                    !attachedAudioPath.isNullOrBlank() ||
                     checklistItems.any { it.text.isNotBlank() }
                 if (canSave) {
                     onConfirm(
-                        title.trim(), content.trim(), selectedColor, isPinned, currentDrawingPath,
-                        tagsList.joinToString(","), attachedImagePath,
-                        checklistItemsToJson(checklistItems.toList()), attachedAudioPath, reminderAt
+                        title.trim(), noteBlocksToContent(blocks), selectedColor, isPinned,
+                        noteBlocksFirstPath(blocks, "d"),
+                        tagsList.joinToString(","), noteBlocksFirstPath(blocks, "i"),
+                        checklistItemsToJson(checklistItems.toList()), attachedAudioPath, reminderAt,
+                        noteBlocksToJson(blocks)
                     )
                 }
             }
@@ -2777,36 +2817,27 @@ fun EditNoteDialog(
     val editorBgEdit = if (isDark) getNoteAccentColor(selectedColor) else parseColor(selectedColor)
 
     val contextEdit = LocalContext.current
-    val dialogViewEdit = LocalView.current
-    DisposableEffect(Unit) {
-        val window = (dialogViewEdit.parent as? DialogWindowProvider)?.window
-        val previousMode = window?.attributes?.softInputMode
-        window?.setSoftInputMode(WindowManager.LayoutParams.SOFT_INPUT_ADJUST_RESIZE)
-        onDispose {
-            if (window != null && previousMode != null) {
-                window.setSoftInputMode(previousMode)
-            }
-        }
-    }
 
     val scopeEdit = androidx.compose.runtime.rememberCoroutineScope()
     val photoPickerEdit = androidx.activity.compose.rememberLauncherForActivityResult(
-        contract = androidx.activity.result.contract.ActivityResultContracts.PickVisualMedia()
-    ) { uri ->
-        if (uri != null) {
+        contract = androidx.activity.result.contract.ActivityResultContracts.PickMultipleVisualMedia(6)
+    ) { uris ->
+        if (uris.isNotEmpty()) {
             scopeEdit.launch {
-                val path = copyUriToNotesImages(contextEdit, uri)
-                if (path != null) attachedImagePath = path
+                val paths = uris.mapNotNull { copyUriToNotesImages(contextEdit, it) }
+                if (paths.isNotEmpty()) {
+                    insertBlocksAtFocus(paths.map { NoteBlockState(kind = "i", path = it) })
+                }
             }
         }
     }
 
     Dialog(
         onDismissRequest = handleExit,
-        properties = DialogProperties(usePlatformDefaultWidth = false)
+        properties = DialogProperties(usePlatformDefaultWidth = false, decorFitsSystemWindows = false)
     ) {
         Surface(modifier = Modifier.fillMaxSize(), color = editorBgEdit) {
-            Column(modifier = Modifier.fillMaxSize().imePadding()) {
+            Column(modifier = Modifier.fillMaxSize().statusBarsPadding().imePadding().navigationBarsPadding()) {
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
@@ -2825,7 +2856,7 @@ fun EditNoteDialog(
                                     appendLine(title.trim())
                                     appendLine()
                                 }
-                                append(content.trim())
+                                append(noteBlocksToContent(blocks))
                             }
                             com.example.sync.NoteShareHelper.shareText(contextEdit, title.trim(), shareBody)
                         }
@@ -2864,7 +2895,10 @@ fun EditNoteDialog(
                 )
 
                 // پاپ‌آپ هوشمند ایجاد و انتخاب برچسب با # (دقیقاً مشابه Google Keep)
-                val activeHashtag = extractActiveHashtagQuery(content)
+                val focusBlock = blocks.firstOrNull { it.id == focusedTextBlockId && it.kind == "t" } ?: blocks.lastOrNull { it.kind == "t" }
+                val focusCursor = focusBlock?.tfv?.selection?.start?.coerceIn(0, focusBlock.tfv.text.length) ?: 0
+                val focusPrefix = focusBlock?.tfv?.text?.substring(0, focusCursor) ?: ""
+                val activeHashtag = extractActiveHashtagQuery(focusPrefix)
                 if (activeHashtag != null) {
                     Surface(
                         modifier = Modifier.fillMaxWidth(),
@@ -2884,7 +2918,11 @@ fun EditNoteDialog(
                                         if (newTag.isNotBlank() && !tagsList.contains(newTag)) {
                                             tagsList.add(newTag)
                                         }
-                                        content = removeActiveHashtagFromContent(content)
+                                        if (focusBlock != null) {
+                                            val cleanedPrefix = removeActiveHashtagFromContent(focusPrefix)
+                                            val suffix = focusBlock.tfv.text.substring(focusCursor)
+                                            focusBlock.tfv = androidx.compose.ui.text.input.TextFieldValue(cleanedPrefix + suffix, androidx.compose.ui.text.TextRange(cleanedPrefix.length))
+                                        }
                                     },
                                     shape = RoundedCornerShape(8.dp),
                                     color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.5f),
@@ -2920,7 +2958,11 @@ fun EditNoteDialog(
                                         if (!tagsList.contains(cand)) {
                                             tagsList.add(cand)
                                         }
-                                        content = removeActiveHashtagFromContent(content)
+                                        if (focusBlock != null) {
+                                            val cleanedPrefix = removeActiveHashtagFromContent(focusPrefix)
+                                            val suffix = focusBlock.tfv.text.substring(focusCursor)
+                                            focusBlock.tfv = androidx.compose.ui.text.input.TextFieldValue(cleanedPrefix + suffix, androidx.compose.ui.text.TextRange(cleanedPrefix.length))
+                                        }
                                     },
                                     shape = RoundedCornerShape(8.dp),
                                     color = Color.Transparent,
@@ -2997,139 +3039,14 @@ fun EditNoteDialog(
                     }
                 }
 
-                TextField(
-                    value = content,
-                    onValueChange = { content = it },
-                    placeholder = { Text(if (strings.isFa) "متن یادداشت (برای برچسب # بنویسید)" else "Note Content (use # for label)") },
-                    textStyle = MaterialTheme.typography.bodyLarge,
-                    colors = TextFieldDefaults.colors(
-                        focusedContainerColor = Color.Transparent,
-                        unfocusedContainerColor = Color.Transparent,
-                        focusedIndicatorColor = Color.Transparent,
-                        unfocusedIndicatorColor = Color.Transparent
-                    ),
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .weight(1f)
+                NoteBlocksEditor(
+                    blocks = blocks,
+                    isFa = strings.isFa,
+                    onChanged = {},
+                    onFocusedTextBlock = { focusedTextBlockId = it },
+                    onOpenDrawing = { drawingBlock = it },
+                    modifier = Modifier.weight(1f)
                 )
-
-                // نمایش طرح وایت‌برد در صورت وجود با قابلیت کلیک جهت باز شدن تمام‌صفحه
-                if (!currentDrawingPath.isNullOrBlank()) {
-                    val drawingBitmap = remember(currentDrawingPath, initialNote.updatedAt) {
-                        val file = File(currentDrawingPath!!)
-                        if (file.exists()) BitmapFactory.decodeFile(currentDrawingPath)?.asImageBitmap() else null
-                    }
-                    if (drawingBitmap != null) {
-                        Column(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f), RoundedCornerShape(12.dp))
-                                .border(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f), RoundedCornerShape(12.dp))
-                                .padding(8.dp)
-                        ) {
-                            Row(
-                                modifier = Modifier.fillMaxWidth(),
-                                horizontalArrangement = Arrangement.SpaceBetween,
-                                verticalAlignment = Alignment.CenterVertically
-                            ) {
-                                Text(
-                                    text = if (strings.isFa) "طرح وایت‌برد (برای مشاهده/ویرایش لمس کنید):" else "Drawing (Tap to view/edit):",
-                                    fontSize = 11.sp,
-                                    fontWeight = FontWeight.SemiBold,
-                                    color = MaterialTheme.colorScheme.primary
-                                )
-                                TextButton(
-                                    onClick = { currentDrawingPath = null },
-                                    colors = androidx.compose.material3.ButtonDefaults.textButtonColors(
-                                        contentColor = MaterialTheme.colorScheme.error
-                                    )
-                                ) {
-                                    Icon(Icons.Default.Delete, contentDescription = null, modifier = Modifier.size(16.dp))
-                                    Spacer(modifier = Modifier.width(4.dp))
-                                    Text(if (strings.isFa) "حذف طرح" else "Remove", fontSize = 11.sp)
-                                }
-                            }
-                            Spacer(modifier = Modifier.height(4.dp))
-                            Box(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .clip(RoundedCornerShape(8.dp))
-                                    .border(1.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.3f), RoundedCornerShape(8.dp))
-                                    .clickable {
-                                        onOpenDrawingFullScreen?.invoke(
-                                            initialNote.copy(
-                                                title = title,
-                                                content = content,
-                                                colorHex = selectedColor,
-                                                isPinned = isPinned,
-                                                drawingPath = currentDrawingPath,
-                                                tag = tagsList.joinToString(",")
-                                            )
-                                        )
-                                    }
-                            ) {
-                                Image(
-                                    bitmap = drawingBitmap,
-                                    contentDescription = "طرح دستی",
-                                    contentScale = ContentScale.Fit,
-                                    modifier = Modifier
-                                        .fillMaxWidth()
-                                        .height(130.dp)
-                                )
-                            }
-                        }
-                    }
-                }
-
-                if (!attachedImagePath.isNullOrBlank()) {
-                    val photoBitmap = remember(attachedImagePath) {
-                        val file = File(attachedImagePath!!)
-                        if (file.exists()) BitmapFactory.decodeFile(attachedImagePath)?.asImageBitmap() else null
-                    }
-                    if (photoBitmap != null) {
-                        Column(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f), RoundedCornerShape(12.dp))
-                                .border(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f), RoundedCornerShape(12.dp))
-                                .padding(8.dp)
-                        ) {
-                            Row(
-                                modifier = Modifier.fillMaxWidth(),
-                                horizontalArrangement = Arrangement.SpaceBetween,
-                                verticalAlignment = Alignment.CenterVertically
-                            ) {
-                                Text(
-                                    text = if (strings.isFa) "عکس پیوست شده:" else "Attached photo:",
-                                    fontSize = 11.sp,
-                                    fontWeight = FontWeight.SemiBold,
-                                    color = MaterialTheme.colorScheme.primary
-                                )
-                                TextButton(
-                                    onClick = { attachedImagePath = null },
-                                    colors = androidx.compose.material3.ButtonDefaults.textButtonColors(
-                                        contentColor = MaterialTheme.colorScheme.error
-                                    )
-                                ) {
-                                    Icon(Icons.Default.Delete, contentDescription = null, modifier = Modifier.size(16.dp))
-                                    Spacer(modifier = Modifier.width(4.dp))
-                                    Text(if (strings.isFa) "حذف عکس" else "Remove", fontSize = 11.sp)
-                                }
-                            }
-                            Spacer(modifier = Modifier.height(4.dp))
-                            Image(
-                                bitmap = photoBitmap,
-                                contentDescription = if (strings.isFa) "عکس پیوست" else "Attached photo",
-                                contentScale = ContentScale.Fit,
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .height(150.dp)
-                                    .clip(RoundedCornerShape(8.dp))
-                            )
-                        }
-                    }
-                }
-
                 if (reminderAt > 0) {
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         Icon(
@@ -3206,23 +3123,12 @@ fun EditNoteDialog(
                         }
                         DropdownMenu(expanded = showAddMenu, onDismissRequest = { showAddMenu = false }) {
                             DropdownMenuItem(
-                                text = { Text(if (strings.isFa) "افزودن طرح وایت‌برد" else "Add drawing", fontSize = 13.sp) },
+                                text = { Text(if (strings.isFa) "افزودن نقاشی" else "Add drawing", fontSize = 13.sp) },
                                 onClick = {
                                     showAddMenu = false
-                                    onOpenDrawingFullScreen?.invoke(
-                                        initialNote.copy(
-                                            title = title,
-                                            content = content,
-                                            colorHex = selectedColor,
-                                            isPinned = isPinned,
-                                            drawingPath = currentDrawingPath,
-                                            tag = tagsList.joinToString(","),
-                                            imagePath = attachedImagePath,
-                                            audioPath = attachedAudioPath,
-                                            checklistJson = checklistItemsToJson(checklistItems.toList()),
-                                            reminderAt = reminderAt
-                                        )
-                                    )
+                                    val nb = NoteBlockState(kind = "d")
+                                    insertBlocksAtFocus(listOf(nb))
+                                    drawingBlock = nb
                                 }
                             )
                             DropdownMenuItem(
@@ -3272,6 +3178,19 @@ fun EditNoteDialog(
                 }
             }
         }
+    }
+
+    // بوم نقاشی روی خود ویرایشگر باز می‌شود؛ با برگشت، کاربر به همین یادداشت برمی‌گردد
+    drawingBlock?.let { block ->
+        WhiteboardDrawingDialog(
+            initialTitle = title,
+            initialDrawingPath = block.path,
+            onDismiss = { drawingBlock = null },
+            onSaveDrawing = { _, path, _ ->
+                block.path = path
+                drawingBlock = null
+            }
+        )
     }
 }
 

@@ -60,6 +60,12 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
+import androidx.compose.foundation.Image
+import androidx.compose.material.icons.filled.Close
+import androidx.compose.runtime.Composable
+import androidx.compose.ui.graphics.asImageBitmap
+import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.window.Dialog
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.CompositionLocalProvider
@@ -197,11 +203,6 @@ class MainActivity : ComponentActivity() {
 
                         var selectedTab by remember { mutableIntStateOf(0) }
                         val sharedNoteSeed by viewModel.sharedNoteSeed.collectAsState()
-                        LaunchedEffect(sharedNoteSeed) {
-                            if (sharedNoteSeed != null) {
-                                selectedTab = 2
-                            }
-                        }
                         val openNoteRequest by viewModel.openNoteRequest.collectAsState()
                         LaunchedEffect(openNoteRequest) {
                             if (openNoteRequest != null) {
@@ -244,6 +245,42 @@ class MainActivity : ComponentActivity() {
                         // BackHandler to navigate back to Calendar tab if on secondary tab or chat
                         BackHandler(enabled = selectedTab != 0) {
                             selectedTab = 0
+                        }
+
+                        // اشتراک از برنامه‌های دیگر: کارت سریع و کوچک به سبک گوگل کیپ،
+                        // بدون باز شدن صفحهٔ تقویم و ویرایشگر بزرگ یادداشت
+                        val activityForShare = LocalContext.current as? android.app.Activity
+                        val launchedForShare = remember {
+                            intent.action == android.content.Intent.ACTION_SEND ||
+                                intent.action == android.content.Intent.ACTION_SEND_MULTIPLE
+                        }
+                        sharedNoteSeed?.let { seed ->
+                            QuickShareNoteDialog(
+                                seed = seed,
+                                isFa = strings.isFa,
+                                onDismiss = {
+                                    viewModel.consumeSharedNoteSeed()
+                                    if (launchedForShare) activityForShare?.finish()
+                                },
+                                onSave = { t, c, tag, img ->
+                                    val bj = if (!img.isNullOrBlank()) {
+                                        com.example.data.noteBlocksDataToJson(
+                                            listOf(
+                                                com.example.data.NoteBlockData("i", path = img),
+                                                com.example.data.NoteBlockData("t", text = c)
+                                            )
+                                        )
+                                    } else {
+                                        ""
+                                    }
+                                    viewModel.addNote(
+                                        title = t, content = c, colorHex = "#FEF3C7", tag = tag,
+                                        imagePath = img, blocksJson = bj
+                                    )
+                                    viewModel.consumeSharedNoteSeed()
+                                    if (launchedForShare) activityForShare?.finish()
+                                }
+                            )
                         }
 
                         Scaffold(
@@ -808,6 +845,107 @@ class MainActivity : ComponentActivity() {
     private fun handleIntentForUpdate(intent: Intent?) {
         if (intent?.getBooleanExtra(com.example.update.UpdateReminderReceiver.EXTRA_FROM_UPDATE_REMINDER, false) == true) {
             viewModel.handleUpdateNotificationClick(this)
+        }
+    }
+}
+
+// کارت ذخیرهٔ سریع برای اشتراک از برنامه‌های دیگر (به سبک گوگل کیپ):
+// کوچک و مستقیم، بدون باز شدن صفحه‌های برنامه
+@Composable
+fun QuickShareNoteDialog(
+    seed: MainViewModel.SharedNoteSeed,
+    isFa: Boolean,
+    onDismiss: () -> Unit,
+    onSave: (title: String, content: String, tag: String, imagePath: String?) -> Unit
+) {
+    var title by remember(seed) { mutableStateOf(seed.title) }
+    var content by remember(seed) { mutableStateOf(seed.content) }
+    var tag by remember(seed) { mutableStateOf("") }
+    Dialog(onDismissRequest = onDismiss) {
+        Surface(
+            shape = RoundedCornerShape(20.dp),
+            color = MaterialTheme.colorScheme.surface,
+            shadowElevation = 8.dp,
+            modifier = Modifier.fillMaxWidth()
+        ) {
+            Column(
+                modifier = Modifier.padding(18.dp),
+                verticalArrangement = Arrangement.spacedBy(10.dp)
+            ) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Text(
+                        text = if (isFa) "ذخیره در یادداشت‌ها" else "Save to notes",
+                        fontWeight = FontWeight.Bold,
+                        fontSize = 16.sp
+                    )
+                    Spacer(modifier = Modifier.weight(1f))
+                    IconButton(onClick = onDismiss) {
+                        Icon(Icons.Default.Close, contentDescription = null)
+                    }
+                }
+                if (!seed.imagePath.isNullOrBlank()) {
+                    val bmp = remember(seed.imagePath) {
+                        try {
+                            val f = java.io.File(seed.imagePath!!)
+                            if (f.exists()) {
+                                android.graphics.BitmapFactory.decodeFile(seed.imagePath)?.asImageBitmap()
+                            } else {
+                                null
+                            }
+                        } catch (_: Exception) {
+                            null
+                        }
+                    }
+                    if (bmp != null) {
+                        Image(
+                            bitmap = bmp,
+                            contentDescription = null,
+                            contentScale = ContentScale.Crop,
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .height(150.dp)
+                                .clip(RoundedCornerShape(12.dp))
+                        )
+                    }
+                }
+                OutlinedTextField(
+                    value = title,
+                    onValueChange = { title = it },
+                    label = { Text(if (isFa) "عنوان" else "Title") },
+                    singleLine = true,
+                    modifier = Modifier.fillMaxWidth()
+                )
+                OutlinedTextField(
+                    value = content,
+                    onValueChange = { content = it },
+                    label = { Text(if (isFa) "متن" else "Text") },
+                    minLines = 3,
+                    maxLines = 6,
+                    modifier = Modifier.fillMaxWidth()
+                )
+                OutlinedTextField(
+                    value = tag,
+                    onValueChange = { tag = it },
+                    label = { Text(if (isFa) "برچسب (اختیاری)" else "Tag (optional)") },
+                    singleLine = true,
+                    modifier = Modifier.fillMaxWidth()
+                )
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    TextButton(onClick = onDismiss, modifier = Modifier.weight(1f)) {
+                        Text(if (isFa) "بی‌خیال" else "Cancel")
+                    }
+                    Button(
+                        onClick = { onSave(title.trim(), content.trim(), tag.trim(), seed.imagePath) },
+                        enabled = title.isNotBlank() || content.isNotBlank() || !seed.imagePath.isNullOrBlank(),
+                        modifier = Modifier.weight(1f)
+                    ) {
+                        Text(if (isFa) "ذخیره" else "Save")
+                    }
+                }
+            }
         }
     }
 }

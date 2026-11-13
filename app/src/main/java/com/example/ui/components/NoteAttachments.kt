@@ -7,19 +7,36 @@ import android.media.MediaRecorder
 import android.net.Uri
 import android.os.Build
 import android.widget.Toast
+import android.graphics.BitmapFactory
+import androidx.compose.foundation.ExperimentalFoundationApi
+import androidx.compose.foundation.Image
+import androidx.compose.foundation.background
+import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.relocation.BringIntoViewRequester
+import androidx.compose.foundation.relocation.bringIntoViewRequester
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicTextField
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.Draw
 import androidx.compose.material.icons.filled.Mic
 import androidx.compose.material.icons.filled.Pause
 import androidx.compose.material.icons.filled.PlayArrow
@@ -34,19 +51,31 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshots.SnapshotStateList
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.graphics.SolidColor
+import androidx.compose.ui.graphics.asImageBitmap
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.text.TextLayoutResult
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.TextFieldValue
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.core.content.ContextCompat
 import com.example.calendar.PersianCalendarHelper
+import com.example.data.NoteBlockData
+import com.example.data.noteBlocksDataToJson
+import com.example.data.parseNoteBlocksData
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.withContext
@@ -439,6 +468,280 @@ fun formatNoteReminderLabel(millis: Long): String {
     )
     val time = "%02d:%02d".format(cal.get(Calendar.HOUR_OF_DAY), cal.get(Calendar.MINUTE))
     return "${jalali.formattedPersian} - ${PersianCalendarHelper.toPersianDigits(time)}"
+}
+
+// ---------- Inline content blocks: text / photo / drawing in one flow ----------
+// مدل سندمحور یادداشت: متن و عکس و نقاشی مثل ورد و مقالهٔ تلگرام وسط همان جریان متن می‌نشینند.
+
+class NoteBlockState(
+    val id: String = UUID.randomUUID().toString(),
+    val kind: String, // "t" text, "i" image, "d" drawing
+    text: String = "",
+    path: String? = null
+) {
+    var tfv by mutableStateOf(TextFieldValue(text))
+    var path by mutableStateOf(path)
+}
+
+fun buildInitialNoteBlocks(
+    blocksJson: String?,
+    content: String,
+    imagePath: String?,
+    drawingPath: String?
+): MutableList<NoteBlockState> {
+    val parsed = parseNoteBlocksData(blocksJson)
+    val blocks = mutableListOf<NoteBlockState>()
+    if (parsed.isNotEmpty()) {
+        for (b in parsed) {
+            blocks.add(NoteBlockState(kind = b.kind, text = b.text, path = b.path))
+        }
+    } else {
+        // یادداشت قدیمی بدون بلوک: متن، بعد پیوست‌های قدیمی به همان ترتیب نمایشی قبلی
+        blocks.add(NoteBlockState(kind = "t", text = content))
+        if (!drawingPath.isNullOrBlank()) blocks.add(NoteBlockState(kind = "d", path = drawingPath))
+        if (!imagePath.isNullOrBlank()) blocks.add(NoteBlockState(kind = "i", path = imagePath))
+    }
+    if (blocks.none { it.kind == "t" }) {
+        blocks.add(0, NoteBlockState(kind = "t", text = content))
+    }
+    if (blocks.lastOrNull()?.kind != "t") {
+        blocks.add(NoteBlockState(kind = "t"))
+    }
+    return blocks
+}
+
+// نسخهٔ ذخیره‌شدنی بلوک‌ها: بلوک رسانه‌ای بی‌فایل و متن‌های خالی دو سر حذف می‌شوند؛
+// اگر هیچ رسانه‌ای نیست، رشتهٔ خالی برمی‌گردد تا یادداشت متنی ساده بماند.
+fun noteBlocksToJson(blocks: List<NoteBlockState>): String {
+    val kept = blocks.filter { it.kind == "t" || !it.path.isNullOrBlank() }.toMutableList()
+    while (kept.isNotEmpty() && kept.first().kind == "t" && kept.first().tfv.text.isBlank()) kept.removeAt(0)
+    while (kept.isNotEmpty() && kept.last().kind == "t" && kept.last().tfv.text.isBlank()) kept.removeAt(kept.lastIndex)
+    if (kept.isEmpty()) return ""
+    if (kept.all { it.kind == "t" }) return ""
+    return noteBlocksDataToJson(kept.map { NoteBlockData(it.kind, it.tfv.text, it.path) })
+}
+
+fun noteBlocksToContent(blocks: List<NoteBlockState>): String =
+    blocks.filter { it.kind == "t" }.joinToString("\n\n") { it.tfv.text }.trim()
+
+fun noteBlocksFirstPath(blocks: List<NoteBlockState>, kind: String): String? =
+    blocks.firstOrNull { it.kind == kind && !it.path.isNullOrBlank() }?.path
+
+fun noteBlocksSignature(blocks: List<NoteBlockState>): String =
+    blocks.joinToString("|") { it.kind + ":" + (if (it.kind == "t") it.tfv.text else (it.path ?: "")) }
+
+fun noteBlocksHaveContent(blocks: List<NoteBlockState>): Boolean =
+    blocks.any { (it.kind == "t" && it.tfv.text.isNotBlank()) || (it.kind != "t" && !it.path.isNullOrBlank()) }
+
+@OptIn(ExperimentalFoundationApi::class)
+@Composable
+private fun NoteTextBlock(
+    block: NoteBlockState,
+    isFa: Boolean,
+    showPlaceholder: Boolean,
+    onChanged: () -> Unit,
+    onFocused: (String) -> Unit
+) {
+    val bringIntoViewRequester = remember { BringIntoViewRequester() }
+    var layoutResult by remember { mutableStateOf<TextLayoutResult?>(null) }
+    var focused by remember { mutableStateOf(false) }
+    val scope = rememberCoroutineScope()
+
+    LaunchedEffect(block.tfv.selection, focused) {
+        if (focused) {
+            val cursor = layoutResult?.getCursorRect(block.tfv.selection.start)
+            if (cursor != null) {
+                bringIntoViewRequester.bringIntoView(cursor)
+            }
+        }
+    }
+
+    BasicTextField(
+        value = block.tfv,
+        onValueChange = { newValue ->
+            block.tfv = newValue
+            onChanged()
+        },
+        textStyle = MaterialTheme.typography.bodyLarge.copy(
+            color = MaterialTheme.colorScheme.onSurface
+        ),
+        cursorBrush = SolidColor(MaterialTheme.colorScheme.primary),
+        onTextLayout = { layoutResult = it },
+        modifier = Modifier
+            .fillMaxWidth()
+            .bringIntoViewRequester(bringIntoViewRequester)
+            .onFocusChanged { state ->
+                focused = state.isFocused
+                if (state.isFocused) {
+                    onFocused(block.id)
+                    scope.launch {
+                        val cursor = layoutResult?.getCursorRect(block.tfv.selection.start)
+                        if (cursor != null) bringIntoViewRequester.bringIntoView(cursor)
+                    }
+                }
+            },
+        decorationBox = { innerTextField ->
+            if (showPlaceholder && block.tfv.text.isEmpty()) {
+                Text(
+                    text = if (isFa) "متن یادداشت (برای برچسب # بنویسید)" else "Note content (use # for label)",
+                    style = MaterialTheme.typography.bodyLarge,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f)
+                )
+            }
+            innerTextField()
+        }
+    )
+}
+
+@Composable
+private fun NoteMediaBlock(
+    block: NoteBlockState,
+    isFa: Boolean,
+    isDrawing: Boolean,
+    onOpenDrawing: (NoteBlockState) -> Unit,
+    onRemove: (NoteBlockState) -> Unit
+) {
+    val bitmap = remember(block.path) {
+        val p = block.path
+        if (p.isNullOrBlank()) null else try {
+            val f = File(p)
+            if (f.exists()) BitmapFactory.decodeFile(p)?.asImageBitmap() else null
+        } catch (_: Exception) {
+            null
+        }
+    }
+    Box(modifier = Modifier.fillMaxWidth()) {
+        if (bitmap != null) {
+            val ratio = (bitmap.width.toFloat() / bitmap.height.coerceAtLeast(1)).coerceIn(0.55f, 2.4f)
+            Image(
+                bitmap = bitmap,
+                contentDescription = if (isDrawing) {
+                    if (isFa) "طرح نقاشی" else "Drawing"
+                } else {
+                    if (isFa) "عکس" else "Photo"
+                },
+                contentScale = ContentScale.Crop,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .aspectRatio(ratio)
+                    .heightIn(max = 430.dp)
+                    .clip(RoundedCornerShape(14.dp))
+                    .then(
+                        if (isDrawing) {
+                            Modifier
+                                .border(1.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.35f), RoundedCornerShape(14.dp))
+                                .clickable { onOpenDrawing(block) }
+                        } else {
+                            Modifier
+                        }
+                    )
+            )
+        } else {
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(120.dp)
+                    .clip(RoundedCornerShape(14.dp))
+                    .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.45f))
+                    .border(1.dp, MaterialTheme.colorScheme.outlineVariant, RoundedCornerShape(14.dp))
+                    .clickable(enabled = isDrawing) { onOpenDrawing(block) },
+                contentAlignment = Alignment.Center
+            ) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Icon(
+                        Icons.Default.Draw,
+                        contentDescription = null,
+                        tint = MaterialTheme.colorScheme.primary,
+                        modifier = Modifier.size(20.dp)
+                    )
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text(
+                        text = if (isFa) "برای کشیدن طرح لمس کنید" else "Tap to draw",
+                        fontSize = 13.sp,
+                        color = MaterialTheme.colorScheme.primary,
+                        fontWeight = FontWeight.Medium
+                    )
+                }
+            }
+        }
+        IconButton(
+            onClick = { onRemove(block) },
+            modifier = Modifier
+                .align(Alignment.TopEnd)
+                .padding(6.dp)
+                .size(28.dp)
+                .background(MaterialTheme.colorScheme.surface.copy(alpha = 0.85f), CircleShape)
+        ) {
+            Icon(
+                Icons.Default.Close,
+                contentDescription = if (isFa) "حذف" else "Remove",
+                modifier = Modifier.size(16.dp),
+                tint = MaterialTheme.colorScheme.error
+            )
+        }
+        if (isDrawing && bitmap != null) {
+            Box(
+                modifier = Modifier
+                    .align(Alignment.BottomStart)
+                    .padding(8.dp)
+                    .background(MaterialTheme.colorScheme.surface.copy(alpha = 0.85f), RoundedCornerShape(8.dp))
+                    .padding(horizontal = 8.dp, vertical = 4.dp)
+            ) {
+                Text(
+                    text = if (isFa) "طرح — برای ویرایش لمس کنید" else "Drawing — tap to edit",
+                    fontSize = 11.sp,
+                    color = MaterialTheme.colorScheme.onSurface
+                )
+            }
+        }
+    }
+}
+
+@Composable
+fun NoteBlocksEditor(
+    blocks: SnapshotStateList<NoteBlockState>,
+    isFa: Boolean,
+    onChanged: () -> Unit,
+    onFocusedTextBlock: (String) -> Unit,
+    onOpenDrawing: (NoteBlockState) -> Unit,
+    modifier: Modifier = Modifier
+) {
+    val textBlockCount = blocks.count { it.kind == "t" }
+    Column(
+        modifier = modifier
+            .fillMaxWidth()
+            .verticalScroll(rememberScrollState()),
+        verticalArrangement = Arrangement.spacedBy(10.dp)
+    ) {
+        blocks.forEach { block ->
+            key(block.id) {
+                when (block.kind) {
+                    "t" -> NoteTextBlock(
+                        block = block,
+                        isFa = isFa,
+                        showPlaceholder = textBlockCount == 1,
+                        onChanged = onChanged,
+                        onFocused = onFocusedTextBlock
+                    )
+                    "i" -> NoteMediaBlock(
+                        block = block,
+                        isFa = isFa,
+                        isDrawing = false,
+                        onOpenDrawing = onOpenDrawing,
+                        onRemove = { blocks.remove(it); onChanged() }
+                    )
+                    "d" -> NoteMediaBlock(
+                        block = block,
+                        isFa = isFa,
+                        isDrawing = true,
+                        onOpenDrawing = onOpenDrawing,
+                        onRemove = { blocks.remove(it); onChanged() }
+                    )
+                }
+            }
+        }
+        Spacer(modifier = Modifier.height(24.dp))
+    }
 }
 
 fun showNoteReminderPicker(context: Context, currentMillis: Long, onPicked: (Long) -> Unit) {
