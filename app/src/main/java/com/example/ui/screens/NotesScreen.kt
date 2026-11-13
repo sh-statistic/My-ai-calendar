@@ -15,6 +15,7 @@ import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.ExperimentalFoundationApi
+import androidx.activity.compose.BackHandler
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.combinedClickable
@@ -140,6 +141,18 @@ fun NotesScreen(
     val trashedNotes by viewModel.trashedNotes.collectAsState()
     val openNoteRequest by viewModel.openNoteRequest.collectAsState()
     var showEmptyTrashConfirm by remember { mutableStateOf(false) }
+
+    // دکمهٔ برگشت گوشی اول داخل همین صفحه یک قدم برمی‌گردد: لغو انتخاب چندتایی،
+    // و در نمای بایگانی/سطل زباله برگشت به فهرست اصلی یادداشت‌ها.
+    // فقط وقتی هیچ‌کدام فعال نیست، برگشت به تب تقویم (BackHandler در MainActivity) انجام می‌شود.
+    BackHandler(enabled = selectionMode || notesView != 0) {
+        if (selectionMode) {
+            selectionMode = false
+            selectedNoteIds = emptySet()
+        } else {
+            notesView = 0
+        }
+    }
 
     LaunchedEffect(Unit) { viewModel.purgeOldTrashedNotes() }
 
