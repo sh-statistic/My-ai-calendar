@@ -1,11 +1,13 @@
 package com.example.ui.components
 
+import androidx.activity.compose.BackHandler
 import android.graphics.BitmapFactory
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.navigationBarsPadding
@@ -50,7 +52,6 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.material3.AlertDialog
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.ui.window.Dialog
-import androidx.compose.ui.window.DialogProperties
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import androidx.compose.material3.Button
@@ -71,14 +72,12 @@ import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.RadioButton
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Switch
-import android.view.WindowManager
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.material.icons.filled.PushPin
 import androidx.compose.material.icons.filled.Share
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalView
-import androidx.compose.ui.window.DialogWindowProvider
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TextField
@@ -2332,16 +2331,10 @@ fun AddNoteDialog(
         }
     }
 
-    Dialog(
-        onDismissRequest = handleExit,
-        properties = DialogProperties(usePlatformDefaultWidth = false, decorFitsSystemWindows = false)
-    ) {
-        // نوار ابزار ذاتاً به ته پنجره می‌چسبد؛ پنجره با باز شدن صفحه‌کلید خودش کوچک می‌شود تا نوار بالای صفحه‌کلید بنشیند
-        val dialogWindow = (LocalView.current.parent as? DialogWindowProvider)?.window
-        LaunchedEffect(dialogWindow) {
-            dialogWindow?.setSoftInputMode(WindowManager.LayoutParams.SOFT_INPUT_ADJUST_RESIZE)
-        }
-        Surface(modifier = Modifier.fillMaxSize(), color = editorBgAdd) {
+    // ویرایشگر در پنجرهٔ اصلی می‌نشيند (نه دیالوگ) تا نوار ابزارش با صفحه‌کلید درست کار کند؛ دکمهٔ برگشت هم همان خروج است
+    BackHandler { handleExit() }
+
+    Surface(modifier = Modifier.fillMaxSize().clickable(interactionSource = remember { MutableInteractionSource() }, indication = null) {}, color = editorBgAdd) {
             Column(modifier = Modifier.fillMaxSize().statusBarsPadding().navigationBarsPadding()) {
                 Row(
                     modifier = Modifier
@@ -2688,7 +2681,6 @@ fun AddNoteDialog(
                 }
             }
         }
-    }
 
     // بوم نقاشی روی خود ویرایشگر باز می‌شود؛ با برگشت، کاربر به همین یادداشت برمی‌گردد
     drawingBlock?.let { block ->
@@ -2832,16 +2824,10 @@ fun EditNoteDialog(
         }
     }
 
-    Dialog(
-        onDismissRequest = handleExit,
-        properties = DialogProperties(usePlatformDefaultWidth = false, decorFitsSystemWindows = false)
-    ) {
-        // نوار ابزار ذاتاً به ته پنجره می‌چسبد؛ پنجره با باز شدن صفحه‌کلید خودش کوچک می‌شود تا نوار بالای صفحه‌کلید بنشیند
-        val dialogWindow = (LocalView.current.parent as? DialogWindowProvider)?.window
-        LaunchedEffect(dialogWindow) {
-            dialogWindow?.setSoftInputMode(WindowManager.LayoutParams.SOFT_INPUT_ADJUST_RESIZE)
-        }
-        Surface(modifier = Modifier.fillMaxSize(), color = editorBgEdit) {
+    // ویرایشگر در پنجرهٔ اصلی می‌نشيند (نه دیالوگ) تا نوار ابزارش با صفحه‌کلید درست کار کند؛ دکمهٔ برگشت هم همان خروج است
+    BackHandler { handleExit() }
+
+    Surface(modifier = Modifier.fillMaxSize().clickable(interactionSource = remember { MutableInteractionSource() }, indication = null) {}, color = editorBgEdit) {
             Column(modifier = Modifier.fillMaxSize().statusBarsPadding().navigationBarsPadding()) {
                 Row(
                     modifier = Modifier
@@ -3182,7 +3168,6 @@ fun EditNoteDialog(
                 }
             }
         }
-    }
 
     // بوم نقاشی روی خود ویرایشگر باز می‌شود؛ با برگشت، کاربر به همین یادداشت برمی‌گردد
     drawingBlock?.let { block ->

@@ -90,6 +90,7 @@ import androidx.compose.ui.unit.sp
 import com.example.calendar.PersianCalendarHelper
 import com.example.settings.AppPreferences
 import com.example.ui.MainViewModel
+import com.example.ui.NoteEditorRequest
 import com.example.ui.CalendarViewMode
 import com.example.ui.LocalAppLanguage
 import com.example.ui.rememberAppStrings
@@ -511,6 +512,89 @@ class MainActivity : ComponentActivity() {
                                 5 -> ChatScreen(viewModel = viewModel)
                             }
                         }
+                    }
+
+                    // ویرایشگر یادداشت روی خود پنجرهٔ اصلی باز می‌شود، نه در یک پنجرهٔ دیالوگ جدا؛
+                    // پنجرهٔ اصلی در فایل برنامه روی کوچک‌شدن با صفحه‌کلید تنظیم است و نوار ابزار ویرایشگر همیشه ته صفحه می‌چسبد
+                    val noteEditorRequest by viewModel.noteEditorRequest.collectAsState()
+                    val editorNotes by viewModel.activeNotes.collectAsState()
+                    val editorExistingTags = remember(editorNotes) {
+                        editorNotes.flatMap { it.tag.split(",").map { t -> t.trim() } }
+                            .filter { it.isNotBlank() }
+                            .distinct()
+                    }
+                    when (val req = noteEditorRequest) {
+                        NoteEditorRequest.Add -> {
+                            com.example.ui.components.AddNoteDialog(
+                                onDismiss = { viewModel.closeNoteEditor() },
+                                onConfirm = { title, content, colorHex, tag, isPinned, imagePath, checklistJson, audioPath, reminderAt, blocksJson ->
+                                    viewModel.addNote(
+                                        title, content, colorHex,
+                                        isPinned = isPinned, tag = tag, imagePath = imagePath,
+                                        checklistJson = checklistJson, audioPath = audioPath, reminderAt = reminderAt,
+                                        blocksJson = blocksJson
+                                    )
+                                    viewModel.closeNoteEditor()
+                                },
+                                existingTags = editorExistingTags
+                            )
+                        }
+                        is NoteEditorRequest.Edit -> {
+                            val editorArchivedNotes by viewModel.archivedNotes.collectAsState()
+                            var noteSnapshot by remember(req.noteId) { mutableStateOf<com.example.data.NoteEntity?>(null) }
+                            LaunchedEffect(req.noteId, editorNotes, editorArchivedNotes) {
+                                if (noteSnapshot == null) {
+                                    noteSnapshot = editorNotes.firstOrNull { it.id == req.noteId }
+                                        ?: editorArchivedNotes.firstOrNull { it.id == req.noteId }
+                                }
+                            }
+                            val frozenNote = noteSnapshot
+                            if (frozenNote != null) {
+                                com.example.ui.components.EditNoteDialog(
+                                    initialNote = frozenNote,
+                                    onDismiss = { viewModel.closeNoteEditor() },
+                                    onConfirm = { title, content, colorHex, isPinned, drawingPath, tag, imagePath, checklistJson, audioPath, reminderAt, blocksJson ->
+                                        viewModel.updateNote(
+                                            frozenNote.copy(
+                                                title = title,
+                                                content = content,
+                                                colorHex = colorHex,
+                                                isPinned = isPinned,
+                                                drawingPath = drawingPath,
+                                                tag = tag,
+                                                imagePath = imagePath,
+                                                checklistJson = checklistJson,
+                                                audioPath = audioPath,
+                                                reminderAt = reminderAt,
+                                                blocksJson = blocksJson,
+                                                updatedAt = System.currentTimeMillis()
+                                            )
+                                        )
+                                        viewModel.closeNoteEditor()
+                                    },
+                                    onAutosave = { title, content, colorHex, isPinned, drawingPath, tag, imagePath, checklistJson, audioPath, reminderAt, blocksJson ->
+                                        viewModel.updateNote(
+                                            frozenNote.copy(
+                                                title = title,
+                                                content = content,
+                                                colorHex = colorHex,
+                                                isPinned = isPinned,
+                                                drawingPath = drawingPath,
+                                                tag = tag,
+                                                imagePath = imagePath,
+                                                checklistJson = checklistJson,
+                                                audioPath = audioPath,
+                                                reminderAt = reminderAt,
+                                                blocksJson = blocksJson,
+                                                updatedAt = System.currentTimeMillis()
+                                            )
+                                        )
+                                    },
+                                    existingTags = editorExistingTags
+                                )
+                            }
+                        }
+                        null -> {}
                     }
 
                     // In-App Update Dialog with Automatic Safety Backup

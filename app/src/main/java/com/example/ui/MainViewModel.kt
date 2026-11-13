@@ -96,6 +96,18 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         _openNoteRequest.value = null
     }
 
+    // ویرایشگر یادداشت روی پنجرهٔ اصلی باز می‌شود، نه در دیالوگ جدا؛ پنجرهٔ اصلی با صفحه‌کلید درست کوچک می‌شود
+    private val _noteEditorRequest = MutableStateFlow<NoteEditorRequest?>(null)
+    val noteEditorRequest: StateFlow<NoteEditorRequest?> = _noteEditorRequest.asStateFlow()
+
+    fun openNoteEditor(request: NoteEditorRequest) {
+        _noteEditorRequest.value = request
+    }
+
+    fun closeNoteEditor() {
+        _noteEditorRequest.value = null
+    }
+
     val syncLogs: StateFlow<List<SyncLogEntity>> = repository.recentSyncLogs
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
@@ -2136,4 +2148,9 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             _isServerRunning.value = false
         }
     }
+}
+
+sealed interface NoteEditorRequest {
+    data object Add : NoteEditorRequest
+    data class Edit(val noteId: String) : NoteEditorRequest
 }
