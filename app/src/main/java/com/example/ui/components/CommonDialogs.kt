@@ -106,7 +106,6 @@ import androidx.compose.ui.layout.ContentScale
 import java.io.File
 import com.example.ui.screens.getAdaptiveNoteColor
 import com.example.ui.screens.getAdaptiveNoteBorder
-import com.example.ui.screens.getNoteAccentColor
 import androidx.compose.ui.platform.ClipboardManager
 import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.platform.testTag
@@ -2311,11 +2310,10 @@ fun AddNoteDialog(
         onDismiss()
     }
 
-    val editorBgAdd = if (MaterialTheme.colorScheme.background.luminance() < 0.5f) {
-        getNoteAccentColor(selectedColor)
-    } else {
-        parseColor(selectedColor)
-    }
+    val editorBgAdd = getAdaptiveNoteColor(
+        selectedColor,
+        MaterialTheme.colorScheme.background.luminance() < 0.5f
+    )
 
     val contextAdd = LocalContext.current
 
@@ -2348,7 +2346,6 @@ fun AddNoteDialog(
                     IconButton(onClick = handleExit) {
                         Icon(Icons.Default.Close, contentDescription = null)
                     }
-                    Text(strings.addNote, fontWeight = FontWeight.Bold, fontSize = 17.sp)
                     Spacer(modifier = Modifier.weight(1f))
                     IconButton(
                         onClick = {
@@ -2370,7 +2367,7 @@ fun AddNoteDialog(
                         .fillMaxWidth()
                         .weight(1f)
                         .padding(horizontal = 16.dp, vertical = 8.dp),
-                    verticalArrangement = Arrangement.spacedBy(12.dp)
+                    verticalArrangement = Arrangement.spacedBy(6.dp)
                 ) {
                 TextField(
                     value = title,
@@ -2583,7 +2580,7 @@ fun AddNoteDialog(
                 ) {
                     val isDarkBar = MaterialTheme.colorScheme.background.luminance() < 0.5f
                     noteColors.forEach { hex ->
-                        val col = if (isDarkBar) getNoteAccentColor(hex) else parseColor(hex)
+                        val col = getAdaptiveNoteColor(hex, isDarkBar)
                         val isSelected = selectedColor == hex
                         Box(
                             modifier = Modifier
@@ -2599,7 +2596,12 @@ fun AddNoteDialog(
                             contentAlignment = Alignment.Center
                         ) {
                             if (isSelected) {
-                                Icon(Icons.Default.Check, contentDescription = null, tint = Color.White, modifier = Modifier.size(16.dp))
+                                Icon(
+                                    Icons.Default.Check,
+                                    contentDescription = null,
+                                    tint = if (isDarkBar) Color.White else Color(0xFF374151),
+                                    modifier = Modifier.size(16.dp)
+                                )
                             }
                         }
                     }
@@ -2796,7 +2798,7 @@ fun EditNoteDialog(
         onDismiss()
     }
 
-    val editorBgEdit = if (isDark) getNoteAccentColor(selectedColor) else parseColor(selectedColor)
+    val editorBgEdit = getAdaptiveNoteColor(selectedColor, isDark)
 
     val contextEdit = LocalContext.current
 
@@ -2829,7 +2831,6 @@ fun EditNoteDialog(
                     IconButton(onClick = handleExit) {
                         Icon(Icons.Default.Close, contentDescription = null)
                     }
-                    Text(strings.editNote, fontWeight = FontWeight.Bold, fontSize = 17.sp)
                     Spacer(modifier = Modifier.weight(1f))
                     IconButton(
                         onClick = {
@@ -2851,7 +2852,7 @@ fun EditNoteDialog(
                         .fillMaxWidth()
                         .weight(1f)
                         .padding(horizontal = 16.dp, vertical = 8.dp),
-                    verticalArrangement = Arrangement.spacedBy(12.dp)
+                    verticalArrangement = Arrangement.spacedBy(6.dp)
                 ) {
                 TextField(
                     value = title,
@@ -3058,7 +3059,7 @@ fun EditNoteDialog(
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     noteColors.forEach { hex ->
-                        val col = if (isDark) getNoteAccentColor(hex) else parseColor(hex)
+                        val col = getAdaptiveNoteColor(hex, isDark)
                         val isSelected = selectedColor == hex
                         Box(
                             modifier = Modifier
@@ -3074,7 +3075,12 @@ fun EditNoteDialog(
                             contentAlignment = Alignment.Center
                         ) {
                             if (isSelected) {
-                                Icon(Icons.Default.Check, contentDescription = null, tint = Color.White, modifier = Modifier.size(16.dp))
+                                Icon(
+                                    Icons.Default.Check,
+                                    contentDescription = null,
+                                    tint = if (isDark) Color.White else Color(0xFF374151),
+                                    modifier = Modifier.size(16.dp)
+                                )
                             }
                         }
                     }

@@ -22,6 +22,8 @@ import androidx.compose.foundation.combinedClickable
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
@@ -770,9 +772,20 @@ fun getNoteAccentColor(hex: String): Color {
 }
 
 fun getAdaptiveNoteColor(hex: String, isDark: Boolean): Color {
-    if (!isDark) return parseColor(hex)
-    // کریستالی تیره: سطح کاملاً خنثی، لوکس و تمیز بدون رنگ‌های کدر و قهوه‌ای
-    return Color(0xFF18181C)
+    if (!isDark) {
+        // رنگ پیش‌فرض در روز کمی آرام‌تر از زرد اصلی تا چشم را نزند
+        return if (hex.uppercase() == "#FEF3C7") Color(0xFFFAF4E6) else parseColor(hex)
+    }
+    // تم شب: برای هر رنگ، گونهٔ عمیق و خاموشِ همان رنگ؛ نه مشکیِ یکدست، نه رنگ تند و درخشان
+    return when (hex.uppercase()) {
+        "#FEF3C7" -> Color(0xFF262019) // پیش‌فرض: خنثیِ گرم و آرام
+        "#DCFCE7" -> Color(0xFF1D2B21) // سبز عمیق
+        "#E0F2FE" -> Color(0xFF1B2836) // آبی عمیق
+        "#FCE7F3" -> Color(0xFF33202B) // صورتی عمیق
+        "#F3E8FF" -> Color(0xFF2A2138) // بنفش عمیق
+        "#F1F5F9" -> Color(0xFF232629) // خاکستری عمیق
+        else -> Color(0xFF1E1E22)
+    }
 }
 
 fun getAdaptiveNoteBorder(hex: String, isDark: Boolean): Color {
@@ -782,7 +795,7 @@ fun getAdaptiveNoteBorder(hex: String, isDark: Boolean): Color {
     return accent.copy(alpha = 0.35f)
 }
 
-@OptIn(ExperimentalFoundationApi::class)
+@OptIn(ExperimentalFoundationApi::class, ExperimentalLayoutApi::class)
 @Composable
 fun NoteCard(
     note: NoteEntity,
@@ -980,17 +993,14 @@ fun NoteCard(
 
             Spacer(modifier = Modifier.height(10.dp))
 
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(6.dp)
+            val tags = note.tag.split(",").map { it.trim() }.filter { it.isNotBlank() }
+            if (tags.isNotEmpty()) {
+                FlowRow(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(6.dp),
+                    verticalArrangement = Arrangement.spacedBy(6.dp)
                 ) {
-                    val tags = note.tag.split(",").map { it.trim() }.filter { it.isNotBlank() }
-                    tags.forEach { tagItem ->
+                    tags.take(6).forEach { tagItem ->
                         val isIdea = tagItem == "ایده"
                         Surface(
                             onClick = { onTagClick(tagItem) },
@@ -1019,13 +1029,36 @@ fun NoteCard(
                             }
                         }
                     }
-
-                    Text(
-                        text = strings.formatDigits(note.persianDate),
-                        fontSize = 10.sp,
-                        color = if (isDark) Color(0xFF71717A) else Color(0xFF64748B)
-                    )
+                    if (tags.size > 6) {
+                        Surface(
+                            onClick = onClick,
+                            color = if (isDark) MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.6f) else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.7f),
+                            shape = RoundedCornerShape(6.dp),
+                            border = BorderStroke(0.6.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.6f))
+                        ) {
+                            Text(
+                                text = "+${tags.size - 6}",
+                                fontSize = 10.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = if (isDark) Color(0xFFE4E4E7) else Color(0xFF334155),
+                                modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
+                            )
+                        }
+                    }
                 }
+                Spacer(modifier = Modifier.height(8.dp))
+            }
+
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(
+                    text = strings.formatDigits(note.persianDate),
+                    fontSize = 10.sp,
+                    color = if (isDark) Color(0xFF71717A) else Color(0xFF64748B)
+                )
 
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     // Quick Copy Icon (Manual save to clipboard)
@@ -1052,7 +1085,7 @@ fun NoteCard(
                             Icon(
                                 Icons.Default.MoreVert,
                                 contentDescription = null,
-                                tint = Color(0xFF475569),
+                                tint = if (isDark) Color(0xFFA1A1AA) else Color(0xFF475569),
                                 modifier = Modifier.size(16.dp)
                             )
                         }
