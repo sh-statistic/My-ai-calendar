@@ -370,8 +370,9 @@ class MainActivity : ComponentActivity() {
                                         }
                                     }
                                 }
-                            } else {
-                                // Standard Compact Header for Secondary Screens (Tasks, Notes, Sync, Settings, Chat)
+                            } else if (selectedTab != 2 && selectedTab != 1) {
+                                // Standard Compact Header for Secondary Screens (Tasks, Sync, Settings, Chat)
+                                // تب‌های یادداشت‌ها و وظایف هدر جدا ندارند؛ عنوانشان در ناوبری پایین هست و بالای خود صفحه‌اند
                                 CenterAlignedTopAppBar(
                                     title = {
                                         if (selectedTab == 3) {
@@ -503,8 +504,8 @@ class MainActivity : ComponentActivity() {
                         ) { tab ->
                             when (tab) {
                                 0 -> CalendarScreen(viewModel = viewModel, modifier = Modifier.fillMaxSize())
-                                1 -> TasksScreen(viewModel = viewModel)
-                                2 -> NotesScreen(viewModel = viewModel)
+                                1 -> TasksScreen(viewModel = viewModel, onOpenAiChat = { selectedTab = 5 })
+                                2 -> NotesScreen(viewModel = viewModel, onOpenAiChat = { selectedTab = 5 })
                                 3 -> LifeGridScreen(viewModel = viewModel)
                                 4 -> SettingsScreen(viewModel = viewModel)
                                 5 -> ChatScreen(viewModel = viewModel)

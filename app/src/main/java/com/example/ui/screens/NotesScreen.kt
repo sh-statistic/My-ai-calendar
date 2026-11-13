@@ -22,6 +22,7 @@ import androidx.compose.foundation.combinedClickable
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Column
@@ -42,6 +43,7 @@ import androidx.compose.foundation.lazy.staggeredgrid.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.AutoAwesome
 import androidx.compose.material.icons.automirrored.filled.Note
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Archive
@@ -119,7 +121,8 @@ import java.io.File
 @Composable
 fun NotesScreen(
     viewModel: MainViewModel,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    onOpenAiChat: () -> Unit = {}
 ) {
     val context = LocalContext.current
     val notes by viewModel.activeNotes.collectAsState()
@@ -209,32 +212,47 @@ fun NotesScreen(
         }
     }
 
-    Box(modifier = modifier.fillMaxSize()) {
+    Box(modifier = modifier.fillMaxSize().statusBarsPadding()) {
         Column(
             modifier = Modifier.fillMaxSize()
         ) {
-            // Search Bar
-            OutlinedTextField(
-                value = searchQuery,
-                onValueChange = { searchQuery = it },
-                placeholder = {
-                    Text(if (strings.isFa) "جستجو در یادداشت‌ها… (#برچسب)" else "Search notes… (#tag)")
-                },
-                leadingIcon = { Icon(Icons.Default.Search, contentDescription = null) },
-                trailingIcon = {
-                    if (searchQuery.isNotBlank()) {
-                        IconButton(onClick = { searchQuery = "" }) {
-                            Icon(Icons.Default.Close, contentDescription = if (strings.isFa) "پاک کردن" else "Clear")
-                        }
-                    }
-                },
-                singleLine = true,
-                shape = RoundedCornerShape(14.dp),
-                colors = com.example.ui.components.modernDialogTextFieldColors(),
+            // Search Bar — بالای صفحه کنار دکمهٔ هوش مصنوعی؛ هدر جدا و آیکون ذره‌بین حذف شدند
+            Row(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(horizontal = 14.dp, vertical = 6.dp)
-            )
+                    .padding(start = 14.dp, end = 4.dp, top = 6.dp, bottom = 6.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                OutlinedTextField(
+                    value = searchQuery,
+                    onValueChange = { searchQuery = it },
+                    placeholder = {
+                        Text(if (strings.isFa) "جستجو در یادداشت‌ها… (#برچسب)" else "Search notes… (#tag)")
+                    },
+                    trailingIcon = {
+                        if (searchQuery.isNotBlank()) {
+                            IconButton(onClick = { searchQuery = "" }) {
+                                Icon(Icons.Default.Close, contentDescription = if (strings.isFa) "پاک کردن" else "Clear")
+                            }
+                        }
+                    },
+                    singleLine = true,
+                    shape = RoundedCornerShape(14.dp),
+                    colors = com.example.ui.components.modernDialogTextFieldColors(),
+                    modifier = Modifier.weight(1f)
+                )
+                IconButton(
+                    onClick = onOpenAiChat,
+                    modifier = Modifier.size(36.dp)
+                ) {
+                    Icon(
+                        Icons.Default.AutoAwesome,
+                        contentDescription = strings.navAiChat,
+                        tint = MaterialTheme.colorScheme.primary,
+                        modifier = Modifier.size(18.dp)
+                    )
+                }
+            }
 
             // نوار جابه‌جایی بین یادداشت‌ها، بایگانی و سطل زباله
             Row(
@@ -997,8 +1015,8 @@ fun NoteCard(
             if (tags.isNotEmpty()) {
                 FlowRow(
                     modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(6.dp),
-                    verticalArrangement = Arrangement.spacedBy(6.dp)
+                    horizontalArrangement = Arrangement.spacedBy(4.dp),
+                    verticalArrangement = Arrangement.spacedBy(4.dp)
                 ) {
                     tags.take(6).forEach { tagItem ->
                         val isIdea = tagItem == "ایده"
@@ -1023,6 +1041,7 @@ fun NoteCard(
                                 Text(
                                     text = if (isIdea) "💡 $tagItem" else tagItem,
                                     fontSize = 10.sp,
+                                    lineHeight = 13.sp,
                                     fontWeight = FontWeight.Bold,
                                     color = if (isIdea) MaterialTheme.colorScheme.primary else (if (isDark) Color(0xFFE4E4E7) else Color(0xFF334155))
                                 )
@@ -1039,6 +1058,7 @@ fun NoteCard(
                             Text(
                                 text = "+${tags.size - 6}",
                                 fontSize = 10.sp,
+                                lineHeight = 13.sp,
                                 fontWeight = FontWeight.Bold,
                                 color = if (isDark) Color(0xFFE4E4E7) else Color(0xFF334155),
                                 modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
