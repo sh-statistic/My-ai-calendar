@@ -43,7 +43,12 @@ import androidx.compose.material.icons.filled.Remove
 import androidx.compose.material.icons.filled.Repeat
 import androidx.compose.material.icons.filled.Schedule
 import androidx.compose.material.icons.filled.Star
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.material3.AlertDialog
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.ui.window.Dialog
+import androidx.compose.ui.window.DialogProperties
+import kotlinx.coroutines.delay
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
@@ -62,8 +67,18 @@ import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.RadioButton
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Switch
+import android.view.WindowManager
+import androidx.compose.foundation.layout.imePadding
+import androidx.compose.material.icons.filled.PushPin
+import androidx.compose.material.icons.filled.Share
+import androidx.compose.runtime.DisposableEffect
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalView
+import androidx.compose.ui.window.DialogWindowProvider
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
+import androidx.compose.material3.TextField
+import androidx.compose.material3.TextFieldDefaults
 import androidx.compose.material3.TimePicker
 import androidx.compose.material3.rememberTimePickerState
 import com.example.calendar.EventRecurrenceConfig
@@ -2214,13 +2229,18 @@ fun removeActiveHashtagFromContent(text: String): String {
 @Composable
 fun AddNoteDialog(
     onDismiss: () -> Unit,
-    onConfirm: (title: String, content: String, colorHex: String, tag: String) -> Unit,
-    existingTags: List<String> = emptyList()
+    onConfirm: (title: String, content: String, colorHex: String, tag: String, isPinned: Boolean, imagePath: String?) -> Unit,
+    existingTags: List<String> = emptyList(),
+    initialTitle: String = "",
+    initialContent: String = "",
+    initialImagePath: String? = null
 ) {
     val strings = rememberAppStrings()
-    var title by remember { mutableStateOf("") }
-    var content by remember { mutableStateOf("") }
+    var title by remember { mutableStateOf(initialTitle) }
+    var content by remember { mutableStateOf(initialContent) }
     var selectedColor by remember { mutableStateOf("#FEF3C7") }
+    var isPinned by remember { mutableStateOf(false) }
+    var attachedImagePath by remember { mutableStateOf(initialImagePath) }
     val tagsList = remember { mutableStateListOf<String>() }
 
     val noteColors = listOf("#FEF3C7", "#DCFCE7", "#E0F2FE", "#FCE7F3", "#F3E8FF", "#F1F5F9")
@@ -2230,39 +2250,97 @@ fun AddNoteDialog(
         (defaultSuggestions + existingTags).distinct()
     }
 
-    AlertDialog(
-        onDismissRequest = onDismiss,
-        title = { Text(strings.addNote, fontWeight = FontWeight.Bold) },
-        text = {
-            Column(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .verticalScroll(rememberScrollState()),
-                verticalArrangement = Arrangement.spacedBy(12.dp)
-            ) {
-                OutlinedTextField(
+    var savedOnce by remember { mutableStateOf(false) }
+    val handleExit: () -> Unit = {
+        val hasAnything = content.isNotBlank() || title.isNotBlank() || tagsList.isNotEmpty() || !attachedImagePath.isNullOrBlank()
+        if (!savedOnce && hasAnything) {
+            savedOnce = true
+            onConfirm(title.trim(), content.trim(), selectedColor, tagsList.joinToString(","), isPinned, attachedImagePath)
+        }
+        onDismiss()
+    }
+
+    val editorBgAdd = if (MaterialTheme.colorScheme.background.luminance() < 0.5f) {
+        getNoteAccentColor(selectedColor)
+    } else {
+        parseColor(selectedColor)
+    }
+
+    val contextAdd = LocalContext.current
+    val dialogViewAdd = LocalView.current
+    DisposableEffect(Unit) {
+        val window = (dialogViewAdd.parent as? DialogWindowProvider)?.window
+        val previousMode = window?.attributes?.softInputMode
+        window?.setSoftInputMode(WindowManager.LayoutParams.SOFT_INPUT_ADJUST_RESIZE)
+        onDispose {
+            if (window != null && previousMode != null) {
+                window.setSoftInputMode(previousMode)
+            }
+        }
+    }
+
+    Dialog(
+        onDismissRequest = handleExit,
+        properties = DialogProperties(usePlatformDefaultWidth = false)
+    ) {
+        Surface(modifier = Modifier.fillMaxSize(), color = editorBgAdd) {
+            Column(modifier = Modifier.fillMaxSize().imePadding()) {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 8.dp, vertical = 8.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    IconButton(onClick = handleExit) {
+                        Icon(Icons.Default.Close, contentDescription = null)
+                    }
+                    Text(strings.addNote, fontWeight = FontWeight.Bold, fontSize = 17.sp)
+                    Spacer(modifier = Modifier.weight(1f))
+                    IconButton(
+                        onClick = {
+                            val shareBody = buildString {
+                                if (title.isNotBlank()) {
+                                    appendLine(title.trim())
+                                    appendLine()
+                                }
+                                append(content.trim())
+                            }
+                            com.example.sync.NoteShareHelper.shareText(contextAdd, title.trim(), shareBody)
+                        }
+                    ) {
+                        Icon(Icons.Default.Share, contentDescription = if (strings.isFa) "اشتراک‌گذاری" else "Share")
+                    }
+                }
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .weight(1f)
+                        .padding(horizontal = 16.dp, vertical = 8.dp),
+                    verticalArrangement = Arrangement.spacedBy(12.dp)
+                ) {
+                TextField(
                     value = title,
                     onValueChange = { title = it },
-                    label = { Text(strings.noteTitleLabel) },
+                    placeholder = { Text(strings.noteTitleLabel) },
                     singleLine = true,
-                    shape = RoundedCornerShape(12.dp),
-                    colors = modernDialogTextFieldColors(),
+                    textStyle = MaterialTheme.typography.titleLarge.copy(fontWeight = FontWeight.SemiBold),
+                    colors = TextFieldDefaults.colors(
+                        focusedContainerColor = Color.Transparent,
+                        unfocusedContainerColor = Color.Transparent,
+                        focusedIndicatorColor = Color.Transparent,
+                        unfocusedIndicatorColor = Color.Transparent
+                    ),
                     modifier = Modifier
                         .fillMaxWidth()
                         .testTag("note_title_input")
                 )
 
-                OutlinedTextField(
-                    value = content,
-                    onValueChange = { content = it },
-                    label = { Text(if (strings.isFa) "متن یادداشت (برای برچسب # بنویسید)" else "Note Content (use # for label)") },
-                    minLines = 4,
-                    maxLines = 8,
-                    shape = RoundedCornerShape(12.dp),
-                    colors = modernDialogTextFieldColors(),
+                Box(
                     modifier = Modifier
-                        .fillMaxWidth()
-                        .testTag("note_content_input")
+                        .width(56.dp)
+                        .height(2.dp)
+                        .clip(RoundedCornerShape(1.dp))
+                        .background(MaterialTheme.colorScheme.onSurface.copy(alpha = 0.18f))
                 )
 
                 // پاپ‌آپ هوشمند ایجاد و انتخاب برچسب با # (دقیقاً مشابه Google Keep)
@@ -2401,59 +2479,114 @@ fun AddNoteDialog(
                     }
                 }
 
-                // کارت انتخاب رنگ کارت یادداشت
-                DialogSectionCard(
-                    title = if (strings.isFa) "رنگ کارت یادداشت:" else "Note Card Color:",
-                    icon = Icons.Default.Palette
-                ) {
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.spacedBy(10.dp),
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        noteColors.forEach { hex ->
-                            val col = if (isDark) getNoteAccentColor(hex) else parseColor(hex)
-                            val isSelected = selectedColor == hex
-                            Box(
-                                modifier = Modifier
-                                    .size(36.dp)
-                                    .clip(CircleShape)
-                                    .background(col)
-                                    .clickable { selectedColor = hex }
-                                    .border(
-                                        width = if (isSelected) 2.5.dp else 1.dp,
-                                        color = if (isSelected) MaterialTheme.colorScheme.primary else Color.Gray.copy(alpha = 0.35f),
-                                        shape = CircleShape
-                                    ),
-                                contentAlignment = Alignment.Center
+                if (!attachedImagePath.isNullOrBlank()) {
+                    val photoBitmap = remember(attachedImagePath) {
+                        val file = File(attachedImagePath!!)
+                        if (file.exists()) BitmapFactory.decodeFile(attachedImagePath)?.asImageBitmap() else null
+                    }
+                    if (photoBitmap != null) {
+                        Column(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f), RoundedCornerShape(12.dp))
+                                .border(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f), RoundedCornerShape(12.dp))
+                                .padding(8.dp)
+                        ) {
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.CenterVertically
                             ) {
-                                if (isSelected) {
-                                    Icon(Icons.Default.Check, contentDescription = null, tint = Color.White, modifier = Modifier.size(18.dp))
+                                Text(
+                                    text = if (strings.isFa) "عکس پیوست شده:" else "Attached photo:",
+                                    fontSize = 11.sp,
+                                    fontWeight = FontWeight.SemiBold,
+                                    color = MaterialTheme.colorScheme.primary
+                                )
+                                TextButton(
+                                    onClick = { attachedImagePath = null },
+                                    colors = androidx.compose.material3.ButtonDefaults.textButtonColors(
+                                        contentColor = MaterialTheme.colorScheme.error
+                                    )
+                                ) {
+                                    Icon(Icons.Default.Delete, contentDescription = null, modifier = Modifier.size(16.dp))
+                                    Spacer(modifier = Modifier.width(4.dp))
+                                    Text(if (strings.isFa) "حذف عکس" else "Remove", fontSize = 11.sp)
                                 }
                             }
+                            Spacer(modifier = Modifier.height(4.dp))
+                            Image(
+                                bitmap = photoBitmap,
+                                contentDescription = if (strings.isFa) "عکس پیوست" else "Attached photo",
+                                contentScale = ContentScale.Fit,
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .height(150.dp)
+                                    .clip(RoundedCornerShape(8.dp))
+                            )
                         }
                     }
                 }
-            }
-        },
-        confirmButton = {
-            Button(
-                onClick = {
-                    if (content.isNotBlank()) {
-                        val combinedTag = tagsList.joinToString(",")
-                        onConfirm(title.trim(), content.trim(), selectedColor, combinedTag)
+
+                TextField(
+                    value = content,
+                    onValueChange = { content = it },
+                    placeholder = { Text(if (strings.isFa) "متن یادداشت (برای برچسب # بنویسید)" else "Note Content (use # for label)") },
+                    textStyle = MaterialTheme.typography.bodyLarge,
+                    colors = TextFieldDefaults.colors(
+                        focusedContainerColor = Color.Transparent,
+                        unfocusedContainerColor = Color.Transparent,
+                        focusedIndicatorColor = Color.Transparent,
+                        unfocusedIndicatorColor = Color.Transparent
+                    ),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .weight(1f)
+                        .testTag("note_content_input")
+                )
+
+                }
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 16.dp, vertical = 10.dp),
+                    horizontalArrangement = Arrangement.spacedBy(10.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    val isDarkBar = MaterialTheme.colorScheme.background.luminance() < 0.5f
+                    noteColors.forEach { hex ->
+                        val col = if (isDarkBar) getNoteAccentColor(hex) else parseColor(hex)
+                        val isSelected = selectedColor == hex
+                        Box(
+                            modifier = Modifier
+                                .size(30.dp)
+                                .clip(CircleShape)
+                                .background(col)
+                                .clickable { selectedColor = hex }
+                                .border(
+                                    width = if (isSelected) 2.5.dp else 1.dp,
+                                    color = if (isSelected) MaterialTheme.colorScheme.primary else Color.Gray.copy(alpha = 0.35f),
+                                    shape = CircleShape
+                                ),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            if (isSelected) {
+                                Icon(Icons.Default.Check, contentDescription = null, tint = Color.White, modifier = Modifier.size(16.dp))
+                            }
+                        }
                     }
-                },
-                enabled = content.isNotBlank(),
-                modifier = Modifier.testTag("confirm_add_note")
-            ) {
-                Text(if (strings.isFa) "ذخیره یادداشت" else "Save Note")
+                    Spacer(modifier = Modifier.weight(1f))
+                    IconButton(onClick = { isPinned = !isPinned }) {
+                        Icon(
+                            Icons.Default.PushPin,
+                            contentDescription = if (strings.isFa) "سنجاق به بالا" else "Pin to top",
+                            tint = if (isPinned) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                }
             }
-        },
-        dismissButton = {
-            TextButton(onClick = onDismiss) { Text(strings.cancel) }
         }
-    )
+    }
 }
 
 @OptIn(ExperimentalLayoutApi::class)
@@ -2463,6 +2596,7 @@ fun EditNoteDialog(
     onDismiss: () -> Unit,
     onOpenDrawingFullScreen: ((NoteEntity) -> Unit)? = null,
     onConfirm: (title: String, content: String, colorHex: String, isPinned: Boolean, drawingPath: String?, tag: String) -> Unit,
+    onAutosave: ((title: String, content: String, colorHex: String, isPinned: Boolean, drawingPath: String?, tag: String) -> Unit)? = null,
     existingTags: List<String> = emptyList()
 ) {
     val strings = rememberAppStrings()
@@ -2484,35 +2618,106 @@ fun EditNoteDialog(
         (defaultSuggestions + existingTags).distinct()
     }
 
-    AlertDialog(
-        onDismissRequest = onDismiss,
-        title = { Text(strings.editNote, fontWeight = FontWeight.Bold) },
-        text = {
-            Column(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .verticalScroll(rememberScrollState()),
-                verticalArrangement = Arrangement.spacedBy(12.dp)
-            ) {
-                OutlinedTextField(
+    val isDirty = title != initialNote.title || content != initialNote.content ||
+        selectedColor != initialNote.colorHex || isPinned != initialNote.isPinned ||
+        currentDrawingPath != initialNote.drawingPath || tagsList.toList() != initialTags
+
+    LaunchedEffect(title, content, selectedColor, isPinned, currentDrawingPath, tagsList.toList()) {
+        if (isDirty && onAutosave != null) {
+            delay(800)
+            onAutosave(title, content, selectedColor, isPinned, currentDrawingPath, tagsList.joinToString(","))
+        }
+    }
+
+    var exitSaved by remember { mutableStateOf(false) }
+    val handleExit: () -> Unit = {
+        if (!exitSaved) {
+            exitSaved = true
+            if (isDirty) {
+                val canSave = content.isNotBlank() || !currentDrawingPath.isNullOrBlank() || title.isNotBlank()
+                if (canSave) {
+                    onConfirm(title.trim(), content.trim(), selectedColor, isPinned, currentDrawingPath, tagsList.joinToString(","))
+                }
+            }
+        }
+        onDismiss()
+    }
+
+    val editorBgEdit = if (isDark) getNoteAccentColor(selectedColor) else parseColor(selectedColor)
+
+    val contextEdit = LocalContext.current
+    val dialogViewEdit = LocalView.current
+    DisposableEffect(Unit) {
+        val window = (dialogViewEdit.parent as? DialogWindowProvider)?.window
+        val previousMode = window?.attributes?.softInputMode
+        window?.setSoftInputMode(WindowManager.LayoutParams.SOFT_INPUT_ADJUST_RESIZE)
+        onDispose {
+            if (window != null && previousMode != null) {
+                window.setSoftInputMode(previousMode)
+            }
+        }
+    }
+
+    Dialog(
+        onDismissRequest = handleExit,
+        properties = DialogProperties(usePlatformDefaultWidth = false)
+    ) {
+        Surface(modifier = Modifier.fillMaxSize(), color = editorBgEdit) {
+            Column(modifier = Modifier.fillMaxSize().imePadding()) {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 8.dp, vertical = 8.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    IconButton(onClick = handleExit) {
+                        Icon(Icons.Default.Close, contentDescription = null)
+                    }
+                    Text(strings.editNote, fontWeight = FontWeight.Bold, fontSize = 17.sp)
+                    Spacer(modifier = Modifier.weight(1f))
+                    IconButton(
+                        onClick = {
+                            val shareBody = buildString {
+                                if (title.isNotBlank()) {
+                                    appendLine(title.trim())
+                                    appendLine()
+                                }
+                                append(content.trim())
+                            }
+                            com.example.sync.NoteShareHelper.shareText(contextEdit, title.trim(), shareBody)
+                        }
+                    ) {
+                        Icon(Icons.Default.Share, contentDescription = if (strings.isFa) "اشتراک‌گذاری" else "Share")
+                    }
+                }
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .weight(1f)
+                        .padding(horizontal = 16.dp, vertical = 8.dp),
+                    verticalArrangement = Arrangement.spacedBy(12.dp)
+                ) {
+                TextField(
                     value = title,
                     onValueChange = { title = it },
-                    label = { Text(strings.noteTitleLabel) },
+                    placeholder = { Text(strings.noteTitleLabel) },
                     singleLine = true,
-                    shape = RoundedCornerShape(12.dp),
-                    colors = modernDialogTextFieldColors(),
+                    textStyle = MaterialTheme.typography.titleLarge.copy(fontWeight = FontWeight.SemiBold),
+                    colors = TextFieldDefaults.colors(
+                        focusedContainerColor = Color.Transparent,
+                        unfocusedContainerColor = Color.Transparent,
+                        focusedIndicatorColor = Color.Transparent,
+                        unfocusedIndicatorColor = Color.Transparent
+                    ),
                     modifier = Modifier.fillMaxWidth()
                 )
 
-                OutlinedTextField(
-                    value = content,
-                    onValueChange = { content = it },
-                    label = { Text(if (strings.isFa) "متن یادداشت (برای برچسب # بنویسید)" else "Note Content (use # for label)") },
-                    minLines = 3,
-                    maxLines = 6,
-                    shape = RoundedCornerShape(12.dp),
-                    colors = modernDialogTextFieldColors(),
-                    modifier = Modifier.fillMaxWidth()
+                Box(
+                    modifier = Modifier
+                        .width(56.dp)
+                        .height(2.dp)
+                        .clip(RoundedCornerShape(1.dp))
+                        .background(MaterialTheme.colorScheme.onSurface.copy(alpha = 0.18f))
                 )
 
                 // پاپ‌آپ هوشمند ایجاد و انتخاب برچسب با # (دقیقاً مشابه Google Keep)
@@ -2649,6 +2854,22 @@ fun EditNoteDialog(
                     }
                 }
 
+                TextField(
+                    value = content,
+                    onValueChange = { content = it },
+                    placeholder = { Text(if (strings.isFa) "متن یادداشت (برای برچسب # بنویسید)" else "Note Content (use # for label)") },
+                    textStyle = MaterialTheme.typography.bodyLarge,
+                    colors = TextFieldDefaults.colors(
+                        focusedContainerColor = Color.Transparent,
+                        unfocusedContainerColor = Color.Transparent,
+                        focusedIndicatorColor = Color.Transparent,
+                        unfocusedIndicatorColor = Color.Transparent
+                    ),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .weight(1f)
+                )
+
                 // نمایش طرح وایت‌برد در صورت وجود با قابلیت کلیک جهت باز شدن تمام‌صفحه
                 if (!currentDrawingPath.isNullOrBlank()) {
                     val drawingBitmap = remember(currentDrawingPath, initialNote.updatedAt) {
@@ -2710,79 +2931,54 @@ fun EditNoteDialog(
                                     contentScale = ContentScale.Fit,
                                     modifier = Modifier
                                         .fillMaxWidth()
-                                        .height(180.dp)
+                                        .height(130.dp)
                                 )
                             }
                         }
                     }
                 }
 
-                // سوییچ سنجاق به بالا
+                }
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f), RoundedCornerShape(10.dp))
-                        .border(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f), RoundedCornerShape(10.dp))
-                        .padding(horizontal = 10.dp, vertical = 6.dp),
-                    horizontalArrangement = Arrangement.SpaceBetween,
+                        .padding(horizontal = 16.dp, vertical = 10.dp),
+                    horizontalArrangement = Arrangement.spacedBy(10.dp),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    Text(if (strings.isFa) "سنجاق به بالا" else "Pin to top", style = MaterialTheme.typography.bodySmall, fontWeight = FontWeight.SemiBold)
-                    Switch(checked = isPinned, onCheckedChange = { isPinned = it })
-                }
-
-                // کارت انتخاب رنگ کارت یادداشت
-                DialogSectionCard(
-                    title = if (strings.isFa) "رنگ کارت یادداشت:" else "Note Card Color:",
-                    icon = Icons.Default.Palette
-                ) {
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.spacedBy(10.dp),
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        noteColors.forEach { hex ->
-                            val col = if (isDark) getNoteAccentColor(hex) else parseColor(hex)
-                            val isSelected = selectedColor == hex
-                            Box(
-                                modifier = Modifier
-                                    .size(36.dp)
-                                    .clip(CircleShape)
-                                    .background(col)
-                                    .clickable { selectedColor = hex }
-                                    .border(
-                                        width = if (isSelected) 2.5.dp else 1.dp,
-                                        color = if (isSelected) MaterialTheme.colorScheme.primary else Color.Gray.copy(alpha = 0.35f),
-                                        shape = CircleShape
-                                    ),
-                                contentAlignment = Alignment.Center
-                            ) {
-                                if (isSelected) {
-                                    Icon(Icons.Default.Check, contentDescription = null, tint = Color.White, modifier = Modifier.size(18.dp))
-                                }
+                    noteColors.forEach { hex ->
+                        val col = if (isDark) getNoteAccentColor(hex) else parseColor(hex)
+                        val isSelected = selectedColor == hex
+                        Box(
+                            modifier = Modifier
+                                .size(30.dp)
+                                .clip(CircleShape)
+                                .background(col)
+                                .clickable { selectedColor = hex }
+                                .border(
+                                    width = if (isSelected) 2.5.dp else 1.dp,
+                                    color = if (isSelected) MaterialTheme.colorScheme.primary else Color.Gray.copy(alpha = 0.35f),
+                                    shape = CircleShape
+                                ),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            if (isSelected) {
+                                Icon(Icons.Default.Check, contentDescription = null, tint = Color.White, modifier = Modifier.size(16.dp))
                             }
                         }
                     }
+                    Spacer(modifier = Modifier.weight(1f))
+                    IconButton(onClick = { isPinned = !isPinned }) {
+                        Icon(
+                            Icons.Default.PushPin,
+                            contentDescription = if (strings.isFa) "سنجاق به بالا" else "Pin to top",
+                            tint = if (isPinned) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
                 }
             }
-        },
-        confirmButton = {
-            val canSave = content.isNotBlank() || !currentDrawingPath.isNullOrBlank() || title.isNotBlank()
-            Button(
-                onClick = {
-                    if (canSave) {
-                        onConfirm(title.trim(), content.trim(), selectedColor, isPinned, currentDrawingPath, tagsList.joinToString(","))
-                    }
-                },
-                enabled = canSave
-            ) {
-                Text(strings.saveChanges)
-            }
-        },
-        dismissButton = {
-            TextButton(onClick = onDismiss) { Text(strings.cancel) }
         }
-    )
+    }
 }
 
 @Composable

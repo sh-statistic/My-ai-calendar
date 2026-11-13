@@ -1199,13 +1199,31 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     // Note Actions
+    data class SharedNoteSeed(
+        val title: String = "",
+        val content: String = "",
+        val imagePath: String? = null
+    )
+
+    private val _sharedNoteSeed = MutableStateFlow<SharedNoteSeed?>(null)
+    val sharedNoteSeed: StateFlow<SharedNoteSeed?> = _sharedNoteSeed
+
+    fun onSharedContentReceived(seed: SharedNoteSeed) {
+        _sharedNoteSeed.value = seed
+    }
+
+    fun consumeSharedNoteSeed() {
+        _sharedNoteSeed.value = null
+    }
+
     fun addNote(
         title: String,
         content: String,
         colorHex: String,
         isPinned: Boolean = false,
         drawingPath: String? = null,
-        tag: String = ""
+        tag: String = "",
+        imagePath: String? = null
     ) {
         val note = NoteEntity(
             title = title.ifBlank { if (drawingPath != null) "طرح وایت‌برد" else "یادداشت جدید" },
@@ -1214,7 +1232,8 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             colorHex = colorHex,
             isPinned = isPinned,
             drawingPath = drawingPath,
-            tag = tag
+            tag = tag,
+            imagePath = imagePath
         )
         viewModelScope.launch {
             repository.insertNote(note)
@@ -1225,6 +1244,37 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     fun updateNote(note: NoteEntity) {
         viewModelScope.launch {
             repository.updateNote(note)
+        }
+    }
+
+    fun duplicateNote(note: NoteEntity) {
+        viewModelScope.launch {
+            var newDrawingPath = note.drawingPath
+            val srcPath = note.drawingPath
+            if (!srcPath.isNullOrBlank()) {
+                try {
+                    val srcFile = File(srcPath)
+                    if (srcFile.exists()) {
+                        val newName = "drawing_" + java.util.UUID.randomUUID().toString() + ".png"
+                        val dstFile = File(srcFile.parentFile, newName)
+                        srcFile.copyTo(dstFile, overwrite = true)
+                        val srcJson = File(srcPath.replace(".png", ".json"))
+                        if (srcJson.exists()) {
+                            srcJson.copyTo(File(dstFile.absolutePath.replace(".png", ".json")), overwrite = true)
+                        }
+                        newDrawingPath = dstFile.absolutePath
+                    }
+                } catch (_: Exception) {
+                    newDrawingPath = srcPath
+                }
+            }
+            repository.insertNote(
+                note.copy(
+                    id = java.util.UUID.randomUUID().toString(),
+                    drawingPath = newDrawingPath,
+                    updatedAt = System.currentTimeMillis()
+                )
+            )
         }
     }
 

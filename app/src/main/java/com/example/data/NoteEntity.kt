@@ -16,5 +16,11 @@ data class NoteEntity(
     val drawingPath: String? = null,
     val tag: String = "",
     val updatedAt: Long = System.currentTimeMillis(),
-    val isDeleted: Boolean = false
+    val isDeleted: Boolean = false,
+    val imagePath: String? = null,
+    val audioPath: String? = null,
+    val checklistJson: String = "",
+    val reminderAt: Long = 0,
+    val isArchived: Boolean = false,
+    val deletedAt: Long = 0
 )

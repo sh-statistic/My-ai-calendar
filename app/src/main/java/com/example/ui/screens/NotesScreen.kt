@@ -14,7 +14,11 @@ import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
+import androidx.compose.foundation.ExperimentalFoundationApi
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.combinedClickable
+import androidx.compose.material.icons.filled.Check
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -122,6 +126,8 @@ fun NotesScreen(
     var drawingNoteToViewOrEdit by remember { mutableStateOf<NoteEntity?>(null) }
     var noteToEdit by remember { mutableStateOf<NoteEntity?>(null) }
     var noteToAddToCalendar by remember { mutableStateOf<NoteEntity?>(null) }
+    var selectionMode by remember { mutableStateOf(false) }
+    var selectedNoteIds by remember { mutableStateOf<Set<String>>(emptySet()) }
 
     // استخراج تمام تگ‌های یکتای موجود در یادداشت‌ها برای پیشنهاد داینامیک
     val allExistingTags = remember(notes) {
@@ -183,6 +189,46 @@ fun NotesScreen(
                     .padding(horizontal = 14.dp, vertical = 6.dp)
             )
 
+            if (selectionMode) {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 14.dp, vertical = 4.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    IconButton(onClick = {
+                        selectionMode = false
+                        selectedNoteIds = emptySet()
+                    }) {
+                        Icon(Icons.Default.Close, contentDescription = null)
+                    }
+                    Text(
+                        text = if (strings.isFa) "${selectedNoteIds.size} انتخاب شده" else "${selectedNoteIds.size} selected",
+                        fontWeight = FontWeight.Bold
+                    )
+                    Spacer(modifier = Modifier.weight(1f))
+                    IconButton(
+                        onClick = {
+                            val chosen = notes.filter { selectedNoteIds.contains(it.id) }
+                            com.example.sync.NoteShareHelper.shareAllNotes(context, chosen)
+                        },
+                        enabled = selectedNoteIds.isNotEmpty()
+                    ) {
+                        Icon(Icons.Default.Share, contentDescription = if (strings.isFa) "اشتراک‌گذاری" else "Share")
+                    }
+                    IconButton(
+                        onClick = {
+                            selectedNoteIds.forEach { id -> viewModel.deleteNote(id) }
+                            selectionMode = false
+                            selectedNoteIds = emptySet()
+                        },
+                        enabled = selectedNoteIds.isNotEmpty()
+                    ) {
+                        Icon(Icons.Default.Delete, contentDescription = if (strings.isFa) "حذف" else "Delete", tint = MaterialTheme.colorScheme.error)
+                    }
+                }
+            }
+
             if (filteredNotes.isEmpty()) {
                 Box(
                     modifier = Modifier
@@ -219,11 +265,26 @@ fun NotesScreen(
                         NoteCard(
                             note = note,
                             searchQuery = searchQuery,
+                            isSelected = selectedNoteIds.contains(note.id),
                             onClick = {
-                                if (!note.drawingPath.isNullOrBlank()) {
+                                if (selectionMode) {
+                                    selectedNoteIds = if (selectedNoteIds.contains(note.id)) {
+                                        val next = selectedNoteIds - note.id
+                                        if (next.isEmpty()) selectionMode = false
+                                        next
+                                    } else {
+                                        selectedNoteIds + note.id
+                                    }
+                                } else if (!note.drawingPath.isNullOrBlank()) {
                                     drawingNoteToViewOrEdit = note
                                 } else {
                                     noteToEdit = note
+                                }
+                            },
+                            onLongClick = {
+                                if (!selectionMode) {
+                                    selectionMode = true
+                                    selectedNoteIds = setOf(note.id)
                                 }
                             },
                             onEdit = { noteToEdit = note },
@@ -234,7 +295,16 @@ fun NotesScreen(
                                     Toast.makeText(context, msg, Toast.LENGTH_SHORT).show()
                                 }
                             },
-                            onDelete = { viewModel.deleteNote(note.id) }
+                            onDelete = { viewModel.deleteNote(note.id) },
+                            onDuplicate = { viewModel.duplicateNote(note) },
+                            onTogglePin = {
+                                viewModel.updateNote(
+                                    note.copy(
+                                        isPinned = !note.isPinned,
+                                        updatedAt = System.currentTimeMillis()
+                                    )
+                                )
+                            }
                         )
                     }
                 }
@@ -355,14 +425,28 @@ fun NotesScreen(
         }
     }
 
+    val sharedSeed by viewModel.sharedNoteSeed.collectAsState()
+    LaunchedEffect(sharedSeed) {
+        if (sharedSeed != null) {
+            showAddNoteDialog = true
+        }
+    }
+
     if (showAddNoteDialog) {
         AddNoteDialog(
-            onDismiss = { showAddNoteDialog = false },
-            onConfirm = { title, content, colorHex, tag ->
-                viewModel.addNote(title, content, colorHex, tag = tag)
+            onDismiss = {
                 showAddNoteDialog = false
+                viewModel.consumeSharedNoteSeed()
             },
-            existingTags = allExistingTags
+            onConfirm = { title, content, colorHex, tag, isPinned, imagePath ->
+                viewModel.addNote(title, content, colorHex, isPinned = isPinned, tag = tag, imagePath = imagePath)
+                showAddNoteDialog = false
+                viewModel.consumeSharedNoteSeed()
+            },
+            existingTags = allExistingTags,
+            initialTitle = sharedSeed?.title ?: "",
+            initialContent = sharedSeed?.content ?: "",
+            initialImagePath = sharedSeed?.imagePath
         )
     }
 
@@ -425,6 +509,19 @@ fun NotesScreen(
                     )
                 )
                 noteToEdit = null
+            },
+            onAutosave = { title, content, colorHex, isPinned, drawingPath, tag ->
+                viewModel.updateNote(
+                    note.copy(
+                        title = title,
+                        content = content,
+                        colorHex = colorHex,
+                        isPinned = isPinned,
+                        drawingPath = drawingPath,
+                        tag = tag,
+                        updatedAt = System.currentTimeMillis()
+                    )
+                )
             },
             existingTags = allExistingTags
         )
@@ -491,16 +588,21 @@ fun getAdaptiveNoteBorder(hex: String, isDark: Boolean): Color {
     return accent.copy(alpha = 0.35f)
 }
 
+@OptIn(ExperimentalFoundationApi::class)
 @Composable
 fun NoteCard(
     note: NoteEntity,
     searchQuery: String,
+    isSelected: Boolean = false,
+    onLongClick: () -> Unit = {},
     onClick: () -> Unit,
     onEdit: () -> Unit,
     onTagClick: (String) -> Unit,
     onAddToCalendar: () -> Unit,
     onSyncToGoogleCalendar: () -> Unit,
-    onDelete: () -> Unit
+    onDelete: () -> Unit,
+    onTogglePin: () -> Unit,
+    onDuplicate: () -> Unit
 ) {
     val context = LocalContext.current
     val strings = rememberAppStrings()
@@ -516,8 +618,12 @@ fun NoteCard(
         elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
         modifier = Modifier
             .fillMaxWidth()
-            .border(0.8.dp, cardBorderColor, RoundedCornerShape(14.dp))
-            .clickable { onClick() }
+            .border(
+                if (isSelected) 2.dp else 0.8.dp,
+                if (isSelected) MaterialTheme.colorScheme.primary else cardBorderColor,
+                RoundedCornerShape(14.dp)
+            )
+            .combinedClickable(onClick = { onClick() }, onLongClick = { onLongClick() })
             .testTag("note_card_${note.id}")
     ) {
         Column(modifier = Modifier.padding(12.dp)) {
@@ -554,6 +660,19 @@ fun NoteCard(
                         tint = if (isDark) Color(0xFFF59E0B) else Color(0xFF475569),
                         modifier = Modifier.size(16.dp)
                     )
+                }
+
+                if (isSelected) {
+                    Spacer(modifier = Modifier.width(6.dp))
+                    Box(
+                        modifier = Modifier
+                            .size(20.dp)
+                            .clip(CircleShape)
+                            .background(MaterialTheme.colorScheme.primary),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Icon(Icons.Default.Check, contentDescription = null, tint = Color.White, modifier = Modifier.size(13.dp))
+                    }
                 }
             }
 
@@ -704,6 +823,38 @@ fun NoteCard(
                             expanded = showDropdownMenu,
                             onDismissRequest = { showDropdownMenu = false }
                         ) {
+                            DropdownMenuItem(
+                                text = { Text(if (note.isPinned) (if (strings.isFa) "برداشتن سنجاق" else "Unpin") else (if (strings.isFa) "سنجاق کردن" else "Pin"), fontSize = 12.sp) },
+                                leadingIcon = {
+                                    Icon(
+                                        Icons.Default.PushPin,
+                                        contentDescription = null,
+                                        tint = MaterialTheme.colorScheme.primary,
+                                        modifier = Modifier.size(18.dp)
+                                    )
+                                },
+                                onClick = {
+                                    showDropdownMenu = false
+                                    onTogglePin()
+                                }
+                            )
+
+                            DropdownMenuItem(
+                                text = { Text(if (strings.isFa) "کپی از این یادداشت" else "Duplicate note", fontSize = 12.sp) },
+                                leadingIcon = {
+                                    Icon(
+                                        Icons.Default.ContentCopy,
+                                        contentDescription = null,
+                                        tint = MaterialTheme.colorScheme.primary,
+                                        modifier = Modifier.size(18.dp)
+                                    )
+                                },
+                                onClick = {
+                                    showDropdownMenu = false
+                                    onDuplicate()
+                                }
+                            )
+
                             DropdownMenuItem(
                                 text = { Text(if (strings.isFa) "ارسال به Google Keep" else "Send to Google Keep", fontSize = 12.sp) },
                                 leadingIcon = {
