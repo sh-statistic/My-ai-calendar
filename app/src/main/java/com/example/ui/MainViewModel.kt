@@ -1320,10 +1320,12 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             var newBlocksJson = ""
             var blockDrawingPath: String? = null
             var blockImagePath: String? = null
+            var blockAudioPath: String? = null
             if (note.blocksJson.isNotBlank()) {
                 val copiedBlocks = com.example.data.parseNoteBlocksData(note.blocksJson).map { block ->
                     when (block.kind) {
                         "i" -> block.copy(path = copyAttachmentFile(block.path, "img_", ".jpg"))
+                        "a" -> block.copy(path = copyAttachmentFile(block.path, "voice_", ".m4a"))
                         "d" -> {
                             val sp = block.path
                             if (sp.isNullOrBlank()) {
@@ -1353,13 +1355,14 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 newBlocksJson = com.example.data.noteBlocksDataToJson(copiedBlocks)
                 blockDrawingPath = copiedBlocks.firstOrNull { it.kind == "d" && !it.path.isNullOrBlank() }?.path
                 blockImagePath = copiedBlocks.firstOrNull { it.kind == "i" && !it.path.isNullOrBlank() }?.path
+                blockAudioPath = copiedBlocks.firstOrNull { it.kind == "a" && !it.path.isNullOrBlank() }?.path
             }
             repository.insertNote(
                 note.copy(
                     id = java.util.UUID.randomUUID().toString(),
                     drawingPath = blockDrawingPath ?: newDrawingPath,
                     imagePath = blockImagePath ?: copyAttachmentFile(note.imagePath, "img_", ".jpg"),
-                    audioPath = copyAttachmentFile(note.audioPath, "voice_", ".m4a"),
+                    audioPath = blockAudioPath ?: copyAttachmentFile(note.audioPath, "voice_", ".m4a"),
                     blocksJson = newBlocksJson,
                     reminderAt = 0,
                     isArchived = false,
@@ -1478,9 +1481,10 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 }
             }
 
-            // 1c. Base64 for inline block media (photos/drawings inside the note text flow)
+            // 1c. Base64 for inline block media (photos/drawings/voice inside the note text flow)
             val blockImagesMap = mutableMapOf<String, MutableMap<String, String>>()
             val blockDrawingsMap = mutableMapOf<String, MutableMap<String, String>>()
+            val blockAudiosMap = mutableMapOf<String, MutableMap<String, String>>()
             for (note in baseSyncData.notes) {
                 for (media in com.example.data.extractNoteBlockMedia(note.blocksJson)) {
                     val mediaPath = media.path ?: continue
@@ -1488,7 +1492,11 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                         val file = File(mediaPath)
                         if (file.exists() && file.isFile) {
                             val b64 = android.util.Base64.encodeToString(file.readBytes(), android.util.Base64.NO_WRAP)
-                            val target = if (media.kind == "i") blockImagesMap else blockDrawingsMap
+                            val target = when (media.kind) {
+                                "i" -> blockImagesMap
+                                "a" -> blockAudiosMap
+                                else -> blockDrawingsMap
+                            }
                             target.getOrPut(note.id) { mutableMapOf() }[mediaPath] = b64
                         }
                     } catch (e: Exception) {
@@ -1518,6 +1526,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 noteAudiosBase64 = if (audiosMap.isNotEmpty()) audiosMap else null,
                 noteBlockImagesBase64 = if (blockImagesMap.isNotEmpty()) blockImagesMap else null,
                 noteBlockDrawingsBase64 = if (blockDrawingsMap.isNotEmpty()) blockDrawingsMap else null,
+                noteBlockAudiosBase64 = if (blockAudiosMap.isNotEmpty()) blockAudiosMap else null,
                 customOccasionsData = occData,
                 customOccasionsHiddenData = occHiddenData,
                 appPreferences = if (appPrefsMap.isNotEmpty()) appPrefsMap else null,
@@ -1640,10 +1649,12 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     private fun restoreBlockFiles(syncData: SyncData): List<NoteEntity> {
         val imgMaps = syncData.noteBlockImagesBase64
         val drawMaps = syncData.noteBlockDrawingsBase64
-        if (imgMaps.isNullOrEmpty() && drawMaps.isNullOrEmpty()) return syncData.notes
+        val audioMaps = syncData.noteBlockAudiosBase64
+        if (imgMaps.isNullOrEmpty() && drawMaps.isNullOrEmpty() && audioMaps.isNullOrEmpty()) return syncData.notes
         val app = getApplication<Application>()
         val imagesDir = File(app.filesDir, "notes_images").apply { mkdirs() }
         val drawingsDir = File(app.filesDir, "drawings").apply { mkdirs() }
+        val audiosDir = File(app.filesDir, "notes_audio").apply { mkdirs() }
         return syncData.notes.map { note ->
             if (note.blocksJson.isBlank()) return@map note
             val blocks = com.example.data.parseNoteBlocksData(note.blocksJson)
@@ -1651,9 +1662,12 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             var changed = false
             val newBlocks = blocks.mapIndexed { idx, block ->
                 val path = block.path
-                if (block.kind == "t" || path.isNullOrBlank()) return@mapIndexed block
-                val b64 = (if (block.kind == "i") imgMaps?.get(note.id)?.get(path) else drawMaps?.get(note.id)?.get(path))
-                    ?: return@mapIndexed block
+                if (block.kind == "t" || block.kind == "c" || path.isNullOrBlank()) return@mapIndexed block
+                val b64 = when (block.kind) {
+                    "i" -> imgMaps?.get(note.id)?.get(path)
+                    "a" -> audioMaps?.get(note.id)?.get(path)
+                    else -> drawMaps?.get(note.id)?.get(path)
+                } ?: return@mapIndexed block
                 try {
                     val bytes = android.util.Base64.decode(b64, android.util.Base64.DEFAULT)
                     val existingFile = File(path)
@@ -1661,6 +1675,8 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                         existingFile
                     } else if (block.kind == "i") {
                         File(imagesDir, "img_${note.id}_$idx.jpg")
+                    } else if (block.kind == "a") {
+                        File(audiosDir, "voice_${note.id}_$idx.m4a")
                     } else {
                         File(drawingsDir, "drawing_${note.id}_$idx.png")
                     }
@@ -1678,7 +1694,8 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 note.copy(
                     blocksJson = com.example.data.noteBlocksDataToJson(newBlocks),
                     imagePath = newBlocks.firstOrNull { it.kind == "i" && !it.path.isNullOrBlank() }?.path ?: note.imagePath,
-                    drawingPath = newBlocks.firstOrNull { it.kind == "d" && !it.path.isNullOrBlank() }?.path ?: note.drawingPath
+                    drawingPath = newBlocks.firstOrNull { it.kind == "d" && !it.path.isNullOrBlank() }?.path ?: note.drawingPath,
+                    audioPath = newBlocks.firstOrNull { it.kind == "a" && !it.path.isNullOrBlank() }?.path ?: note.audioPath
                 )
             }
         }

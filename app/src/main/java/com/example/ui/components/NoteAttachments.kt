@@ -46,6 +46,7 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
+import androidx.compose.material3.Surface
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
@@ -220,227 +221,6 @@ fun ChecklistPreview(json: String) {
 
 // ---------- Voice note row (record / play / delete) ----------
 
-@Composable
-fun VoiceNoteRow(
-    audioPath: String?,
-    isFa: Boolean,
-    onAudioChanged: (String?) -> Unit
-) {
-    val context = LocalContext.current
-    var recorder by remember { mutableStateOf<MediaRecorder?>(null) }
-    var recordingFile by remember { mutableStateOf<File?>(null) }
-    var isRecording by remember { mutableStateOf(false) }
-    var recordSeconds by remember { mutableStateOf(0) }
-    var player by remember { mutableStateOf<MediaPlayer?>(null) }
-    var isPlaying by remember { mutableStateOf(false) }
-
-    fun stopPlayer() {
-        try {
-            player?.stop()
-        } catch (_: Exception) {
-        }
-        player?.release()
-        player = null
-        isPlaying = false
-    }
-
-    fun startRecording() {
-        try {
-            val dir = File(context.filesDir, "notes_audio").apply { mkdirs() }
-            val file = File(dir, "voice_" + UUID.randomUUID().toString() + ".m4a")
-            val rec = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
-                MediaRecorder(context)
-            } else {
-                @Suppress("DEPRECATION")
-                MediaRecorder()
-            }
-            rec.setAudioSource(MediaRecorder.AudioSource.MIC)
-            rec.setOutputFormat(MediaRecorder.OutputFormat.MPEG_4)
-            rec.setAudioEncoder(MediaRecorder.AudioEncoder.AAC)
-            rec.setOutputFile(file.absolutePath)
-            rec.prepare()
-            rec.start()
-            recorder = rec
-            recordingFile = file
-            recordSeconds = 0
-            isRecording = true
-        } catch (e: Exception) {
-            Toast.makeText(
-                context,
-                if (isFa) "شروع ضبط ممکن نشد" else "Could not start recording",
-                Toast.LENGTH_SHORT
-            ).show()
-        }
-    }
-
-    fun stopRecording() {
-        val rec = recorder
-        val file = recordingFile
-        isRecording = false
-        recorder = null
-        recordingFile = null
-        if (rec != null) {
-            try {
-                rec.stop()
-            } catch (_: Exception) {
-                // Recording too short or already stopped: drop the file
-                try {
-                    file?.delete()
-                } catch (_: Exception) {
-                }
-                rec.release()
-                return
-            }
-            rec.release()
-        }
-        if (file != null && file.exists() && file.length() > 0) {
-            onAudioChanged(file.absolutePath)
-        }
-    }
-
-    val permissionLauncher = androidx.activity.compose.rememberLauncherForActivityResult(
-        contract = androidx.activity.result.contract.ActivityResultContracts.RequestPermission()
-    ) { granted ->
-        if (granted) {
-            startRecording()
-        } else {
-            Toast.makeText(
-                context,
-                if (isFa) "برای ضبط صدا، اجازه میکروفون لازم است" else "Microphone permission is needed to record",
-                Toast.LENGTH_SHORT
-            ).show()
-        }
-    }
-
-    LaunchedEffect(isRecording) {
-        while (isRecording) {
-            delay(1000)
-            recordSeconds++
-        }
-    }
-
-    DisposableEffect(Unit) {
-        onDispose {
-            try {
-                recorder?.stop()
-            } catch (_: Exception) {
-            }
-            recorder?.release()
-            recorder = null
-            try {
-                player?.stop()
-            } catch (_: Exception) {
-            }
-            player?.release()
-            player = null
-        }
-    }
-
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(vertical = 2.dp),
-        verticalAlignment = Alignment.CenterVertically
-    ) {
-        when {
-            isRecording -> {
-                IconButton(onClick = { stopRecording() }) {
-                    Icon(
-                        Icons.Default.Stop,
-                        contentDescription = null,
-                        tint = MaterialTheme.colorScheme.error
-                    )
-                }
-                Text(
-                    text = if (isFa) {
-                        "در حال ضبط… ${recordSeconds / 60}:${(recordSeconds % 60).toString().padStart(2, '0')}"
-                    } else {
-                        "Recording… ${recordSeconds / 60}:${(recordSeconds % 60).toString().padStart(2, '0')}"
-                    },
-                    fontSize = 13.sp,
-                    color = MaterialTheme.colorScheme.error
-                )
-            }
-            !audioPath.isNullOrBlank() -> {
-                IconButton(onClick = {
-                    if (isPlaying) {
-                        stopPlayer()
-                    } else {
-                        try {
-                            stopPlayer()
-                            val mp = MediaPlayer()
-                            mp.setDataSource(audioPath)
-                            mp.setOnCompletionListener {
-                                isPlaying = false
-                            }
-                            mp.prepare()
-                            mp.start()
-                            player = mp
-                            isPlaying = true
-                        } catch (e: Exception) {
-                            Toast.makeText(
-                                context,
-                                if (isFa) "پخش صدا ممکن نشد" else "Could not play the recording",
-                                Toast.LENGTH_SHORT
-                            ).show()
-                        }
-                    }
-                }) {
-                    Icon(
-                        if (isPlaying) Icons.Default.Pause else Icons.Default.PlayArrow,
-                        contentDescription = null,
-                        tint = MaterialTheme.colorScheme.primary
-                    )
-                }
-                Text(
-                    text = if (isFa) "یادداشت صوتی" else "Voice note",
-                    fontSize = 13.sp,
-                    color = MaterialTheme.colorScheme.onSurface
-                )
-                Spacer(modifier = Modifier.weight(1f))
-                IconButton(onClick = {
-                    stopPlayer()
-                    try {
-                        File(audioPath).delete()
-                    } catch (_: Exception) {
-                    }
-                    onAudioChanged(null)
-                }) {
-                    Icon(
-                        Icons.Default.Delete,
-                        contentDescription = null,
-                        tint = MaterialTheme.colorScheme.error,
-                        modifier = Modifier.size(18.dp)
-                    )
-                }
-            }
-            else -> {
-                IconButton(onClick = {
-                    val granted = ContextCompat.checkSelfPermission(
-                        context,
-                        android.Manifest.permission.RECORD_AUDIO
-                    ) == PackageManager.PERMISSION_GRANTED
-                    if (granted) {
-                        startRecording()
-                    } else {
-                        permissionLauncher.launch(android.Manifest.permission.RECORD_AUDIO)
-                    }
-                }) {
-                    Icon(
-                        Icons.Default.Mic,
-                        contentDescription = null,
-                        tint = MaterialTheme.colorScheme.primary
-                    )
-                }
-                Text(
-                    text = if (isFa) "ضبط صدا" else "Record voice",
-                    fontSize = 13.sp,
-                    color = MaterialTheme.colorScheme.onSurface
-                )
-            }
-        }
-    }
-}
 
 // ---------- Shared image copy helper ----------
 
@@ -492,7 +272,8 @@ fun buildInitialNoteBlocks(
     content: String,
     imagePath: String?,
     drawingPath: String?,
-    checklistJson: String = ""
+    checklistJson: String = "",
+    audioPath: String? = null
 ): MutableList<NoteBlockState> {
     val parsed = parseNoteBlocksData(blocksJson)
     val blocks = mutableListOf<NoteBlockState>()
@@ -510,6 +291,11 @@ fun buildInitialNoteBlocks(
         blocks.add(NoteBlockState(kind = "t", text = content))
         if (!drawingPath.isNullOrBlank()) blocks.add(NoteBlockState(kind = "d", path = drawingPath))
         if (!imagePath.isNullOrBlank()) blocks.add(NoteBlockState(kind = "i", path = imagePath))
+        if (!audioPath.isNullOrBlank()) blocks.add(NoteBlockState(kind = "a", path = audioPath))
+    }
+    // صدای قدیمی (ستون جدا) اگر هنوز بلوک صدا ندارد، یک بلوک در انتها می‌شود
+    if (!audioPath.isNullOrBlank() && blocks.none { it.kind == "a" && it.path == audioPath }) {
+        blocks.add(NoteBlockState(kind = "a", path = audioPath))
     }
     // چک‌لیست قدیمی (ستون جدا) اگر هنوز بلوک چک‌لیست ندارد، یک بلوک در انتها می‌شود
     if (checklistJson.isNotBlank() && blocks.none { it.kind == "c" }) {
@@ -563,7 +349,7 @@ fun noteBlocksHaveContent(blocks: List<NoteBlockState>): Boolean =
     blocks.any {
         (it.kind == "t" && it.tfv.text.isNotBlank()) ||
             (it.kind == "c" && it.checklistItems.any { item -> item.text.isNotBlank() }) ||
-            ((it.kind == "i" || it.kind == "d") && !it.path.isNullOrBlank())
+            ((it.kind == "i" || it.kind == "d" || it.kind == "a") && !it.path.isNullOrBlank())
     }
 
 // چک‌لیست یکپارچهٔ همهٔ بلوک‌های چک‌لیست، برای ستون قدیمی checklistJson (کارت یادداشت و بکاپ)
@@ -783,6 +569,27 @@ fun NoteBlocksEditor(
                             )
                         }
                     }
+                    "a" -> Column(modifier = Modifier.fillMaxWidth()) {
+                        InlineVoiceBlock(
+                            block = block,
+                            isFa = isFa,
+                            onChanged = onChanged
+                        )
+                        TextButton(onClick = { blocks.remove(block); onChanged() }) {
+                            Icon(
+                                Icons.Default.Delete,
+                                contentDescription = null,
+                                modifier = Modifier.size(14.dp),
+                                tint = MaterialTheme.colorScheme.error
+                            )
+                            Spacer(modifier = Modifier.width(4.dp))
+                            Text(
+                                if (isFa) "حذف صدا" else "Remove voice",
+                                fontSize = 11.sp,
+                                color = MaterialTheme.colorScheme.error
+                            )
+                        }
+                    }
                     "i" -> NoteMediaBlock(
                         block = block,
                         isFa = isFa,
@@ -833,4 +640,214 @@ fun showNoteReminderPicker(context: Context, currentMillis: Long, onPicked: (Lon
         cal.get(Calendar.MONTH),
         cal.get(Calendar.DAY_OF_MONTH)
     ).show()
+}
+
+// بلوک صدای درون‌خطی: ضبط و پخش، دقیقاً همان‌جایی که بلوک در متن نشسته است
+@Composable
+fun InlineVoiceBlock(
+    block: NoteBlockState,
+    isFa: Boolean,
+    onChanged: () -> Unit
+) {
+    val context = LocalContext.current
+    var recorder by remember { mutableStateOf<MediaRecorder?>(null) }
+    var recordingFile by remember { mutableStateOf<File?>(null) }
+    var isRecording by remember { mutableStateOf(false) }
+    var recordSeconds by remember { mutableStateOf(0) }
+    var player by remember { mutableStateOf<MediaPlayer?>(null) }
+    var isPlaying by remember { mutableStateOf(false) }
+
+    fun stopPlayer() {
+        try {
+            player?.stop()
+        } catch (_: Exception) {
+        }
+        player?.release()
+        player = null
+        isPlaying = false
+    }
+
+    fun startRecording() {
+        try {
+            val dir = File(context.filesDir, "notes_audio").apply { mkdirs() }
+            val file = File(dir, "voice_" + UUID.randomUUID().toString() + ".m4a")
+            val rec = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+                MediaRecorder(context)
+            } else {
+                @Suppress("DEPRECATION")
+                MediaRecorder()
+            }
+            rec.setAudioSource(MediaRecorder.AudioSource.MIC)
+            rec.setOutputFormat(MediaRecorder.OutputFormat.MPEG_4)
+            rec.setAudioEncoder(MediaRecorder.AudioEncoder.AAC)
+            rec.setOutputFile(file.absolutePath)
+            rec.prepare()
+            rec.start()
+            recorder = rec
+            recordingFile = file
+            recordSeconds = 0
+            isRecording = true
+        } catch (_: Exception) {
+            Toast.makeText(
+                context,
+                if (isFa) "شروع ضبط ممکن نشد" else "Could not start recording",
+                Toast.LENGTH_SHORT
+            ).show()
+        }
+    }
+
+    fun stopRecording() {
+        val rec = recorder
+        val file = recordingFile
+        isRecording = false
+        recorder = null
+        recordingFile = null
+        if (rec != null) {
+            try {
+                rec.stop()
+            } catch (_: Exception) {
+                try {
+                    file?.delete()
+                } catch (_: Exception) {
+                }
+                rec.release()
+                return
+            }
+            rec.release()
+        }
+        if (file != null && file.exists() && file.length() > 0) {
+            block.path = file.absolutePath
+            onChanged()
+        }
+    }
+
+    val permissionLauncher = androidx.activity.compose.rememberLauncherForActivityResult(
+        contract = androidx.activity.result.contract.ActivityResultContracts.RequestPermission()
+    ) { granted ->
+        if (granted) {
+            startRecording()
+        } else {
+            Toast.makeText(
+                context,
+                if (isFa) "برای ضبط صدا، اجازه میکروفون لازم است" else "Microphone permission is needed to record",
+                Toast.LENGTH_SHORT
+            ).show()
+        }
+    }
+
+    LaunchedEffect(isRecording) {
+        while (isRecording) {
+            delay(1000)
+            recordSeconds++
+        }
+    }
+
+    DisposableEffect(Unit) {
+        onDispose {
+            try {
+                recorder?.release()
+            } catch (_: Exception) {
+            }
+            try {
+                player?.release()
+            } catch (_: Exception) {
+            }
+        }
+    }
+
+    val path = block.path
+    Surface(
+        shape = RoundedCornerShape(12.dp),
+        color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.6f),
+        modifier = Modifier.fillMaxWidth()
+    ) {
+        Row(
+            modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
+            if (path.isNullOrBlank()) {
+                if (isRecording) {
+                    IconButton(onClick = { stopRecording() }) {
+                        Icon(Icons.Default.Stop, contentDescription = null, tint = MaterialTheme.colorScheme.error)
+                    }
+                    Text(
+                        text = if (isFa) "در حال ضبط… $recordSeconds ثانیه" else "Recording… ${recordSeconds}s",
+                        fontSize = 13.sp,
+                        color = MaterialTheme.colorScheme.error
+                    )
+                } else {
+                    IconButton(onClick = {
+                        val granted = androidx.core.content.ContextCompat.checkSelfPermission(
+                            context, android.Manifest.permission.RECORD_AUDIO
+                        ) == android.content.pm.PackageManager.PERMISSION_GRANTED
+                        if (granted) {
+                            startRecording()
+                        } else {
+                            permissionLauncher.launch(android.Manifest.permission.RECORD_AUDIO)
+                        }
+                    }) {
+                        Icon(Icons.Default.Mic, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
+                    }
+                    Text(
+                        text = if (isFa) "ضبط صدا" else "Record voice",
+                        fontSize = 13.sp
+                    )
+                }
+            } else {
+                val durationLabel = remember(path) {
+                    try {
+                        val retriever = android.media.MediaMetadataRetriever()
+                        retriever.setDataSource(path)
+                        val ms = retriever.extractMetadata(
+                            android.media.MediaMetadataRetriever.METADATA_KEY_DURATION
+                        )?.toLongOrNull() ?: 0L
+                        retriever.release()
+                        val totalSec = (ms / 1000).toInt()
+                        "%d:%02d".format(totalSec / 60, totalSec % 60)
+                    } catch (_: Exception) {
+                        ""
+                    }
+                }
+                IconButton(onClick = {
+                    if (isPlaying) {
+                        stopPlayer()
+                    } else {
+                        stopPlayer()
+                        try {
+                            val mp = MediaPlayer()
+                            mp.setDataSource(path)
+                            mp.setOnCompletionListener {
+                                isPlaying = false
+                            }
+                            mp.prepare()
+                            mp.start()
+                            player = mp
+                            isPlaying = true
+                        } catch (_: Exception) {
+                            Toast.makeText(
+                                context,
+                                if (isFa) "پخش ممکن نشد" else "Could not play",
+                                Toast.LENGTH_SHORT
+                            ).show()
+                        }
+                    }
+                }) {
+                    Icon(
+                        if (isPlaying) Icons.Default.Pause else Icons.Default.PlayArrow,
+                        contentDescription = null,
+                        tint = MaterialTheme.colorScheme.primary
+                    )
+                }
+                Icon(Icons.Default.Mic, contentDescription = null, tint = MaterialTheme.colorScheme.onSurfaceVariant)
+                Text(
+                    text = if (isFa) "یادداشت صوتی" else "Voice note",
+                    fontSize = 13.sp
+                )
+                if (durationLabel.isNotBlank()) {
+                    Text(text = durationLabel, fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                }
+            }
+        }
+    }
 }
