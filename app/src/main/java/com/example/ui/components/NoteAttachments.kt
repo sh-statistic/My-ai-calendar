@@ -466,7 +466,8 @@ private fun NoteMediaBlock(
             // قاب جمع‌وجور داخل یادداشت ترکیبی: کشیدنِ عادی = اسکرول خودِ یادداشت؛
             // نگه‌داشتن و بعد کشیدن روی طرح = جابه‌جا کردن طرح داخل قاب برای دیدن بقیه‌اش
             val trueRatio = bitmap.width.toFloat() / bitmap.height.coerceAtLeast(1)
-            val frameRatio = trueRatio.coerceIn(0.55f, 2.4f)
+            // سقف ۲٫۴ حذف شد: طرح‌های پهن (مثلاً کمان پهن) قابشان بلندتر از خود طرح می‌شد و زیر طرح پس‌زمینهٔ صفحه دیده می‌شد
+            val frameRatio = trueRatio.coerceAtLeast(0.55f)
             var frameSize by remember(block.path) { mutableStateOf(IntSize.Zero) }
             var panY by remember(block.path) { mutableStateOf(0f) }
             val maxPan = if (frameSize.width > 0 && trueRatio > 0f) {

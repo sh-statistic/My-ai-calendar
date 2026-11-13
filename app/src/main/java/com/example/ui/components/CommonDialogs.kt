@@ -8,6 +8,7 @@ import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
@@ -71,17 +72,16 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Switch
 import android.view.WindowManager
 import androidx.compose.foundation.layout.WindowInsets
-import androidx.compose.foundation.layout.ime
 import androidx.compose.foundation.layout.navigationBars
-import androidx.compose.foundation.layout.union
-import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.material.icons.filled.PushPin
 import androidx.compose.material.icons.filled.Share
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalView
+import android.view.ViewTreeObserver
 import androidx.compose.ui.window.DialogWindowProvider
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -104,6 +104,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.layout.ContentScale
@@ -115,6 +116,7 @@ import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.calendar.JalaliDate
@@ -2240,6 +2242,36 @@ fun removeActiveHashtagFromContent(text: String): String {
     return text.substring(0, idx).trimEnd()
 }
 
+// ارتفاع واقعی صفحه‌کلید را مستقیم از قاب قابل‌مشاهدهٔ پنجره می‌خوانیم.
+// روی بعضی گوشی‌ها inset صفحه‌کلید به پنجرهٔ دیالوگ نمی‌رسد و نوار ابزار از صفحه‌کلید فاصله می‌گرفت؛
+// این اندازه‌گیری روی همهٔ دستگاه‌ها درست جواب می‌دهد و وقتی پنجره خودش resize شود صفر می‌شود.
+@Composable
+private fun rememberKeyboardHeightDp(): Dp {
+    val view = LocalView.current
+    val density = LocalDensity.current
+    var height by remember { mutableStateOf(0.dp) }
+    DisposableEffect(view) {
+        val root = view.rootView
+        val listener = ViewTreeObserver.OnGlobalLayoutListener {
+            val rect = android.graphics.Rect()
+            root.getWindowVisibleDisplayFrame(rect)
+            val hidden = root.height - rect.bottom
+            height = if (hidden > root.height * 0.15) with(density) { hidden.toDp() } else 0.dp
+        }
+        root.viewTreeObserver.addOnGlobalLayoutListener(listener)
+        onDispose { root.viewTreeObserver.removeOnGlobalLayoutListener(listener) }
+    }
+    return height
+}
+
+@Composable
+private fun rememberEditorBottomPadding(): Dp {
+    val keyboardHeight = rememberKeyboardHeightDp()
+    val density = LocalDensity.current
+    val navBottom = with(density) { WindowInsets.navigationBars.getBottom(density).toDp() }
+    return if (keyboardHeight > 0.dp) keyboardHeight else navBottom
+}
+
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
 fun AddNoteDialog(
@@ -2340,11 +2372,11 @@ fun AddNoteDialog(
         properties = DialogProperties(usePlatformDefaultWidth = false, decorFitsSystemWindows = false)
     ) {
         Surface(modifier = Modifier.fillMaxSize(), color = editorBgAdd) {
-            Column(modifier = Modifier.fillMaxSize().statusBarsPadding().windowInsetsPadding(WindowInsets.ime.union(WindowInsets.navigationBars))) {
+            Column(modifier = Modifier.fillMaxSize().statusBarsPadding().padding(bottom = rememberEditorBottomPadding())) {
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(horizontal = 8.dp, vertical = 4.dp),
+                        .padding(horizontal = 8.dp, vertical = 2.dp),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     IconButton(onClick = handleExit) {
@@ -2370,31 +2402,40 @@ fun AddNoteDialog(
                     modifier = Modifier
                         .fillMaxWidth()
                         .weight(1f)
-                        .padding(start = 16.dp, end = 16.dp, top = 2.dp, bottom = 8.dp),
+                        .padding(start = 16.dp, end = 16.dp, top = 0.dp, bottom = 8.dp),
                     verticalArrangement = Arrangement.spacedBy(6.dp)
                 ) {
-                TextField(
+                BasicTextField(
                     value = title,
                     onValueChange = { title = it },
-                    placeholder = { Text(strings.noteTitleLabel) },
                     singleLine = true,
-                    textStyle = MaterialTheme.typography.titleLarge.copy(fontWeight = FontWeight.SemiBold),
-                    colors = TextFieldDefaults.colors(
-                        focusedContainerColor = Color.Transparent,
-                        unfocusedContainerColor = Color.Transparent,
-                        focusedIndicatorColor = Color.Transparent,
-                        unfocusedIndicatorColor = Color.Transparent
+                    textStyle = MaterialTheme.typography.titleLarge.copy(
+                        fontWeight = FontWeight.SemiBold,
+                        color = MaterialTheme.colorScheme.onSurface
                     ),
+                    cursorBrush = SolidColor(MaterialTheme.colorScheme.primary),
                     modifier = Modifier
                         .fillMaxWidth()
-                        .testTag("note_title_input")
+                        .testTag("note_title_input"),
+                    decorationBox = { innerTextField ->
+                        Box {
+                            if (title.isEmpty()) {
+                                Text(
+                                    text = strings.noteTitleLabel,
+                                    style = MaterialTheme.typography.titleLarge.copy(fontWeight = FontWeight.SemiBold),
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f)
+                                )
+                            }
+                            innerTextField()
+                        }
+                    }
                 )
 
                 Box(
                     modifier = Modifier
                         .width(84.dp)
                         .height(2.dp)
-                        .offset(y = (-3).dp)
+                        .offset(y = (-2).dp)
                         .clip(RoundedCornerShape(1.dp))
                         .background(MaterialTheme.colorScheme.onSurface.copy(alpha = 0.18f))
                 )
@@ -2826,11 +2867,11 @@ fun EditNoteDialog(
         properties = DialogProperties(usePlatformDefaultWidth = false, decorFitsSystemWindows = false)
     ) {
         Surface(modifier = Modifier.fillMaxSize(), color = editorBgEdit) {
-            Column(modifier = Modifier.fillMaxSize().statusBarsPadding().windowInsetsPadding(WindowInsets.ime.union(WindowInsets.navigationBars))) {
+            Column(modifier = Modifier.fillMaxSize().statusBarsPadding().padding(bottom = rememberEditorBottomPadding())) {
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(horizontal = 8.dp, vertical = 4.dp),
+                        .padding(horizontal = 8.dp, vertical = 2.dp),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     IconButton(onClick = handleExit) {
@@ -2856,29 +2897,38 @@ fun EditNoteDialog(
                     modifier = Modifier
                         .fillMaxWidth()
                         .weight(1f)
-                        .padding(start = 16.dp, end = 16.dp, top = 2.dp, bottom = 8.dp),
+                        .padding(start = 16.dp, end = 16.dp, top = 0.dp, bottom = 8.dp),
                     verticalArrangement = Arrangement.spacedBy(6.dp)
                 ) {
-                TextField(
+                BasicTextField(
                     value = title,
                     onValueChange = { title = it },
-                    placeholder = { Text(strings.noteTitleLabel) },
                     singleLine = true,
-                    textStyle = MaterialTheme.typography.titleLarge.copy(fontWeight = FontWeight.SemiBold),
-                    colors = TextFieldDefaults.colors(
-                        focusedContainerColor = Color.Transparent,
-                        unfocusedContainerColor = Color.Transparent,
-                        focusedIndicatorColor = Color.Transparent,
-                        unfocusedIndicatorColor = Color.Transparent
+                    textStyle = MaterialTheme.typography.titleLarge.copy(
+                        fontWeight = FontWeight.SemiBold,
+                        color = MaterialTheme.colorScheme.onSurface
                     ),
-                    modifier = Modifier.fillMaxWidth()
+                    cursorBrush = SolidColor(MaterialTheme.colorScheme.primary),
+                    modifier = Modifier.fillMaxWidth(),
+                    decorationBox = { innerTextField ->
+                        Box {
+                            if (title.isEmpty()) {
+                                Text(
+                                    text = strings.noteTitleLabel,
+                                    style = MaterialTheme.typography.titleLarge.copy(fontWeight = FontWeight.SemiBold),
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f)
+                                )
+                            }
+                            innerTextField()
+                        }
+                    }
                 )
 
                 Box(
                     modifier = Modifier
                         .width(84.dp)
                         .height(2.dp)
-                        .offset(y = (-3).dp)
+                        .offset(y = (-2).dp)
                         .clip(RoundedCornerShape(1.dp))
                         .background(MaterialTheme.colorScheme.onSurface.copy(alpha = 0.18f))
                 )

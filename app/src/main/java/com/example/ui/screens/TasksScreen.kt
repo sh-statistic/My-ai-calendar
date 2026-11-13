@@ -7,6 +7,7 @@ import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
@@ -21,6 +22,7 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.AutoAwesome
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.ArrowForward
 import androidx.compose.material.icons.filled.Add
@@ -69,7 +71,8 @@ import com.example.ui.rememberAppStrings
 @Composable
 fun TasksScreen(
     viewModel: MainViewModel,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    onOpenAiChat: () -> Unit = {}
 ) {
     val tasks by viewModel.activeTasks.collectAsState()
     val selectedDate by viewModel.selectedDate.collectAsState()
@@ -134,7 +137,7 @@ fun TasksScreen(
     val totalCount = if (statusFilter == 3) tasks.size else currentScopeTasks.size
     val progress = if (totalCount > 0) (completedCount.toFloat() / totalCount).coerceIn(0f, 1f) else 0f
 
-    Box(modifier = modifier.fillMaxSize()) {
+    Box(modifier = modifier.fillMaxSize().statusBarsPadding()) {
         Column(
             modifier = Modifier.fillMaxSize()
         ) {
@@ -438,20 +441,33 @@ fun TasksScreen(
                             onDelete = { viewModel.deleteTask(task.id) }
                         )
                     }
+
+                    // دکمهٔ افزودن وظیفه با همان استایل دکمهٔ وسط صفحه، زیر آخرین وظیفهٔ ثبت‌شده
+                    item {
+                        OutlinedButton(
+                            onClick = { showAddTaskDialog = true },
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Icon(Icons.Default.Add, contentDescription = null, modifier = Modifier.size(16.dp))
+                            Spacer(modifier = Modifier.width(4.dp))
+                            Text(text = strings.addTask, fontSize = 11.sp)
+                        }
+                    }
                 }
             }
         }
 
+        // دکمهٔ شناور گوشهٔ صفحه: هوش مصنوعی (جای دکمهٔ + قبلی؛ افزودن وظیفه از دکمهٔ داخل صفحه است)
         FloatingActionButton(
-            onClick = { showAddTaskDialog = true },
+            onClick = onOpenAiChat,
             containerColor = MaterialTheme.colorScheme.primary,
             contentColor = MaterialTheme.colorScheme.onPrimary,
             modifier = Modifier
                 .align(Alignment.BottomEnd)
                 .padding(16.dp)
-                .testTag("fab_add_task")
+                .testTag("fab_ai_chat")
         ) {
-            Icon(Icons.Default.Add, contentDescription = strings.addTask)
+            Icon(Icons.Default.AutoAwesome, contentDescription = strings.navAiChat)
         }
     }
 
