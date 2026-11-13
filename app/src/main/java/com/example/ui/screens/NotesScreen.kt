@@ -41,7 +41,11 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.Note
 import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.Archive
 import androidx.compose.material.icons.filled.CalendarMonth
+import androidx.compose.material.icons.filled.Notifications
+import androidx.compose.material.icons.filled.Refresh
+import androidx.compose.material.icons.filled.Unarchive
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.CloudSync
 import androidx.compose.material.icons.filled.ContentCopy
@@ -96,8 +100,11 @@ import androidx.compose.ui.unit.sp
 import com.example.data.NoteEntity
 import com.example.sync.NoteShareHelper
 import com.example.ui.MainViewModel
+import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.TextButton
 import com.example.ui.components.AddNoteDialog
 import com.example.ui.components.AddToCalendarFromNoteDialog
+import com.example.ui.components.ChecklistPreview
 import com.example.ui.components.EditNoteDialog
 import com.example.ui.components.WhiteboardDrawingDialog
 import com.example.ui.components.parseColor
@@ -128,6 +135,28 @@ fun NotesScreen(
     var noteToAddToCalendar by remember { mutableStateOf<NoteEntity?>(null) }
     var selectionMode by remember { mutableStateOf(false) }
     var selectedNoteIds by remember { mutableStateOf<Set<String>>(emptySet()) }
+    var notesView by remember { mutableStateOf(0) } // 0: یادداشت‌ها، 1: بایگانی، 2: سطل زباله
+    val archivedNotes by viewModel.archivedNotes.collectAsState()
+    val trashedNotes by viewModel.trashedNotes.collectAsState()
+    val openNoteRequest by viewModel.openNoteRequest.collectAsState()
+    var showEmptyTrashConfirm by remember { mutableStateOf(false) }
+
+    LaunchedEffect(Unit) { viewModel.purgeOldTrashedNotes() }
+
+    LaunchedEffect(openNoteRequest, notes, archivedNotes) {
+        val id = openNoteRequest ?: return@LaunchedEffect
+        val target = notes.find { it.id == id } ?: archivedNotes.find { it.id == id }
+        if (target != null) {
+            noteToEdit = target
+            viewModel.consumeOpenNoteRequest()
+        }
+    }
+
+    val sourceNotes = when (notesView) {
+        1 -> archivedNotes
+        2 -> trashedNotes
+        else -> notes
+    }
 
     // استخراج تمام تگ‌های یکتای موجود در یادداشت‌ها برای پیشنهاد داینامیک
     val allExistingTags = remember(notes) {
@@ -137,7 +166,7 @@ fun NotesScreen(
     }
 
     val filteredNotes = if (searchQuery.isBlank()) {
-        notes
+        sourceNotes
     } else {
         // شناسایی جستجوی تگ: اگر با # شروع شود، فقط بر اساس تگ فیلتر شود
         val tagSearch = searchQuery.trim().let { q ->
@@ -145,14 +174,14 @@ fun NotesScreen(
         }
         if (tagSearch != null) {
             // فیلتر بر اساس تگ — جستجو در فیلد tag
-            notes.filter { note ->
+            sourceNotes.filter { note ->
                 note.tag.split(",").any { t ->
                     t.trim().contains(tagSearch, ignoreCase = true)
                 }
             }
         } else {
             // جستجوی عمومی: عنوان + محتوا + تگ‌ها
-            notes.filter {
+            sourceNotes.filter {
                 it.title.contains(searchQuery, ignoreCase = true) ||
                 it.content.contains(searchQuery, ignoreCase = true) ||
                 it.tag.split(",").any { t ->
@@ -188,6 +217,61 @@ fun NotesScreen(
                     .fillMaxWidth()
                     .padding(horizontal = 14.dp, vertical = 6.dp)
             )
+
+            // نوار جابه‌جایی بین یادداشت‌ها، بایگانی و سطل زباله
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 10.dp, vertical = 2.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                TextButton(onClick = {
+                    notesView = 0
+                    selectionMode = false
+                    selectedNoteIds = emptySet()
+                }) {
+                    Text(
+                        if (strings.isFa) "یادداشت‌ها" else "Notes",
+                        fontWeight = if (notesView == 0) FontWeight.Bold else FontWeight.Normal,
+                        color = if (notesView == 0) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
+                        fontSize = 13.sp
+                    )
+                }
+                TextButton(onClick = {
+                    notesView = 1
+                    selectionMode = false
+                    selectedNoteIds = emptySet()
+                }) {
+                    Text(
+                        if (strings.isFa) "بایگانی (${archivedNotes.size})" else "Archive (${archivedNotes.size})",
+                        fontWeight = if (notesView == 1) FontWeight.Bold else FontWeight.Normal,
+                        color = if (notesView == 1) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
+                        fontSize = 13.sp
+                    )
+                }
+                TextButton(onClick = {
+                    notesView = 2
+                    selectionMode = false
+                    selectedNoteIds = emptySet()
+                }) {
+                    Text(
+                        if (strings.isFa) "سطل زباله (${trashedNotes.size})" else "Trash (${trashedNotes.size})",
+                        fontWeight = if (notesView == 2) FontWeight.Bold else FontWeight.Normal,
+                        color = if (notesView == 2) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
+                        fontSize = 13.sp
+                    )
+                }
+                if (notesView == 2 && trashedNotes.isNotEmpty()) {
+                    Spacer(modifier = Modifier.weight(1f))
+                    TextButton(onClick = { showEmptyTrashConfirm = true }) {
+                        Text(
+                            if (strings.isFa) "خالی کردن سطل" else "Empty trash",
+                            color = MaterialTheme.colorScheme.error,
+                            fontSize = 12.sp
+                        )
+                    }
+                }
+            }
 
             if (selectionMode) {
                 Row(
@@ -267,7 +351,9 @@ fun NotesScreen(
                             searchQuery = searchQuery,
                             isSelected = selectedNoteIds.contains(note.id),
                             onClick = {
-                                if (selectionMode) {
+                                if (notesView == 2) {
+                                    // یادداشت‌های سطل زباله باز نمی‌شوند؛ از منوی کارت برگردان یا دائمی پاک کن
+                                } else if (selectionMode) {
                                     selectedNoteIds = if (selectedNoteIds.contains(note.id)) {
                                         val next = selectedNoteIds - note.id
                                         if (next.isEmpty()) selectionMode = false
@@ -282,7 +368,7 @@ fun NotesScreen(
                                 }
                             },
                             onLongClick = {
-                                if (!selectionMode) {
+                                if (notesView == 0 && !selectionMode) {
                                     selectionMode = true
                                     selectedNoteIds = setOf(note.id)
                                 }
@@ -295,8 +381,20 @@ fun NotesScreen(
                                     Toast.makeText(context, msg, Toast.LENGTH_SHORT).show()
                                 }
                             },
-                            onDelete = { viewModel.deleteNote(note.id) },
+                            onDelete = {
+                                if (notesView == 2) {
+                                    viewModel.hardDeleteNote(note)
+                                } else {
+                                    viewModel.deleteNote(note.id)
+                                }
+                            },
                             onDuplicate = { viewModel.duplicateNote(note) },
+                            onArchive = { viewModel.archiveNote(note.id, notesView != 1) },
+                            onRestore = if (notesView == 2) {
+                                { viewModel.restoreNote(note.id) }
+                            } else {
+                                null
+                            },
                             onTogglePin = {
                                 viewModel.updateNote(
                                     note.copy(
@@ -432,14 +530,47 @@ fun NotesScreen(
         }
     }
 
+    if (showEmptyTrashConfirm) {
+        AlertDialog(
+            onDismissRequest = { showEmptyTrashConfirm = false },
+            title = { Text(if (strings.isFa) "خالی کردن سطل زباله" else "Empty trash") },
+            text = {
+                Text(
+                    if (strings.isFa) {
+                        "همه یادداشت‌های سطل زباله برای همیشه پاک می‌شوند. ادامه می‌دهی؟"
+                    } else {
+                        "All notes in the trash will be deleted forever. Continue?"
+                    }
+                )
+            },
+            confirmButton = {
+                TextButton(onClick = {
+                    trashedNotes.forEach { viewModel.hardDeleteNote(it) }
+                    showEmptyTrashConfirm = false
+                }) {
+                    Text(if (strings.isFa) "پاک کردن" else "Delete", color = MaterialTheme.colorScheme.error)
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showEmptyTrashConfirm = false }) {
+                    Text(if (strings.isFa) "لغو" else "Cancel")
+                }
+            }
+        )
+    }
+
     if (showAddNoteDialog) {
         AddNoteDialog(
             onDismiss = {
                 showAddNoteDialog = false
                 viewModel.consumeSharedNoteSeed()
             },
-            onConfirm = { title, content, colorHex, tag, isPinned, imagePath ->
-                viewModel.addNote(title, content, colorHex, isPinned = isPinned, tag = tag, imagePath = imagePath)
+            onConfirm = { title, content, colorHex, tag, isPinned, imagePath, checklistJson, audioPath, reminderAt ->
+                viewModel.addNote(
+                    title, content, colorHex,
+                    isPinned = isPinned, tag = tag, imagePath = imagePath,
+                    checklistJson = checklistJson, audioPath = audioPath, reminderAt = reminderAt
+                )
                 showAddNoteDialog = false
                 viewModel.consumeSharedNoteSeed()
             },
@@ -496,7 +627,7 @@ fun NotesScreen(
                 noteToEdit = null
                 drawingNoteToViewOrEdit = noteWithDrawing
             },
-            onConfirm = { title, content, colorHex, isPinned, drawingPath, tag ->
+            onConfirm = { title, content, colorHex, isPinned, drawingPath, tag, imagePath, checklistJson, audioPath, reminderAt ->
                 viewModel.updateNote(
                     note.copy(
                         title = title,
@@ -505,12 +636,16 @@ fun NotesScreen(
                         isPinned = isPinned,
                         drawingPath = drawingPath,
                         tag = tag,
+                        imagePath = imagePath,
+                        checklistJson = checklistJson,
+                        audioPath = audioPath,
+                        reminderAt = reminderAt,
                         updatedAt = System.currentTimeMillis()
                     )
                 )
                 noteToEdit = null
             },
-            onAutosave = { title, content, colorHex, isPinned, drawingPath, tag ->
+            onAutosave = { title, content, colorHex, isPinned, drawingPath, tag, imagePath, checklistJson, audioPath, reminderAt ->
                 viewModel.updateNote(
                     note.copy(
                         title = title,
@@ -519,6 +654,10 @@ fun NotesScreen(
                         isPinned = isPinned,
                         drawingPath = drawingPath,
                         tag = tag,
+                        imagePath = imagePath,
+                        checklistJson = checklistJson,
+                        audioPath = audioPath,
+                        reminderAt = reminderAt,
                         updatedAt = System.currentTimeMillis()
                     )
                 )
@@ -602,7 +741,9 @@ fun NoteCard(
     onSyncToGoogleCalendar: () -> Unit,
     onDelete: () -> Unit,
     onTogglePin: () -> Unit,
-    onDuplicate: () -> Unit
+    onDuplicate: () -> Unit,
+    onArchive: (() -> Unit)? = null,
+    onRestore: (() -> Unit)? = null
 ) {
     val context = LocalContext.current
     val strings = rememberAppStrings()
@@ -699,6 +840,27 @@ fun NoteCard(
                 }
             }
 
+            // Photo Thumbnail (if exists)
+            if (!note.imagePath.isNullOrBlank()) {
+                val photoBitmap = remember(note.imagePath, note.updatedAt) {
+                    val file = File(note.imagePath)
+                    if (file.exists()) BitmapFactory.decodeFile(note.imagePath)?.asImageBitmap() else null
+                }
+                if (photoBitmap != null) {
+                    Image(
+                        bitmap = photoBitmap,
+                        contentDescription = "عکس یادداشت",
+                        contentScale = ContentScale.Crop,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(120.dp)
+                            .clip(RoundedCornerShape(10.dp))
+                            .border(0.6.dp, if (isDark) Color(0xFF2A2A32) else Color.Black.copy(alpha = 0.08f), RoundedCornerShape(10.dp))
+                    )
+                    Spacer(modifier = Modifier.height(6.dp))
+                }
+            }
+
             if (note.content.isNotBlank()) {
                 Text(
                     text = buildHighlightedString(note.content, searchQuery),
@@ -726,6 +888,39 @@ fun NoteCard(
                         color = if (isDark) Color(0xFFA1A1AA) else Color(0xFF64748B),
                         fontWeight = FontWeight.Medium
                     )
+                }
+            }
+
+            if (note.checklistJson.isNotBlank()) {
+                Spacer(modifier = Modifier.height(4.dp))
+                ChecklistPreview(note.checklistJson)
+            }
+
+            if (note.reminderAt > 0 || !note.audioPath.isNullOrBlank()) {
+                Spacer(modifier = Modifier.height(4.dp))
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    if (note.reminderAt > 0) {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Icon(
+                                Icons.Default.Notifications,
+                                contentDescription = null,
+                                tint = if (isDark) Color(0xFFF59E0B) else Color(0xFFD97706),
+                                modifier = Modifier.size(12.dp)
+                            )
+                            Spacer(modifier = Modifier.width(3.dp))
+                            Text(
+                                text = com.example.ui.components.formatNoteReminderLabel(note.reminderAt),
+                                fontSize = 10.sp,
+                                color = if (isDark) Color(0xFFA1A1AA) else Color(0xFF64748B)
+                            )
+                        }
+                    }
+                    if (!note.audioPath.isNullOrBlank()) {
+                        Text(text = "🎙", fontSize = 10.sp)
+                    }
                 }
             }
 
@@ -854,6 +1049,51 @@ fun NoteCard(
                                     onDuplicate()
                                 }
                             )
+
+                            if (onRestore != null) {
+                                DropdownMenuItem(
+                                    text = { Text(if (strings.isFa) "بازگردانی" else "Restore", fontSize = 12.sp) },
+                                    leadingIcon = {
+                                        Icon(
+                                            Icons.Default.Refresh,
+                                            contentDescription = null,
+                                            tint = MaterialTheme.colorScheme.primary,
+                                            modifier = Modifier.size(18.dp)
+                                        )
+                                    },
+                                    onClick = {
+                                        showDropdownMenu = false
+                                        onRestore()
+                                    }
+                                )
+                            }
+
+                            if (onArchive != null) {
+                                DropdownMenuItem(
+                                    text = {
+                                        Text(
+                                            if (note.isArchived) {
+                                                if (strings.isFa) "خروج از بایگانی" else "Unarchive"
+                                            } else {
+                                                if (strings.isFa) "بایگانی" else "Archive"
+                                            },
+                                            fontSize = 12.sp
+                                        )
+                                    },
+                                    leadingIcon = {
+                                        Icon(
+                                            if (note.isArchived) Icons.Default.Unarchive else Icons.Default.Archive,
+                                            contentDescription = null,
+                                            tint = MaterialTheme.colorScheme.primary,
+                                            modifier = Modifier.size(18.dp)
+                                        )
+                                    },
+                                    onClick = {
+                                        showDropdownMenu = false
+                                        onArchive()
+                                    }
+                                )
+                            }
 
                             DropdownMenuItem(
                                 text = { Text(if (strings.isFa) "ارسال به Google Keep" else "Send to Google Keep", fontSize = 12.sp) },

@@ -78,6 +78,24 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     val activeNotes: StateFlow<List<NoteEntity>> = repository.allActiveNotes
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
+    val archivedNotes: StateFlow<List<NoteEntity>> = repository.archivedNotes
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
+
+    val trashedNotes: StateFlow<List<NoteEntity>> = repository.trashedNotes
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
+
+    // درخواست باز کردن یک یادداشت مشخص (مثلاً از لمس اعلان یادآور)
+    private val _openNoteRequest = MutableStateFlow<String?>(null)
+    val openNoteRequest: StateFlow<String?> = _openNoteRequest.asStateFlow()
+
+    fun requestOpenNote(id: String) {
+        _openNoteRequest.value = id
+    }
+
+    fun consumeOpenNoteRequest() {
+        _openNoteRequest.value = null
+    }
+
     val syncLogs: StateFlow<List<SyncLogEntity>> = repository.recentSyncLogs
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
@@ -1223,7 +1241,10 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         isPinned: Boolean = false,
         drawingPath: String? = null,
         tag: String = "",
-        imagePath: String? = null
+        imagePath: String? = null,
+        checklistJson: String = "",
+        audioPath: String? = null,
+        reminderAt: Long = 0
     ) {
         val note = NoteEntity(
             title = title.ifBlank { if (drawingPath != null) "طرح وایت‌برد" else "یادداشت جدید" },
@@ -1233,10 +1254,16 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             isPinned = isPinned,
             drawingPath = drawingPath,
             tag = tag,
-            imagePath = imagePath
+            imagePath = imagePath,
+            audioPath = audioPath,
+            checklistJson = checklistJson,
+            reminderAt = reminderAt
         )
         viewModelScope.launch {
             repository.insertNote(note)
+            if (reminderAt > System.currentTimeMillis()) {
+                com.example.alarm.NoteReminderScheduler.scheduleNoteReminder(getApplication(), note)
+            }
             logMessage("یادداشت ذخیره شد: ${note.title}")
         }
     }
@@ -1244,11 +1271,30 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     fun updateNote(note: NoteEntity) {
         viewModelScope.launch {
             repository.updateNote(note)
+            val app = getApplication<Application>()
+            if (note.reminderAt > System.currentTimeMillis() && !note.isDeleted && !note.isArchived) {
+                com.example.alarm.NoteReminderScheduler.scheduleNoteReminder(app, note)
+            } else {
+                com.example.alarm.NoteReminderScheduler.cancelNoteReminder(app, note.id)
+            }
         }
     }
 
     fun duplicateNote(note: NoteEntity) {
         viewModelScope.launch {
+            fun copyAttachmentFile(srcPath: String?, newPrefix: String, ext: String): String? {
+                if (srcPath.isNullOrBlank()) return srcPath
+                return try {
+                    val srcFile = File(srcPath)
+                    if (!srcFile.exists()) return srcPath
+                    val parent = srcFile.parentFile ?: return srcPath
+                    val dstFile = File(parent, newPrefix + java.util.UUID.randomUUID().toString() + ext)
+                    srcFile.copyTo(dstFile, overwrite = true)
+                    dstFile.absolutePath
+                } catch (_: Exception) {
+                    srcPath
+                }
+            }
             var newDrawingPath = note.drawingPath
             val srcPath = note.drawingPath
             if (!srcPath.isNullOrBlank()) {
@@ -1272,24 +1318,66 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 note.copy(
                     id = java.util.UUID.randomUUID().toString(),
                     drawingPath = newDrawingPath,
+                    imagePath = copyAttachmentFile(note.imagePath, "img_", ".jpg"),
+                    audioPath = copyAttachmentFile(note.audioPath, "voice_", ".m4a"),
+                    reminderAt = 0,
+                    isArchived = false,
+                    isDeleted = false,
+                    deletedAt = 0,
                     updatedAt = System.currentTimeMillis()
                 )
             )
         }
     }
 
+    // حذف معمولی: یادداشت به سطل زباله می‌رود و فایل‌هایش نگه داشته می‌شوند تا بشود برگرداند
     fun deleteNote(id: String) {
         viewModelScope.launch {
-            val existing = repository.allActiveNotes.first().find { it.id == id }
-            existing?.drawingPath?.let { path ->
-                try {
-                    val file = File(path)
-                    if (file.exists()) file.delete()
-                    val jsonFile = File(path.replace(".png", ".json"))
-                    if (jsonFile.exists()) jsonFile.delete()
-                } catch (_: Exception) {}
-            }
+            com.example.alarm.NoteReminderScheduler.cancelNoteReminder(getApplication(), id)
             repository.deleteNote(id)
+        }
+    }
+
+    fun restoreNote(id: String) {
+        viewModelScope.launch {
+            repository.restoreNote(id)
+        }
+    }
+
+    fun archiveNote(id: String, archived: Boolean) {
+        viewModelScope.launch {
+            if (archived) {
+                com.example.alarm.NoteReminderScheduler.cancelNoteReminder(getApplication(), id)
+            }
+            repository.setNoteArchived(id, archived)
+        }
+    }
+
+    // حذف دائمی از سطل زباله: ردیف و همه فایل‌های پیوست پاک می‌شوند
+    fun hardDeleteNote(note: NoteEntity) {
+        viewModelScope.launch {
+            com.example.alarm.NoteReminderScheduler.cancelNoteReminder(getApplication(), note.id)
+            listOf(note.drawingPath, note.imagePath, note.audioPath).forEach { path ->
+                if (!path.isNullOrBlank()) {
+                    try {
+                        val file = File(path)
+                        if (file.exists()) file.delete()
+                        if (path == note.drawingPath) {
+                            val jsonFile = File(path.replace(".png", ".json"))
+                            if (jsonFile.exists()) jsonFile.delete()
+                        }
+                    } catch (_: Exception) {}
+                }
+            }
+            repository.hardDeleteNote(note.id)
+        }
+    }
+
+    // پاک‌سازی خودکار سطل زباله: هرچه بیش از ۳۰ روز مانده، دائمی پاک می‌شود
+    fun purgeOldTrashedNotes() {
+        viewModelScope.launch {
+            val cutoff = System.currentTimeMillis() - 30L * 24 * 60 * 60 * 1000
+            repository.purgeOldTrashedNotes(cutoff)
         }
     }
 
@@ -1316,6 +1404,34 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 }
             }
 
+            // 1b. Image & audio Base64 for rich-content notes
+            val imagesMap = mutableMapOf<String, String>()
+            val audiosMap = mutableMapOf<String, String>()
+            for (note in baseSyncData.notes) {
+                if (!note.imagePath.isNullOrBlank()) {
+                    try {
+                        val file = File(note.imagePath)
+                        if (file.exists() && file.isFile) {
+                            val b64 = android.util.Base64.encodeToString(file.readBytes(), android.util.Base64.NO_WRAP)
+                            imagesMap[note.id] = b64
+                        }
+                    } catch (e: Exception) {
+                        e.printStackTrace()
+                    }
+                }
+                if (!note.audioPath.isNullOrBlank()) {
+                    try {
+                        val file = File(note.audioPath)
+                        if (file.exists() && file.isFile) {
+                            val b64 = android.util.Base64.encodeToString(file.readBytes(), android.util.Base64.NO_WRAP)
+                            audiosMap[note.id] = b64
+                        }
+                    } catch (e: Exception) {
+                        e.printStackTrace()
+                    }
+                }
+            }
+
             // 2. Custom Occasions
             val (occData, occHiddenData) = PersianOccasionsHelper.exportCustomOccasionsRaw(app)
 
@@ -1333,6 +1449,8 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             val syncData = baseSyncData.copy(
                 mementoMoriJson = mementoManager.exportToJson(),
                 noteDrawingsBase64 = if (drawingsMap.isNotEmpty()) drawingsMap else null,
+                noteImagesBase64 = if (imagesMap.isNotEmpty()) imagesMap else null,
+                noteAudiosBase64 = if (audiosMap.isNotEmpty()) audiosMap else null,
                 customOccasionsData = occData,
                 customOccasionsHiddenData = occHiddenData,
                 appPreferences = if (appPrefsMap.isNotEmpty()) appPrefsMap else null,
@@ -1406,6 +1524,51 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         }
     }
 
+    private fun restoreAttachmentFiles(syncData: SyncData): List<NoteEntity> {
+        val app = getApplication<Application>()
+        val imagesMap = syncData.noteImagesBase64
+        val audiosMap = syncData.noteAudiosBase64
+        if (imagesMap.isNullOrEmpty() && audiosMap.isNullOrEmpty()) return syncData.notes
+        val imagesDir = File(app.filesDir, "notes_images").apply { mkdirs() }
+        val audiosDir = File(app.filesDir, "notes_audio").apply { mkdirs() }
+        return syncData.notes.map { note ->
+            var result = note
+            val imgB64 = imagesMap?.get(note.id)
+            if (!imgB64.isNullOrBlank()) {
+                try {
+                    val bytes = android.util.Base64.decode(imgB64, android.util.Base64.DEFAULT)
+                    val existingFile = note.imagePath?.let { File(it) }
+                    val targetFile = if (existingFile != null && existingFile.parentFile?.exists() == true) {
+                        existingFile
+                    } else {
+                        File(imagesDir, "img_${note.id}.jpg")
+                    }
+                    targetFile.writeBytes(bytes)
+                    result = result.copy(imagePath = targetFile.absolutePath)
+                } catch (e: Exception) {
+                    e.printStackTrace()
+                }
+            }
+            val audB64 = audiosMap?.get(note.id)
+            if (!audB64.isNullOrBlank()) {
+                try {
+                    val bytes = android.util.Base64.decode(audB64, android.util.Base64.DEFAULT)
+                    val existingFile = note.audioPath?.let { File(it) }
+                    val targetFile = if (existingFile != null && existingFile.parentFile?.exists() == true) {
+                        existingFile
+                    } else {
+                        File(audiosDir, "voice_${note.id}.m4a")
+                    }
+                    targetFile.writeBytes(bytes)
+                    result = result.copy(audioPath = targetFile.absolutePath)
+                } catch (e: Exception) {
+                    e.printStackTrace()
+                }
+            }
+            result
+        }
+    }
+
     fun importBackupJson(jsonStr: String, onComplete: (Boolean, String) -> Unit) {
         viewModelScope.launch(Dispatchers.IO) {
             val app = getApplication<Application>()
@@ -1415,10 +1578,22 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
 
                 // 1. Restore drawing files and connect drawingPath
                 val updatedNotes = restoreDrawingFiles(rawSyncData)
-                val syncData = rawSyncData.copy(notes = updatedNotes)
+                val notesWithAttachments = restoreAttachmentFiles(rawSyncData.copy(notes = updatedNotes))
+                val syncData = rawSyncData.copy(notes = notesWithAttachments)
 
                 // 2. Merge database records
                 repository.mergeSyncData(syncData, "پشتیبان دستی JSON")
+
+                // 2b. Re-arm note reminders that came back with the backup
+                try {
+                    for (note in syncData.notes) {
+                        if (note.reminderAt > System.currentTimeMillis() && !note.isDeleted && !note.isArchived) {
+                            com.example.alarm.NoteReminderScheduler.scheduleNoteReminder(app, note)
+                        }
+                    }
+                } catch (e: Exception) {
+                    e.printStackTrace()
+                }
 
                 // 3. Restore Memento Mori (a failure here must not void the merge above)
                 try {

@@ -120,8 +120,14 @@ interface TaskDao {
 
 @Dao
 interface NoteDao {
-    @Query("SELECT * FROM notes WHERE isDeleted = 0 ORDER BY isPinned DESC, updatedAt DESC")
+    @Query("SELECT * FROM notes WHERE isDeleted = 0 AND isArchived = 0 ORDER BY isPinned DESC, updatedAt DESC")
     fun getAllActiveNotes(): Flow<List<NoteEntity>>
+
+    @Query("SELECT * FROM notes WHERE isDeleted = 0 AND isArchived = 1 ORDER BY updatedAt DESC")
+    fun getArchivedNotes(): Flow<List<NoteEntity>>
+
+    @Query("SELECT * FROM notes WHERE isDeleted = 1 ORDER BY deletedAt DESC")
+    fun getTrashedNotes(): Flow<List<NoteEntity>>
 
     @Query("SELECT * FROM notes")
     suspend fun getAllNotesForSync(): List<NoteEntity>
@@ -138,11 +144,20 @@ interface NoteDao {
     @Update
     suspend fun updateNote(note: NoteEntity)
 
-    @Query("UPDATE notes SET isDeleted = 1, updatedAt = :updatedAt WHERE id = :id")
+    @Query("UPDATE notes SET isDeleted = 1, deletedAt = :updatedAt, updatedAt = :updatedAt WHERE id = :id")
     suspend fun softDeleteNote(id: String, updatedAt: Long = System.currentTimeMillis())
+
+    @Query("UPDATE notes SET isDeleted = 0, deletedAt = 0, updatedAt = :updatedAt WHERE id = :id")
+    suspend fun restoreNote(id: String, updatedAt: Long = System.currentTimeMillis())
+
+    @Query("UPDATE notes SET isArchived = :archived, updatedAt = :updatedAt WHERE id = :id")
+    suspend fun setNoteArchived(id: String, archived: Boolean, updatedAt: Long = System.currentTimeMillis())
 
     @Query("DELETE FROM notes WHERE id = :id")
     suspend fun hardDeleteNote(id: String)
+
+    @Query("DELETE FROM notes WHERE isDeleted = 1 AND deletedAt > 0 AND deletedAt < :cutoff")
+    suspend fun purgeOldTrashedNotes(cutoff: Long)
 }
 
 @Dao

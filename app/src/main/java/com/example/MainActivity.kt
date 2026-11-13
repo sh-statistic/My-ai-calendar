@@ -116,6 +116,7 @@ class MainActivity : ComponentActivity() {
 
         handleIntentForUpdate(intent)
         handleShareIntent(intent)
+        handleOpenNoteIntent(intent)
 
         // راه‌اندازی استعلام خودکار و دوره‌ای پس‌زمینه با WorkManager حتی در صورت بسته بودن برنامه
         com.example.update.UpdateWorkScheduler.schedulePeriodicCheck(this)
@@ -198,6 +199,12 @@ class MainActivity : ComponentActivity() {
                         val sharedNoteSeed by viewModel.sharedNoteSeed.collectAsState()
                         LaunchedEffect(sharedNoteSeed) {
                             if (sharedNoteSeed != null) {
+                                selectedTab = 2
+                            }
+                        }
+                        val openNoteRequest by viewModel.openNoteRequest.collectAsState()
+                        LaunchedEffect(openNoteRequest) {
+                            if (openNoteRequest != null) {
                                 selectedTab = 2
                             }
                         }
@@ -739,6 +746,14 @@ class MainActivity : ComponentActivity() {
         setIntent(intent)
         handleIntentForUpdate(intent)
         handleShareIntent(intent)
+        handleOpenNoteIntent(intent)
+    }
+
+    private fun handleOpenNoteIntent(intent: Intent?) {
+        val noteId = intent?.getStringExtra(
+            com.example.alarm.NoteReminderReceiver.EXTRA_OPEN_NOTE_ID
+        ) ?: return
+        viewModel.requestOpenNote(noteId)
     }
 
     private fun handleShareIntent(intent: Intent?) {
