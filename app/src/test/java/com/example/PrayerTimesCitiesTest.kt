@@ -90,7 +90,9 @@ class PrayerTimesCitiesTest {
             }
             ch?.let { alpha.indexOf(it).takeIf { i -> i >= 0 } ?: 99 }
         }
-        val khorasan = PrayerTimesCalculator.CITIES.drop(31).map { it.nameFa }
+        // The Khorasan block sits right after the original 31 cities; the other
+        // provinces were appended after it, so take exactly its 88 entries.
+        val khorasan = PrayerTimesCalculator.CITIES.drop(31).take(88).map { it.nameFa }
         assertEquals(88, khorasan.size)
         for (i in 0 until khorasan.size - 1) {
             val a = rankOf(khorasan[i])

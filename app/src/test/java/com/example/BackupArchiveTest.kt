@@ -6,6 +6,9 @@ import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
+import org.junit.runner.RunWith
+import org.robolectric.RobolectricTestRunner
+import org.robolectric.annotation.Config
 import java.io.ByteArrayInputStream
 import java.io.ByteArrayOutputStream
 import java.io.File
@@ -14,7 +17,11 @@ import java.nio.file.Files
 /**
  * Round-trip tests for the ZIP backup archive format: the data JSON, the manifest
  * mapping and the raw media bytes must all come back exactly as they went in.
+ * Robolectric is needed for the real org.json implementation (the manifest is
+ * built with it), like the other tests in this repo.
  */
+@RunWith(RobolectricTestRunner::class)
+@Config(sdk = [36])
 class BackupArchiveTest {
 
     @Test
