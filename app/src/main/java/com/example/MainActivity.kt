@@ -619,30 +619,11 @@ class MainActivity : ComponentActivity() {
                         contract = androidx.activity.result.contract.ActivityResultContracts.OpenDocument()
                     ) { uri ->
                         if (uri != null) {
-                            try {
-                                val jsonText = context.contentResolver.openInputStream(uri)
-                                    ?.bufferedReader()
-                                    ?.use { it.readText() }
-                                if (!jsonText.isNullOrBlank()) {
-                                    viewModel.importBackupJson(jsonText) { ok, msg ->
-                                        Toast.makeText(context, msg, Toast.LENGTH_LONG).show()
-                                        if (ok) {
-                                            viewModel.dismissExternalBackupPrompt()
-                                        }
-                                    }
-                                } else {
-                                    Toast.makeText(
-                                        context,
-                                        if (isRtl) "فایل انتخاب‌شده خالی است" else "Selected file is empty",
-                                        Toast.LENGTH_SHORT
-                                    ).show()
+                            viewModel.importBackupUri(context, uri) { ok, msg ->
+                                Toast.makeText(context, msg, Toast.LENGTH_LONG).show()
+                                if (ok) {
+                                    viewModel.dismissExternalBackupPrompt()
                                 }
-                            } catch (e: Exception) {
-                                Toast.makeText(
-                                    context,
-                                    if (isRtl) "خطا در خواندن فایل: ${e.localizedMessage}" else "Error reading file: ${e.localizedMessage}",
-                                    Toast.LENGTH_SHORT
-                                ).show()
                             }
                         }
                     }
@@ -670,9 +651,9 @@ class MainActivity : ComponentActivity() {
                             text = {
                                 Text(
                                     text = if (isRtl) {
-                                        "به نظر می‌رسد برنامه حذف و مجدداً نصب شده است.\n\nیک فایل پشتیبان خودکار (MyCalendar_SafetyBackup.json) در پوشه Downloads گوشی شما شناسایی شد؛ اما به دلیل محدودیت امنیتی اندروید پس از نصب مجدد، نیاز است فایل را یک بار انتخاب کنید تا تمام رویدادها، کارها و یادداشت‌هایتان بازیابی شوند."
+                                        "به نظر می‌رسد برنامه حذف و مجدداً نصب شده است.\n\nیک فایل پشتیبان خودکار (MyCalendar_SafetyBackup) در پوشه Downloads گوشی شما شناسایی شد؛ اما به دلیل محدودیت امنیتی اندروید پس از نصب مجدد، نیاز است فایل را یک بار انتخاب کنید تا تمام رویدادها، کارها و یادداشت‌هایتان بازیابی شوند."
                                     } else {
-                                        "It looks like the app was reinstalled.\n\nAn automatic backup file (MyCalendar_SafetyBackup.json) was detected in your Downloads folder. Due to Android security restrictions after reinstallation, please select the file once from Downloads to restore all your events, tasks, and notes."
+                                        "It looks like the app was reinstalled.\n\nAn automatic backup file (MyCalendar_SafetyBackup) was detected in your Downloads folder. Due to Android security restrictions after reinstallation, please select the file once from Downloads to restore all your events, tasks, and notes."
                                     },
                                     fontSize = 13.sp,
                                     lineHeight = 20.sp

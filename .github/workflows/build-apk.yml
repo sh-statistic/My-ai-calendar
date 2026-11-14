@@ -41,8 +41,8 @@ jobs:
             echo "No KEYSTORE_BASE64 secret provided; Gradle will fallback to repository debug.keystore"
           fi
 
-      - name: Run backup unit tests
-        run: ./gradlew testDebugUnitTest --tests "com.example.BackupRoundTripTest" --stacktrace
+      - name: Run unit tests
+        run: ./gradlew testDebugUnitTest --stacktrace
 
       - name: Build Release APK
         env:

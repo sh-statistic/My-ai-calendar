@@ -17,6 +17,7 @@ import com.example.BuildConfig
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import org.json.JSONObject
+import com.example.data.SyncData
 import java.io.BufferedReader
 import java.io.File
 import java.io.FileOutputStream
@@ -485,7 +486,7 @@ object AppUpdateManager {
             // 3. Save in public Downloads directory so it survives app uninstall (only when backup has real data)
             if (isMeaningful) {
                 try {
-                    val fileName = "MyCalendar_SafetyBackup.json"
+                    val fileName = publicBackupName
                     if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
                         val resolver = context.contentResolver
                         // Check if an entry with this name already exists in Downloads
@@ -504,7 +505,7 @@ object AppUpdateManager {
                         val targetUri = existingUri ?: run {
                             val values = ContentValues().apply {
                                 put(MediaStore.Downloads.DISPLAY_NAME, fileName)
-                                put(MediaStore.Downloads.MIME_TYPE, "application/json")
+                                put(MediaStore.Downloads.MIME_TYPE, publicBackupMime)
                                 put(MediaStore.Downloads.RELATIVE_PATH, Environment.DIRECTORY_DOWNLOADS)
                             }
                             resolver.insert(collection, values)
@@ -553,10 +554,15 @@ object AppUpdateManager {
         if (!backupFile.exists() || backupFile.length() == 0L) return false
         val isMeaningful = fileHasMeaningfulBackupContent(backupFile)
         return try {
+            val isZip = backupFile.name.endsWith(".zip", ignoreCase = true)
+            val extBackupName = if (isZip) "safety_backup.zip" else "safety_backup.json"
+            val publicBackupName = if (isZip) "MyCalendar_SafetyBackup.zip" else "MyCalendar_SafetyBackup.json"
+            val publicBackupMime = if (isZip) "application/zip" else "application/json"
+
             // 1. Save in app external files directory
             val extDir = context.getExternalFilesDir(null)
             if (extDir != null) {
-                val file = File(extDir, "safety_backup.json")
+                val file = File(extDir, extBackupName)
                 if (isMeaningful || !fileHasMeaningfulBackupContent(file)) {
                     backupFile.inputStream().use { input ->
                         file.outputStream().use { output -> input.copyTo(output) }
@@ -623,12 +629,18 @@ object AppUpdateManager {
 
     private fun fileHasMeaningfulBackupContent(file: File): Boolean {
         if (!file.exists() || file.length() == 0L) return false
+        if (com.example.data.BackupArchive.isArchive(file)) {
+            return try {
+                val dataJson = file.inputStream().use { com.example.data.BackupArchive.readDataJson(it) }
+                hasMeaningfulBackupContent(dataJson)
+            } catch (_: Exception) { false }
+        }
         // A backup larger than 2 MB certainly carries real content; never parse it whole here.
         if (file.length() > 2_000_000L) return true
         return try { hasMeaningfulBackupContent(file.readText()) } catch (_: Exception) { false }
     }
 
-    private val safetyBackupFileNameRegex = Regex("""^MyCalendar_SafetyBackup( \(\d+\))?\.json$""")
+    private val safetyBackupFileNameRegex = Regex("""^MyCalendar_SafetyBackup( \(\d+\))?\.(json|zip)$""")
 
     /**
      * Finds every public Downloads safety backup candidate, newest first. Besides the exact
@@ -720,10 +732,101 @@ object AppUpdateManager {
         return try {
             val candidates = findPublicSafetyBackupCandidates(context)
             if (candidates.isEmpty()) return false
-            candidates.none { !readPublicSafetyBackupCandidate(context, it).isNullOrBlank() }
+            candidates.none { candidateYieldsReadableBackup(context, it) }
         } catch (_: Exception) {
             false
         }
+    }
+
+    private fun candidateYieldsReadableBackup(context: Context, candidate: Pair<Uri?, File?>): Boolean {
+        val file = materializeCandidate(context, candidate) ?: return false
+        if (com.example.data.BackupArchive.isArchive(file)) {
+            val dataJson = try {
+                file.inputStream().use { com.example.data.BackupArchive.readDataJson(it) }
+            } catch (_: Exception) { null }
+            return hasMeaningfulBackupContent(dataJson)
+        }
+        val text = try { file.readText() } catch (_: Exception) { null }
+        return !text.isNullOrBlank()
+    }
+
+    /** Copies a MediaStore candidate into a plain cache file so it can be parsed as a file. */
+    private fun materializeCandidate(context: Context, candidate: Pair<Uri?, File?>): File? {
+        val (uri, file) = candidate
+        if (file != null) return file
+        if (uri == null) return null
+        return try {
+            val tmp = File(context.cacheDir, "safety_backup_candidate")
+            val copied = context.contentResolver.openInputStream(uri)?.use { input ->
+                tmp.outputStream().use { output -> input.copyTo(output) }
+            }
+            if (copied == null) null else tmp
+        } catch (_: Exception) { null }
+    }
+
+    private fun parseSafetyBackupFile(file: File): SyncData? {
+        return try {
+            if (com.example.data.BackupArchive.isArchive(file)) {
+                val archive = file.inputStream().use { com.example.data.BackupArchive.read(it) }
+                if (!hasMeaningfulBackupContent(archive.dataJson)) return null
+                com.example.data.BackupArchive.toSyncData(archive) {
+                    android.util.Base64.encodeToString(it, android.util.Base64.NO_WRAP)
+                }
+            } else {
+                val text = file.readText()
+                if (!hasMeaningfulBackupContent(text)) null else SyncData.fromJsonString(text)
+            }
+        } catch (_: Exception) { null }
+    }
+
+    /**
+     * Loads the newest meaningful safety backup as a [SyncData], whichever container
+     * it lives in: a ZIP archive (current format) or a plain JSON (older versions).
+     * Sources, in order: the SharedPreferences copy (pre-update backups by older
+     * versions), the app external files dir, then public Downloads, newest first.
+     */
+    fun loadLatestSafetyBackupSyncData(context: Context): SyncData? {
+        try {
+            val prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+            val fromPrefs = prefs.getString(KEY_SAFETY_BACKUP_JSON, null)
+            if (hasMeaningfulBackupContent(fromPrefs)) {
+                try { return SyncData.fromJsonString(fromPrefs!!) } catch (_: Exception) { }
+            }
+        } catch (_: Exception) { }
+
+        try {
+            val extDir = context.getExternalFilesDir(null)
+            if (extDir != null) {
+                val extCandidates = listOf(File(extDir, "safety_backup.zip"), File(extDir, "safety_backup.json"))
+                    .filter { it.exists() && it.length() > 0 }
+                    .sortedByDescending { it.lastModified() }
+                for (f in extCandidates) {
+                    parseSafetyBackupFile(f)?.let { return it }
+                }
+            }
+        } catch (_: Exception) { }
+
+        for (candidate in findPublicSafetyBackupCandidates(context)) {
+            val file = materializeCandidate(context, candidate) ?: continue
+            parseSafetyBackupFile(file)?.let { return it }
+        }
+        return null
+    }
+
+    /** The newest ZIP safety backup as a plain file (for the dialog's instant restore). */
+    fun latestSafetyBackupArchiveFile(context: Context): File? {
+        try {
+            val extDir = context.getExternalFilesDir(null)
+            if (extDir != null) {
+                val f = File(extDir, "safety_backup.zip")
+                if (f.exists() && f.length() > 0 && com.example.data.BackupArchive.isArchive(f)) return f
+            }
+        } catch (_: Exception) { }
+        for (candidate in findPublicSafetyBackupCandidates(context)) {
+            val file = materializeCandidate(context, candidate) ?: continue
+            if (com.example.data.BackupArchive.isArchive(file)) return file
+        }
+        return null
     }
 
     /**

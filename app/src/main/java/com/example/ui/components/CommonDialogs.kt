@@ -3414,7 +3414,8 @@ fun PairingInfoDialog(
 fun JsonBackupDialog(
     backupFile: File?,
     onDismiss: () -> Unit,
-    onImport: (String) -> Unit
+    onImport: (String) -> Unit,
+    onImportFile: (File) -> Unit
 ) {
     val strings = rememberAppStrings()
     val context = androidx.compose.ui.platform.LocalContext.current
@@ -3424,9 +3425,13 @@ fun JsonBackupDialog(
     // Load the auto-backup off the main thread: reading a multi-megabyte backup file
     // during composition was one of the causes of this dialog freezing on open.
     var detectedAutoBackup by remember { mutableStateOf<String?>(null) }
+    var detectedAutoBackupFile by remember { mutableStateOf<File?>(null) }
     androidx.compose.runtime.LaunchedEffect(Unit) {
         detectedAutoBackup = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
             com.example.update.AppUpdateManager.getLatestSafetyBackup(context)
+        }
+        detectedAutoBackupFile = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+            com.example.update.AppUpdateManager.latestSafetyBackupArchiveFile(context)
         }
     }
 
@@ -3436,17 +3441,19 @@ fun JsonBackupDialog(
         if (uri != null) {
             scope.launch {
                 try {
-                    val content = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
-                        context.contentResolver.openInputStream(uri)
-                            ?.bufferedReader()
-                            ?.use { it.readText() }
+                    val tempFile = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+                        val tmp = File(context.cacheDir, "picked_backup_${System.currentTimeMillis()}")
+                        context.contentResolver.openInputStream(uri)?.use { input ->
+                            tmp.outputStream().use { output -> input.copyTo(output) }
+                        }
+                        if (tmp.exists() && tmp.length() > 0) tmp else null
                     }
-                    if (!content.isNullOrBlank()) {
-                        onImport(content)
+                    if (tempFile != null) {
+                        onImportFile(tempFile)
                     } else {
-                    android.widget.Toast.makeText(
-                        context,
-                        if (strings.isFa) "فایل انتخاب‌شده خالی است" else "Selected file is empty",
+                        android.widget.Toast.makeText(
+                            context,
+                            if (strings.isFa) "فایل انتخاب‌شده خالی است" else "Selected file is empty",
                             android.widget.Toast.LENGTH_SHORT
                         ).show()
                     }
@@ -3538,7 +3545,7 @@ fun JsonBackupDialog(
                                     kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
                                         com.example.update.AppUpdateManager.performSafetyBackupFromFile(context, fileToSave)
                                     }
-                                    saveBackupFileLauncher.launch("MyCalendar_SafetyBackup.json")
+                                    saveBackupFileLauncher.launch("MyCalendar_SafetyBackup.zip")
                                 }
                             }
                         },
@@ -3559,9 +3566,9 @@ fun JsonBackupDialog(
                         ) {
                             Text(
                                 text = if (strings.isFa) {
-                                    "💡 راهنمای بازیابی پس از نصب مجدد یا آپدیت:\nبرنامه پیش از هر آپدیت، یک فایل پشتیبان خودکار با نام MyCalendar_SafetyBackup.json در پوشه Downloads گوشی ذخیره می‌کند. با دکمه زیر می‌توانید این فایل را انتخاب و تمام اطلاعات را بازیابی کنید:"
+                                    "💡 راهنمای بازیابی پس از نصب مجدد یا آپدیت:\nبرنامه پیش از هر آپدیت، یک فایل پشتیبان خودکار با نام MyCalendar_SafetyBackup در پوشه Downloads گوشی ذخیره می‌کند. با دکمه زیر می‌توانید این فایل را انتخاب و تمام اطلاعات را بازیابی کنید:"
                                 } else {
-                                    "💡 Restore Tip:\nBefore every update, an automatic backup named MyCalendar_SafetyBackup.json is saved in your Downloads folder. Tap below to select and restore it:"
+                                    "💡 Restore Tip:\nBefore every update, an automatic backup named MyCalendar_SafetyBackup is saved in your Downloads folder. Tap below to select and restore it:"
                                 },
                                 style = MaterialTheme.typography.bodySmall,
                                 lineHeight = 18.sp
@@ -3581,10 +3588,12 @@ fun JsonBackupDialog(
                             }
 
                             val autoBackupContent = detectedAutoBackup
-                            if (!autoBackupContent.isNullOrBlank()) {
+                            val autoBackupFile = detectedAutoBackupFile
+                            if (autoBackupFile != null || !autoBackupContent.isNullOrBlank()) {
                                 androidx.compose.material3.OutlinedButton(
                                     onClick = {
-                                        onImport(autoBackupContent)
+                                        if (autoBackupFile != null) onImportFile(autoBackupFile)
+                                        else if (!autoBackupContent.isNullOrBlank()) onImport(autoBackupContent)
                                     },
                                     modifier = Modifier.fillMaxWidth()
                                 ) {

@@ -1473,31 +1473,38 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     // Backup & Restore
+    /** Everything a backup contains, before a container format is chosen. */
+    private class BackupParts(
+        val base: SyncData,
+        val media: List<com.example.data.BackupArchive.MediaItem>
+    )
+
     /**
-     * Builds the complete backup JSON. Runs synchronously; callers invoke it on the IO
-     * dispatcher. Kept separate from delivery on purpose: a media-heavy backup can be
-     * tens of megabytes, so it should be written to a file (see [exportBackupToFile])
-     * instead of travelling through UI state as one giant String.
+     * Collects the backup content once: the sync data (occasions, preferences and
+     * memento filled in, media maps left empty) plus the media FILES belonging to
+     * it. No media bytes are read here; each container builder embeds them its own
+     * way (base64 maps for the legacy JSON, raw entries for the ZIP archive).
      */
-    private fun buildBackupJson(): String {
+    private fun buildBackupParts(): BackupParts {
         val app = getApplication<Application>()
         val baseSyncData = repository.getFullSyncData("Android-Backup")
 
-        // 1. Drawing Base64 for whiteboard notes (+ فایل خط‌های نقاشی کنارش تا بعد از ریکاوری قابل ویرایش بماند)
-        val drawingsMap = mutableMapOf<String, String>()
-        val drawingSidecarsMap = mutableMapOf<String, String>()
+        val media = mutableListOf<com.example.data.BackupArchive.MediaItem>()
+
+        // 1. Whiteboard drawings of notes (+ فایل خط‌های نقاشی کنارش تا بعد از ریکاوری قابل ویرایش بماند)
         for (note in baseSyncData.notes) {
             if (!note.drawingPath.isNullOrBlank()) {
                 try {
                     val file = File(note.drawingPath)
                     if (file.exists() && file.isFile) {
-                        val bytes = file.readBytes()
-                        val b64 = android.util.Base64.encodeToString(bytes, android.util.Base64.NO_WRAP)
-                        drawingsMap[note.id] = b64
                         val jsonFile = File(note.drawingPath.replace(".png", ".json"))
-                        if (jsonFile.exists() && jsonFile.isFile) {
-                            drawingSidecarsMap[note.id] = jsonFile.readText()
-                        }
+                        media += com.example.data.BackupArchive.MediaItem(
+                            noteId = note.id,
+                            kind = com.example.data.BackupArchive.KIND_DRAWING,
+                            blockKey = null,
+                            file = file,
+                            sidecarFile = if (jsonFile.exists() && jsonFile.isFile) jsonFile else null
+                        )
                     }
                 } catch (e: Exception) {
                     e.printStackTrace()
@@ -1505,16 +1512,13 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             }
         }
 
-        // 1b. Image & audio Base64 for rich-content notes
-        val imagesMap = mutableMapOf<String, String>()
-        val audiosMap = mutableMapOf<String, String>()
+        // 1b. Image & audio attachments of rich-content notes
         for (note in baseSyncData.notes) {
             if (!note.imagePath.isNullOrBlank()) {
                 try {
                     val file = File(note.imagePath)
                     if (file.exists() && file.isFile) {
-                        val b64 = android.util.Base64.encodeToString(file.readBytes(), android.util.Base64.NO_WRAP)
-                        imagesMap[note.id] = b64
+                        media += com.example.data.BackupArchive.MediaItem(note.id, com.example.data.BackupArchive.KIND_IMAGE, null, file)
                     }
                 } catch (e: Exception) {
                     e.printStackTrace()
@@ -1524,8 +1528,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 try {
                     val file = File(note.audioPath)
                     if (file.exists() && file.isFile) {
-                        val b64 = android.util.Base64.encodeToString(file.readBytes(), android.util.Base64.NO_WRAP)
-                        audiosMap[note.id] = b64
+                        media += com.example.data.BackupArchive.MediaItem(note.id, com.example.data.BackupArchive.KIND_AUDIO, null, file)
                     }
                 } catch (e: Exception) {
                     e.printStackTrace()
@@ -1533,37 +1536,30 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             }
         }
 
-        // 1c. Base64 for inline block media (photos/drawings/voice inside the note text flow)
-        val blockImagesMap = mutableMapOf<String, MutableMap<String, String>>()
-        val blockDrawingsMap = mutableMapOf<String, MutableMap<String, String>>()
-        val blockAudiosMap = mutableMapOf<String, MutableMap<String, String>>()
-        val blockDrawingSidecarsMap = mutableMapOf<String, MutableMap<String, String>>()
+        // 1c. Inline block media (photos/drawings/voice inside the note text flow)
         for (note in baseSyncData.notes) {
-            for (media in com.example.data.extractNoteBlockMedia(note.blocksJson)) {
-                val mediaPath = media.path ?: continue
+            for (blockMedia in com.example.data.extractNoteBlockMedia(note.blocksJson)) {
+                val mediaPath = blockMedia.path ?: continue
                 try {
                     val file = File(mediaPath)
                     if (file.exists() && file.isFile) {
-                        val b64 = android.util.Base64.encodeToString(file.readBytes(), android.util.Base64.NO_WRAP)
-                        val target = when (media.kind) {
-                            "i" -> blockImagesMap
-                            "a" -> blockAudiosMap
-                            else -> blockDrawingsMap
+                        val kind = when (blockMedia.kind) {
+                            "i" -> com.example.data.BackupArchive.KIND_BLOCK_IMAGE
+                            "a" -> com.example.data.BackupArchive.KIND_BLOCK_AUDIO
+                            else -> com.example.data.BackupArchive.KIND_BLOCK_DRAWING
                         }
-                        target.getOrPut(note.id) { mutableMapOf() }[mediaPath] = b64
-                        if (media.kind == "d") {
+                        val sidecarFile = if (blockMedia.kind == "d") {
                             val jsonFile = File(mediaPath.replace(".png", ".json"))
-                            if (jsonFile.exists() && jsonFile.isFile) {
-                                blockDrawingSidecarsMap.getOrPut(note.id) { mutableMapOf() }[mediaPath] =
-                                    jsonFile.readText()
-                            }
-                        }
+                            if (jsonFile.exists() && jsonFile.isFile) jsonFile else null
+                        } else null
+                        media += com.example.data.BackupArchive.MediaItem(note.id, kind, mediaPath, file, sidecarFile)
                     }
                 } catch (e: Exception) {
                     e.printStackTrace()
                 }
             }
         }
+
 
         // 2. Custom Occasions
         val (occData, occHiddenData) = PersianOccasionsHelper.exportCustomOccasionsRaw(app)
@@ -1579,26 +1575,47 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         val prayerPrefsMap = getPrefsMap("hamgam_prayer_prefs")
         val hijriOffsetPrefsMap = getPrefsMap("hijri_offset_prefs")
 
-        val syncData = baseSyncData.copy(
+        val base = baseSyncData.copy(
             mementoMoriJson = mementoManager.exportToJson(),
-            noteDrawingsBase64 = if (drawingsMap.isNotEmpty()) drawingsMap else null,
-            noteImagesBase64 = if (imagesMap.isNotEmpty()) imagesMap else null,
-            noteAudiosBase64 = if (audiosMap.isNotEmpty()) audiosMap else null,
-            noteBlockImagesBase64 = if (blockImagesMap.isNotEmpty()) blockImagesMap else null,
-            noteBlockDrawingsBase64 = if (blockDrawingsMap.isNotEmpty()) blockDrawingsMap else null,
-            noteBlockAudiosBase64 = if (blockAudiosMap.isNotEmpty()) blockAudiosMap else null,
-            noteDrawingSidecars = if (drawingSidecarsMap.isNotEmpty()) drawingSidecarsMap else null,
-            noteBlockDrawingSidecars = if (blockDrawingSidecarsMap.isNotEmpty()) blockDrawingSidecarsMap else null,
             customOccasionsData = occData,
             customOccasionsHiddenData = occHiddenData,
             appPreferences = if (appPrefsMap.isNotEmpty()) appPrefsMap else null,
             prayerPreferences = if (prayerPrefsMap.isNotEmpty()) prayerPrefsMap else null,
             hijriOffsetPreferences = if (hijriOffsetPrefsMap.isNotEmpty()) hijriOffsetPrefsMap else null
         )
+        return BackupParts(base, media)
+    }
+
+    /**
+     * Legacy single-JSON backup text. The media mapping is shared with the archive
+     * format through [com.example.data.BackupArchive.toSyncData], so both containers
+     * always carry identical content.
+     */
+    private fun buildBackupJson(): String {
+        val parts = buildBackupParts()
+        val resolved = parts.media.mapNotNull { item ->
+            try {
+                com.example.data.BackupArchive.ResolvedMedia(
+                    noteId = item.noteId,
+                    kind = item.kind,
+                    blockKey = item.blockKey,
+                    bytes = item.file.readBytes(),
+                    sidecarText = item.sidecarFile?.readText()
+                )
+            } catch (e: Exception) {
+                e.printStackTrace()
+                null
+            }
+        }
+        val archiveData = com.example.data.BackupArchive.ArchiveData(parts.base.toJsonString(), resolved)
+        val syncData = com.example.data.BackupArchive.toSyncData(archiveData) {
+            android.util.Base64.encodeToString(it, android.util.Base64.NO_WRAP)
+        }
         val json = syncData.toJsonString()
         logMessage("پشتیبان کامل JSON با موفقیت تولید شد")
         return json
     }
+
 
     fun exportBackupJson(onResult: (String) -> Unit) {
         viewModelScope.launch(Dispatchers.IO) {
@@ -1617,17 +1634,13 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     fun exportBackupToFile(onResult: (File?) -> Unit) {
         viewModelScope.launch(Dispatchers.IO) {
             val file = try {
-                val json = buildBackupJson()
+                val parts = buildBackupParts()
                 val app = getApplication<Application>()
-                val target = File(app.cacheDir, "MyCalendar_SafetyBackup.json")
-                target.bufferedWriter(Charsets.UTF_8).use { writer ->
-                    var index = 0
-                    while (index < json.length) {
-                        val chunkEnd = minOf(index + 65536, json.length)
-                        writer.write(json, index, chunkEnd - index)
-                        index = chunkEnd
-                    }
+                val target = File(app.cacheDir, "MyCalendar_SafetyBackup.zip")
+                target.outputStream().buffered().use { out ->
+                    com.example.data.BackupArchive.write(parts.base.toJsonString(), parts.media, out)
                 }
+                logMessage("پشتیبان کامل (بستهٔ فشرده) با موفقیت تولید شد")
                 target
             } catch (e: Exception) {
                 e.printStackTrace()
@@ -1818,107 +1831,178 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
 
     fun importBackupJson(jsonStr: String, onComplete: (Boolean, String) -> Unit) {
         viewModelScope.launch(Dispatchers.IO) {
-            val app = getApplication<Application>()
-            val warnings = mutableListOf<String>()
+            val parsed = try {
+                SyncData.fromJsonString(jsonStr)
+            } catch (e: Exception) {
+                logMessage("خطا در پردازش فایل پشتیبان: ${e.localizedMessage}")
+                withContext(Dispatchers.Main) {
+                    onComplete(false, "فایل پشتیبان نامعتبر است")
+                }
+                return@launch
+            }
+            importSyncData(parsed, onComplete)
+        }
+    }
+
+    /**
+     * Imports a backup the user picked as a file: a ZIP archive (current format) or
+     * a plain JSON file (backups written by older versions). Both end up in the
+     * exact same restore pipeline.
+     */
+    fun importBackupFile(file: File, onComplete: (Boolean, String) -> Unit) {
+        viewModelScope.launch(Dispatchers.IO) {
             try {
-                val rawSyncData = SyncData.fromJsonString(jsonStr)
-
-                // 1. Restore drawing files and connect drawingPath
-                val updatedNotes = restoreDrawingFiles(rawSyncData)
-                val notesWithAttachments = restoreAttachmentFiles(rawSyncData.copy(notes = updatedNotes))
-                val notesWithBlocks = restoreBlockFiles(rawSyncData.copy(notes = notesWithAttachments))
-                val syncData = rawSyncData.copy(notes = notesWithBlocks)
-
-                // 2. Merge database records
-                repository.mergeSyncData(syncData, "پشتیبان دستی JSON")
-
-                // 2b. Re-arm note reminders that came back with the backup
-                try {
-                    for (note in syncData.notes) {
-                        if (note.reminderAt > System.currentTimeMillis() && !note.isDeleted && !note.isArchived) {
-                            com.example.alarm.NoteReminderScheduler.scheduleNoteReminder(app, note)
-                        }
+                if (com.example.data.BackupArchive.isArchive(file)) {
+                    val archive = file.inputStream().use { com.example.data.BackupArchive.read(it) }
+                    val syncData = com.example.data.BackupArchive.toSyncData(archive) {
+                        android.util.Base64.encodeToString(it, android.util.Base64.NO_WRAP)
                     }
-                } catch (e: Exception) {
-                    e.printStackTrace()
-                }
-
-                // 2c. Restored events have no AlarmManager registrations; re-arm them all.
-                // Guarded separately so an alarm problem can never fail the restore itself.
-                try {
-                    EventAlarmScheduler.rearmAll(app, repository.allActiveEvents.first())
-                } catch (e: Exception) {
-                    logMessage("تنظیم دوباره زنگ‌های رویدادها بعد از بازیابی انجام نشد: ${e.message}")
-                }
-
-                // 3. Restore Memento Mori (a failure here must not void the merge above)
-                try {
-                    val restoredMemento = mementoManager.importFromJson(syncData.mementoMoriJson)
-                    if (restoredMemento > 0) {
-                        _mementoRevision.value += 1
-                        checkMementoMonthAndYearStatus()
-                    }
-                } catch (e: Exception) {
-                    warnings.add("memento")
-                    e.printStackTrace()
-                }
-
-                // 4. Restore Custom Occasions
-                try {
-                    if (syncData.customOccasionsData != null || syncData.customOccasionsHiddenData != null) {
-                        PersianOccasionsHelper.importCustomOccasionsRaw(
-                            app,
-                            syncData.customOccasionsData,
-                            syncData.customOccasionsHiddenData
-                        )
+                    importSyncData(syncData, onComplete)
+                } else {
+                    val text = file.readText()
+                    if (text.isBlank()) {
                         withContext(Dispatchers.Main) {
-                            refreshOccasions()
+                            onComplete(false, "فایل انتخاب‌شده خالی است")
                         }
+                        return@launch
                     }
-                } catch (e: Exception) {
-                    warnings.add("occasions")
-                    e.printStackTrace()
-                }
-
-                // 5. Restore Preferences + re-init (a prefs failure must never
-                // report the whole backup "invalid" once the data is merged)
-                try {
-                    restorePreferencesMap("hamgam_app_preferences", syncData.appPreferences)
-                    restorePreferencesMap("hamgam_prayer_prefs", syncData.prayerPreferences)
-                    restorePreferencesMap("hijri_offset_prefs", syncData.hijriOffsetPreferences)
-
-                    // Re-initialize managers / state affected by restored preferences
-                    com.example.calendar.HijriOffsetManager.init(app)
-                    val updatedPrayerSettings = com.example.prayer.FajrAlarmManager.getSettings(app)
-                    _fajrAlarmSettings.value = updatedPrayerSettings
-                    _selectedCity.value = com.example.prayer.PrayerTimesCalculator.getCityByName(updatedPrayerSettings.cityName)
-                    _appLanguage.value = com.example.settings.AppPreferences.getAppLanguage(app)
-                    _isDarkMode.value = com.example.settings.AppPreferences.isDarkMode(app)
-                    _calendarViewMode.value = if (com.example.settings.AppPreferences.getCalendarViewMode(app) == "WEEK") CalendarViewMode.WEEK else CalendarViewMode.MONTH
-                } catch (e: Exception) {
-                    warnings.add("preferences")
-                    e.printStackTrace()
-                }
-
-                withContext(Dispatchers.Main) {
-                    refreshPrayerTimes()
-                    refreshOccasions()
-                }
-
-                logMessage("بازیابی موفقیت‌آمیز فایل پشتیبان (${syncData.events.size} رویداد، ${syncData.tasks.size} کار، ${syncData.notes.size} یادداشت)")
-                withContext(Dispatchers.Main) {
-                    val message = if (warnings.isEmpty()) {
-                        "داده‌ها با موفقیت بازیابی شدند"
-                    } else {
-                        "داده‌ها بازیابی شدند، ولی این بخش‌ها کامل برنگشت: ${warnings.joinToString("، ")}"
-                    }
-                    onComplete(true, message)
+                    importSyncData(SyncData.fromJsonString(text), onComplete)
                 }
             } catch (e: Exception) {
                 logMessage("خطا در پردازش فایل پشتیبان: ${e.localizedMessage}")
                 withContext(Dispatchers.Main) {
                     onComplete(false, "فایل پشتیبان نامعتبر است")
                 }
+            }
+        }
+    }
+
+    /**
+     * Imports a backup from a content Uri (system file picker): copies the stream
+     * into a cache file first, then lets [importBackupFile] decide the format.
+     */
+    fun importBackupUri(context: android.content.Context, uri: android.net.Uri, onComplete: (Boolean, String) -> Unit) {
+        viewModelScope.launch(Dispatchers.IO) {
+            val tempFile = try {
+                val tmp = File(context.cacheDir, "picked_backup_${System.currentTimeMillis()}")
+                context.contentResolver.openInputStream(uri)?.use { input ->
+                    tmp.outputStream().use { output -> input.copyTo(output) }
+                }
+                if (tmp.exists() && tmp.length() > 0) tmp else null
+            } catch (e: Exception) {
+                e.printStackTrace()
+                null
+            }
+            if (tempFile == null) {
+                withContext(Dispatchers.Main) {
+                    onComplete(false, "فایل انتخاب‌شده خالی است")
+                }
+            } else {
+                importBackupFile(tempFile, onComplete)
+            }
+        }
+    }
+
+    private suspend fun importSyncData(rawSyncData: SyncData, onComplete: (Boolean, String) -> Unit) {
+        val app = getApplication<Application>()
+        val warnings = mutableListOf<String>()
+        try {
+
+            // 1. Restore drawing files and connect drawingPath
+            val updatedNotes = restoreDrawingFiles(rawSyncData)
+            val notesWithAttachments = restoreAttachmentFiles(rawSyncData.copy(notes = updatedNotes))
+            val notesWithBlocks = restoreBlockFiles(rawSyncData.copy(notes = notesWithAttachments))
+            val syncData = rawSyncData.copy(notes = notesWithBlocks)
+
+            // 2. Merge database records
+            repository.mergeSyncData(syncData, "پشتیبان دستی JSON")
+
+            // 2b. Re-arm note reminders that came back with the backup
+            try {
+                for (note in syncData.notes) {
+                    if (note.reminderAt > System.currentTimeMillis() && !note.isDeleted && !note.isArchived) {
+                        com.example.alarm.NoteReminderScheduler.scheduleNoteReminder(app, note)
+                    }
+                }
+            } catch (e: Exception) {
+                e.printStackTrace()
+            }
+
+            // 2c. Restored events have no AlarmManager registrations; re-arm them all.
+            // Guarded separately so an alarm problem can never fail the restore itself.
+            try {
+                EventAlarmScheduler.rearmAll(app, repository.allActiveEvents.first())
+            } catch (e: Exception) {
+                logMessage("تنظیم دوباره زنگ‌های رویدادها بعد از بازیابی انجام نشد: ${e.message}")
+            }
+
+            // 3. Restore Memento Mori (a failure here must not void the merge above)
+            try {
+                val restoredMemento = mementoManager.importFromJson(syncData.mementoMoriJson)
+                if (restoredMemento > 0) {
+                    _mementoRevision.value += 1
+                    checkMementoMonthAndYearStatus()
+                }
+            } catch (e: Exception) {
+                warnings.add("memento")
+                e.printStackTrace()
+            }
+
+            // 4. Restore Custom Occasions
+            try {
+                if (syncData.customOccasionsData != null || syncData.customOccasionsHiddenData != null) {
+                    PersianOccasionsHelper.importCustomOccasionsRaw(
+                        app,
+                        syncData.customOccasionsData,
+                        syncData.customOccasionsHiddenData
+                    )
+                    withContext(Dispatchers.Main) {
+                        refreshOccasions()
+                    }
+                }
+            } catch (e: Exception) {
+                warnings.add("occasions")
+                e.printStackTrace()
+            }
+
+            // 5. Restore Preferences + re-init (a prefs failure must never
+            // report the whole backup "invalid" once the data is merged)
+            try {
+                restorePreferencesMap("hamgam_app_preferences", syncData.appPreferences)
+                restorePreferencesMap("hamgam_prayer_prefs", syncData.prayerPreferences)
+                restorePreferencesMap("hijri_offset_prefs", syncData.hijriOffsetPreferences)
+
+                // Re-initialize managers / state affected by restored preferences
+                com.example.calendar.HijriOffsetManager.init(app)
+                val updatedPrayerSettings = com.example.prayer.FajrAlarmManager.getSettings(app)
+                _fajrAlarmSettings.value = updatedPrayerSettings
+                _selectedCity.value = com.example.prayer.PrayerTimesCalculator.getCityByName(updatedPrayerSettings.cityName)
+                _appLanguage.value = com.example.settings.AppPreferences.getAppLanguage(app)
+                _isDarkMode.value = com.example.settings.AppPreferences.isDarkMode(app)
+                _calendarViewMode.value = if (com.example.settings.AppPreferences.getCalendarViewMode(app) == "WEEK") CalendarViewMode.WEEK else CalendarViewMode.MONTH
+            } catch (e: Exception) {
+                warnings.add("preferences")
+                e.printStackTrace()
+            }
+
+            withContext(Dispatchers.Main) {
+                refreshPrayerTimes()
+                refreshOccasions()
+            }
+
+            logMessage("بازیابی موفقیت‌آمیز فایل پشتیبان (${syncData.events.size} رویداد، ${syncData.tasks.size} کار، ${syncData.notes.size} یادداشت)")
+            withContext(Dispatchers.Main) {
+                val message = if (warnings.isEmpty()) {
+                    "داده‌ها با موفقیت بازیابی شدند"
+                } else {
+                    "داده‌ها بازیابی شدند، ولی این بخش‌ها کامل برنگشت: ${warnings.joinToString("، ")}"
+                }
+                onComplete(true, message)
+            }
+        } catch (e: Exception) {
+            logMessage("خطا در پردازش فایل پشتیبان: ${e.localizedMessage}")
+            withContext(Dispatchers.Main) {
+                onComplete(false, "فایل پشتیبان نامعتبر است")
             }
         }
     }
@@ -1951,10 +2035,10 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             val isDatabaseEmpty = existingEvents.isEmpty() && existingTasks.isEmpty() && existingNotes.isEmpty()
 
             if (upgradedToVersion != null || hasPendingSafetyBackup || isDatabaseEmpty) {
-                val safetyBackup = AppUpdateManager.getLatestSafetyBackup(app)
-                if (!safetyBackup.isNullOrBlank()) {
+                val safetySyncData = AppUpdateManager.loadLatestSafetyBackupSyncData(app)
+                if (safetySyncData != null) {
                     try {
-                        val rawSyncData = SyncData.fromJsonString(safetyBackup)
+                        val rawSyncData = safetySyncData
                         val updatedNotes = restoreDrawingFiles(rawSyncData)
                         val notesWithAttachments = restoreAttachmentFiles(rawSyncData.copy(notes = updatedNotes))
                         val notesWithBlocks = restoreBlockFiles(rawSyncData.copy(notes = notesWithAttachments))
