@@ -21,6 +21,12 @@ interface EventDao {
     @Query("SELECT * FROM events WHERE id = :id LIMIT 1")
     suspend fun getEventById(id: String): EventEntity?
 
+    @Query("SELECT * FROM events WHERE recurrenceId = :recurrenceId AND isDeleted = 0 ORDER BY persianDate ASC, startTime ASC")
+    suspend fun getEventsByRecurrenceId(recurrenceId: String): List<EventEntity>
+
+    @Query("SELECT * FROM events WHERE recurrenceId = :recurrenceId AND persianDate >= :fromPersianDate AND isDeleted = 0 ORDER BY persianDate ASC, startTime ASC")
+    suspend fun getEventsByRecurrenceIdFromDate(recurrenceId: String, fromPersianDate: String): List<EventEntity>
+
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertEvent(event: EventEntity)
 
