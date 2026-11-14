@@ -1,5 +1,8 @@
 package com.example.ui.screens
 
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.horizontalScroll
+import com.example.data.extractNoteBlockMedia
 import android.graphics.BitmapFactory
 import android.widget.Toast
 import androidx.compose.animation.AnimatedVisibility
@@ -833,47 +836,65 @@ fun NoteCard(
 
             Spacer(modifier = Modifier.height(6.dp))
 
-            // Whiteboard Drawing Thumbnail (if exists)
-            if (!note.drawingPath.isNullOrBlank()) {
-                val drawingBitmap = remember(note.drawingPath, note.updatedAt) {
-                    val file = File(note.drawingPath)
-                    if (file.exists()) BitmapFactory.decodeFile(note.drawingPath)?.asImageBitmap() else null
-                }
-                if (drawingBitmap != null) {
-                    Image(
-                        bitmap = drawingBitmap,
-                        contentDescription = "طرح وایت‌برد",
-                        contentScale = ContentScale.Crop,
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .height(120.dp)
-                            .clip(RoundedCornerShape(10.dp))
-                            .border(0.6.dp, if (isDark) Color(0xFF2A2A32) else Color.Black.copy(alpha = 0.08f), RoundedCornerShape(10.dp))
+            // نوار بندانگشتیِ همهٔ عکس‌ها و طرح‌های یادداشت، بالای کارت: کاربر بدون باز کردنِ یادداشت
+            // و اسکرول کردنِ متن بلندش می‌فهمد کدام عکس توی کدام یادداشت است.
+            val thumbPaths = remember(note.blocksJson, note.imagePath, note.drawingPath, note.updatedAt) {
+                val fromBlocks = extractNoteBlockMedia(note.blocksJson)
+                    .filter { it.kind == "i" || it.kind == "d" }
+                    .mapNotNull { it.path }
+                val candidates = if (fromBlocks.isNotEmpty()) {
+                    fromBlocks
+                } else {
+                    listOfNotNull(
+                        note.drawingPath?.takeIf { it.isNotBlank() },
+                        note.imagePath?.takeIf { it.isNotBlank() }
                     )
-                    Spacer(modifier = Modifier.height(6.dp))
                 }
+                candidates.filter { runCatching { File(it).exists() }.getOrDefault(false) }
+            }
+            if (thumbPaths.isNotEmpty()) {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .horizontalScroll(rememberScrollState()),
+                    horizontalArrangement = Arrangement.spacedBy(6.dp)
+                ) {
+                    thumbPaths.forEach { thumbPath ->
+                        val thumbBitmap = remember(thumbPath, note.updatedAt) {
+                            try {
+                                val f = File(thumbPath)
+                                if (!f.exists()) {
+                                    null
+                                } else {
+                                    val boundsOpts = BitmapFactory.Options().apply { inJustDecodeBounds = true }
+                                    BitmapFactory.decodeFile(thumbPath, boundsOpts)
+                                    var sample = 1
+                                    while (boundsOpts.outWidth / (sample * 2) >= 160 && boundsOpts.outHeight / (sample * 2) >= 160) {
+                                        sample *= 2
+                                    }
+                                    val opts = BitmapFactory.Options().apply { inSampleSize = sample }
+                                    BitmapFactory.decodeFile(thumbPath, opts)?.asImageBitmap()
+                                }
+                            } catch (_: Exception) {
+                                null
+                            }
+                        }
+                        if (thumbBitmap != null) {
+                            Image(
+                                bitmap = thumbBitmap,
+                                contentDescription = null,
+                                contentScale = ContentScale.Crop,
+                                modifier = Modifier
+                                    .size(54.dp)
+                                    .clip(RoundedCornerShape(8.dp))
+                                    .border(0.6.dp, if (isDark) Color(0xFF2A2A32) else Color.Black.copy(alpha = 0.08f), RoundedCornerShape(8.dp))
+                            )
+                        }
+                    }
+                }
+                Spacer(modifier = Modifier.height(6.dp))
             }
 
-            // Photo Thumbnail (if exists)
-            if (!note.imagePath.isNullOrBlank()) {
-                val photoBitmap = remember(note.imagePath, note.updatedAt) {
-                    val file = File(note.imagePath)
-                    if (file.exists()) BitmapFactory.decodeFile(note.imagePath)?.asImageBitmap() else null
-                }
-                if (photoBitmap != null) {
-                    Image(
-                        bitmap = photoBitmap,
-                        contentDescription = "عکس یادداشت",
-                        contentScale = ContentScale.Crop,
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .height(120.dp)
-                            .clip(RoundedCornerShape(10.dp))
-                            .border(0.6.dp, if (isDark) Color(0xFF2A2A32) else Color.Black.copy(alpha = 0.08f), RoundedCornerShape(10.dp))
-                    )
-                    Spacer(modifier = Modifier.height(6.dp))
-                }
-            }
 
             if (note.content.isNotBlank()) {
                 Text(
