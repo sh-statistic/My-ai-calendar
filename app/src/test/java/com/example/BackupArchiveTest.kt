@@ -74,6 +74,28 @@ class BackupArchiveTest {
     }
 
     @Test
+    fun progressCallbacksAreMonotonicAndComplete() {
+        val dir = Files.createTempDirectory("backup-archive-progress").toFile()
+        val photo = File(dir, "photo.jpg").apply { writeBytes(ByteArray(5000) { (it % 253).toByte() }) }
+        val dataJson = "{\"deviceId\":\"progress\"}"
+        val media = listOf(BackupArchive.MediaItem("n1", BackupArchive.KIND_IMAGE, null, photo))
+
+        val writeFractions = mutableListOf<Float>()
+        val out = ByteArrayOutputStream()
+        BackupArchive.write(dataJson, media, out) { writeFractions.add(it) }
+        assertTrue(writeFractions.isNotEmpty())
+        assertEquals(1f, writeFractions.last(), 0.0001f)
+        assertTrue(writeFractions.zipWithNext().all { (a, b) -> b >= a })
+
+        val zipBytes = out.toByteArray()
+        val readFractions = mutableListOf<Float>()
+        BackupArchive.read(ByteArrayInputStream(zipBytes), zipBytes.size.toLong()) { readFractions.add(it) }
+        assertTrue(readFractions.isNotEmpty())
+        assertTrue(readFractions.all { it in 0f..1f })
+        assertTrue(readFractions.zipWithNext().all { (a, b) -> b >= a })
+    }
+
+    @Test
     fun archiveWithoutMediaRoundTrips() {
         val dataJson = "{\"deviceId\":\"empty\"}"
         val out = ByteArrayOutputStream()

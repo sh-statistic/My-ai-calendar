@@ -3,6 +3,7 @@ package com.example.data
 import org.json.JSONArray
 import org.json.JSONObject
 import java.io.BufferedInputStream
+import java.io.FilterInputStream
 import java.io.File
 import java.io.InputStream
 import java.io.OutputStream
@@ -74,12 +75,26 @@ object BackupArchive {
         }
     }
 
-    fun write(dataJson: String, media: List<MediaItem>, out: OutputStream) {
+    fun write(dataJson: String, media: List<MediaItem>, out: OutputStream, onProgress: ((Float) -> Unit)? = null) {
+        val dataBytes = dataJson.toByteArray(Charsets.UTF_8)
+        val totalBytes = dataBytes.size + media.sumOf { it.file.length() + (it.sidecarFile?.length() ?: 0L) }
+        var writtenBytes = 0L
+        var lastPercent = -1
+        fun reportProgress() {
+            if (onProgress == null || totalBytes <= 0L) return
+            val pct = (writtenBytes * 100 / totalBytes).toInt().coerceIn(0, 100)
+            if (pct != lastPercent) {
+                lastPercent = pct
+                onProgress(pct / 100f)
+            }
+        }
         val manifest = JSONArray()
         ZipOutputStream(out.buffered()).use { zip ->
             zip.putNextEntry(ZipEntry("data.json"))
-            zip.write(dataJson.toByteArray(Charsets.UTF_8))
+            zip.write(dataBytes)
             zip.closeEntry()
+            writtenBytes += dataBytes.size
+            reportProgress()
 
             // Manifest is written after the entries are named but before their bytes;
             // entry names are index-based, so they are known up front.
@@ -102,13 +117,19 @@ object BackupArchive {
                 zip.putNextEntry(ZipEntry(entryName))
                 item.file.inputStream().buffered().use { input -> input.copyTo(zip) }
                 zip.closeEntry()
+                writtenBytes += item.file.length()
+                reportProgress()
                 if (item.sidecarFile != null) {
+                    val sidecarBytes = item.sidecarFile.readText().toByteArray(Charsets.UTF_8)
                     zip.putNextEntry(ZipEntry("$entryName.sidecar"))
-                    zip.write(item.sidecarFile.readText().toByteArray(Charsets.UTF_8))
+                    zip.write(sidecarBytes)
                     zip.closeEntry()
+                    writtenBytes += sidecarBytes.size
+                    reportProgress()
                 }
             }
         }
+        onProgress?.invoke(1f)
     }
 
     /** Reads only the `data.json` entry (written first), or null when absent. */
@@ -125,9 +146,14 @@ object BackupArchive {
         return null
     }
 
-    fun read(input: InputStream): ArchiveData {
+    fun read(input: InputStream, totalBytes: Long = -1L, onProgress: ((Float) -> Unit)? = null): ArchiveData {
+        val source = if (onProgress != null && totalBytes > 0L) {
+            CountingInputStream(input, totalBytes, onProgress)
+        } else {
+            input
+        }
         val entries = mutableMapOf<String, ByteArray>()
-        ZipInputStream(BufferedInputStream(input)).use { zip ->
+        ZipInputStream(BufferedInputStream(source)).use { zip ->
             var entry = zip.nextEntry
             while (entry != null) {
                 if (!entry.isDirectory) {
@@ -203,5 +229,50 @@ object BackupArchive {
             noteDrawingSidecars = drawingSidecars.ifEmpty { null },
             noteBlockDrawingSidecars = blockDrawingSidecars.ifEmpty { null }
         )
+    }
+
+    /** Reports read progress as a fraction of the archive's total byte size. */
+    private class CountingInputStream(
+        inner: InputStream,
+        private val total: Long,
+        private val onProgress: (Float) -> Unit
+    ) : FilterInputStream(inner) {
+        private var readBytes = 0L
+        private var lastPercent = -1
+
+        override fun read(): Int {
+            val n = super.read()
+            if (n >= 0) {
+                readBytes++
+                report()
+            }
+            return n
+        }
+
+        override fun read(b: ByteArray, off: Int, len: Int): Int {
+            val n = super.read(b, off, len)
+            if (n > 0) {
+                readBytes += n
+                report()
+            }
+            return n
+        }
+
+        override fun skip(n: Long): Long {
+            val skipped = super.skip(n)
+            if (skipped > 0) {
+                readBytes += skipped
+                report()
+            }
+            return skipped
+        }
+
+        private fun report() {
+            val pct = (readBytes * 100 / total).toInt().coerceIn(0, 100)
+            if (pct != lastPercent) {
+                lastPercent = pct
+                onProgress(pct / 100f)
+            }
+        }
     }
 }

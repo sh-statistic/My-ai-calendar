@@ -353,6 +353,33 @@ fun SyncScreen(
         )
     }
 
+    val backupWork by viewModel.backupWork.collectAsState()
+    val activeBackupWork = backupWork as? MainViewModel.BackupWork.Active
+    if (activeBackupWork != null) {
+        androidx.compose.material3.AlertDialog(
+            onDismissRequest = {},
+            title = {
+                androidx.compose.material3.Text(
+                    if (activeBackupWork.isImport) "در حال برگردوندن بکاپ" else "در حال ساخت بکاپ"
+                )
+            },
+            text = {
+                Column {
+                    val fraction = activeBackupWork.fraction
+                    if (fraction != null) {
+                        androidx.compose.material3.LinearProgressIndicator(progress = { fraction }, modifier = Modifier.fillMaxWidth())
+                        Spacer(modifier = Modifier.height(8.dp))
+                        val pctText = "${(fraction * 100).toInt()}%"
+                        androidx.compose.material3.Text(com.example.calendar.PersianCalendarHelper.toPersianDigits(pctText), fontSize = 13.sp)
+                    } else {
+                        androidx.compose.material3.LinearProgressIndicator(modifier = Modifier.fillMaxWidth())
+                    }
+                }
+            },
+            confirmButton = {}
+        )
+    }
+
     if (showBackupDialog) {
         JsonBackupDialog(
             backupFile = backupExportFile,
