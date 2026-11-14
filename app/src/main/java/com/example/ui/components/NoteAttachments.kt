@@ -1,5 +1,8 @@
 package com.example.ui.components
 
+import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.mutableFloatStateOf
+import androidx.compose.ui.unit.Constraints
 import android.content.Context
 import android.content.pm.PackageManager
 import android.media.MediaPlayer
@@ -18,7 +21,6 @@ import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.defaultMinSize
 import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -39,8 +41,7 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.gestures.detectDragGesturesAfterLongPress
 import androidx.compose.foundation.layout.offset
 import androidx.compose.ui.input.pointer.pointerInput
-import androidx.compose.ui.layout.onSizeChanged
-import androidx.compose.ui.unit.IntOffset
+import androidx.compose.ui.layout.SubcomposeLayout
 import androidx.compose.ui.unit.IntSize
 import kotlin.math.roundToInt
 import androidx.compose.material.icons.Icons
@@ -80,7 +81,6 @@ import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.TextLayoutResult
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.TextFieldValue
@@ -550,53 +550,48 @@ private fun NoteMediaBlock(
         if (bitmap != null) {
             // قاب جمع‌وجور داخل یادداشت ترکیبی: کشیدنِ عادی = اسکرول خودِ یادداشت؛
             // نگه‌داشتن و بعد کشیدن روی طرح = جابه‌جا کردن طرح داخل قاب برای دیدن بقیه‌اش.
-            // ارتفاع قاب و عکس هر دو مستقیم از اندازهٔ واقعی عکس حساب می‌شوند؛ با نسبتِ قاب و سقفِ ارتفاع
-            // قاب از عکس بلندتر درمی‌آمد و جابه‌جایی هم کامل نمی‌رسید، برای همین آن روش کنار گذاشته شد.
-            val trueRatio = bitmap.width.toFloat() / bitmap.height.coerceAtLeast(1)
-            BoxWithConstraints(modifier = Modifier.fillMaxWidth()) {
-                val density = LocalDensity.current
-                val imageH = maxWidth / trueRatio
-                val frameH = minOf(imageH, 430.dp)
-                val maxPanDp = imageH - frameH
-                var panDp by remember(block.path) { mutableStateOf(0.dp) }
-                LaunchedEffect(maxPanDp) {
-                    panDp = panDp.coerceIn(0.dp, maxPanDp)
-                }
-                Box(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .height(frameH)
-                        .clip(RoundedCornerShape(14.dp))
-                        .then(
-                            if (isDrawing) {
-                                Modifier.border(1.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.35f), RoundedCornerShape(14.dp))
-                            } else {
-                                Modifier
+            // ارتفاع واقعی عکس را خودِ سیستمِ چیدمان اندازه می‌گیرد، نه اعدادِ داخل فایل؛ سقفِ قاب و
+            // مرزِ جابه‌جایی هر دو از همان اندازه می‌آیند تا روی هیچ گوشی‌ای از اندازهٔ واقعی جدا نیفتند.
+            var panPx by remember(block.path) { mutableFloatStateOf(0f) }
+            var maxPanPx by remember(block.path) { mutableIntStateOf(0) }
+            LaunchedEffect(maxPanPx) {
+                panPx = panPx.coerceIn(0f, maxPanPx.toFloat())
+            }
+            SubcomposeLayout(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clip(RoundedCornerShape(14.dp))
+                    .then(
+                        if (isDrawing) {
+                            Modifier.border(1.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.35f), RoundedCornerShape(14.dp))
+                        } else {
+                            Modifier
+                        }
+                    )
+                    .then(
+                        if (isDrawing) {
+                            Modifier.clickable { onOpenDrawing(block) }
+                        } else {
+                            // ضربه روی عکس فقط مصرف می‌شود تا صفحه‌کلید الکی باز نشود
+                            Modifier.clickable { }
+                        }
+                    )
+                    .then(
+                        if (isDrawing && maxPanPx > 0) {
+                            Modifier.pointerInput(block.path, maxPanPx) {
+                                detectDragGesturesAfterLongPress(
+                                    onDrag = { change, dragAmount ->
+                                        panPx = (panPx - dragAmount.y).coerceIn(0f, maxPanPx.toFloat())
+                                        change.consume()
+                                    }
+                                )
                             }
-                        )
-                        .then(
-                            if (isDrawing && maxPanDp > 0.dp) {
-                                Modifier.pointerInput(block.path, maxPanDp) {
-                                    detectDragGesturesAfterLongPress(
-                                        onDrag = { change, dragAmount ->
-                                            panDp = (panDp - with(density) { dragAmount.y.toDp() }).coerceIn(0.dp, maxPanDp)
-                                            change.consume()
-                                        }
-                                    )
-                                }
-                            } else {
-                                Modifier
-                            }
-                        )
-                        .then(
-                            if (isDrawing) {
-                                Modifier.clickable { onOpenDrawing(block) }
-                            } else {
-                                // ضربه روی عکس فقط مصرف می‌شود تا صفحه‌کلید الکی باز نشود
-                                Modifier.clickable { }
-                            }
-                        )
-                ) {
+                        } else {
+                            Modifier
+                        }
+                    )
+            ) { constraints ->
+                val imgPlaceable = subcompose("media_image") {
                     Image(
                         bitmap = bitmap,
                         contentDescription = if (isDrawing) {
@@ -605,12 +600,13 @@ private fun NoteMediaBlock(
                             if (isFa) "عکس" else "Photo"
                         },
                         contentScale = ContentScale.FillWidth,
-                        alignment = Alignment.TopCenter,
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .height(imageH)
-                            .offset { IntOffset(0, -panDp.roundToPx()) }
+                        modifier = Modifier.fillMaxWidth()
                     )
+                }.first().measure(constraints.copy(minHeight = 0, maxHeight = Constraints.Infinity))
+                val frameH = minOf(imgPlaceable.height, 430.dp.roundToPx())
+                maxPanPx = imgPlaceable.height - frameH
+                layout(constraints.maxWidth, frameH) {
+                    imgPlaceable.place(0, -panPx.roundToInt())
                 }
             }
         } else {
