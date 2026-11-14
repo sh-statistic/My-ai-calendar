@@ -6,15 +6,15 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 
 /**
- * Guards the Khorasan Razavi expansion of the prayer city list
- * (spec: khorasan-cities-spec.md, 2026-11-14).
+ * Guards the expansions of the prayer city list
+ * (specs: khorasan-cities-spec.md and more-cities-spec.md, 2026-11-14).
  * Pure logic only — no Android/Robolectric needed.
  */
 class PrayerTimesCitiesTest {
 
     @Test
-    fun cityCount_is119() {
-        assertEquals(119, PrayerTimesCalculator.CITIES.size)
+    fun cityCount_is427() {
+        assertEquals(427, PrayerTimesCalculator.CITIES.size)
     }
 
     @Test
@@ -36,6 +36,18 @@ class PrayerTimesCitiesTest {
         val mashhad = PrayerTimesCalculator.CITIES.single { it.nameFa == "مشهد" }
         assertEquals(36.2972, mashhad.latitude, 0.0)
         assertEquals(59.6067, mashhad.longitude, 0.0)
+    }
+
+    @Test
+    fun importantCitiesOfOtherProvinces_arePresent() {
+        val names = PrayerTimesCalculator.CITIES.map { it.nameFa }.toSet()
+        for (expected in listOf(
+            "کاشان", "آبادان", "بابل", "ساوه", "چابهار", "گنبد کاووس",
+            "مراغه", "خوی", "سیرجان", "بروجرد", "لاهیجان", "میناب",
+            "رودبار گیلان", "رودبار کرمان", "پرند", "بندر امام", "شادگان"
+        )) {
+            assertTrue("missing: $expected", expected in names)
+        }
     }
 
     @Test
