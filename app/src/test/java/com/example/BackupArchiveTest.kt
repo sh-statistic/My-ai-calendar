@@ -67,6 +67,54 @@ class BackupArchiveTest {
     }
 
     @Test
+    fun archiveCarriesExtensionsAndReadme() {
+        val dir = Files.createTempDirectory("backup-archive-portable").toFile()
+        val photo = File(dir, "photo.jpg").apply { writeBytes(byteArrayOf(1, 2, 3)) }
+        val out = ByteArrayOutputStream()
+        BackupArchive.write(
+            "{\"deviceId\":\"portable\"}",
+            listOf(BackupArchive.MediaItem("n1", BackupArchive.KIND_IMAGE, null, photo)),
+            out
+        )
+        val names = mutableListOf<String>()
+        java.util.zip.ZipInputStream(ByteArrayInputStream(out.toByteArray())).use { zip ->
+            var entry = zip.nextEntry
+            while (entry != null) {
+                names.add(entry.name)
+                entry = zip.nextEntry
+            }
+        }
+        assertTrue(names.contains("README.txt"))
+        assertTrue(names.contains("media/0000.jpg"))
+        assertTrue(names.contains("data.json"))
+        assertTrue(names.contains("manifest.json"))
+    }
+
+    @Test
+    fun legacyArchiveWithoutExtensionsStillReads() {
+        // Archives written before media entries carried extensions (and before
+        // README.txt existed) must still restore: the reader follows the manifest.
+        val dataJson = "{\"deviceId\":\"legacy\"}"
+        val manifest = "[{\"noteId\":\"n1\",\"kind\":\"image\",\"entry\":\"media/0000\"}]"
+        val out = ByteArrayOutputStream()
+        java.util.zip.ZipOutputStream(out).use { zip ->
+            zip.putNextEntry(java.util.zip.ZipEntry("data.json"))
+            zip.write(dataJson.toByteArray(Charsets.UTF_8))
+            zip.closeEntry()
+            zip.putNextEntry(java.util.zip.ZipEntry("manifest.json"))
+            zip.write(manifest.toByteArray(Charsets.UTF_8))
+            zip.closeEntry()
+            zip.putNextEntry(java.util.zip.ZipEntry("media/0000"))
+            zip.write(byteArrayOf(5, 6, 7))
+            zip.closeEntry()
+        }
+        val read = BackupArchive.read(ByteArrayInputStream(out.toByteArray()))
+        assertEquals(dataJson, read.dataJson)
+        assertEquals(1, read.media.size)
+        assertArrayEquals(byteArrayOf(5, 6, 7), read.media[0].bytes)
+    }
+
+    @Test
     fun plainJsonIsNotAnArchive() {
         val dir = Files.createTempDirectory("backup-archive-test2").toFile()
         val json = File(dir, "backup.json").apply { writeText("{\"deviceId\":\"x\"}") }
