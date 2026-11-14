@@ -2359,10 +2359,7 @@ fun AddNoteDialog(
                         Icon(Icons.Default.Close, contentDescription = null)
                     }
                     Spacer(modifier = Modifier.weight(1f))
-                    IconButton(
-                        onClick = { isPinned = !isPinned },
-                        modifier = Modifier.size(40.dp).background(iconBubbleColor, CircleShape)
-                    ) {
+                    IconButton(onClick = { isPinned = !isPinned }) {
                         Icon(
                             Icons.Default.PushPin,
                             contentDescription = if (strings.isFa) "سنجاق به بالا" else "Pin to top",
@@ -2370,12 +2367,9 @@ fun AddNoteDialog(
                         )
                     }
                     Spacer(modifier = Modifier.width(6.dp))
-                    IconButton(
-                        onClick = {
-                            showNoteReminderPicker(contextAdd, reminderAt) { picked -> reminderAt = picked }
-                        },
-                        modifier = Modifier.size(40.dp).background(iconBubbleColor, CircleShape)
-                    ) {
+                    IconButton(onClick = {
+                        showNoteReminderPicker(contextAdd, reminderAt) { picked -> reminderAt = picked }
+                    }) {
                         Icon(
                             Icons.Default.Notifications,
                             contentDescription = if (strings.isFa) "یادآور" else "Reminder",
@@ -2393,8 +2387,7 @@ fun AddNoteDialog(
                                 append(noteBlocksToContent(blocks))
                             }
                             com.example.sync.NoteShareHelper.shareText(contextAdd, title.trim(), shareBody)
-                        },
-                        modifier = Modifier.size(40.dp).background(iconBubbleColor, CircleShape)
+                        }
                     ) {
                         Icon(Icons.Default.Share, contentDescription = if (strings.isFa) "اشتراک‌گذاری" else "Share")
                     }
@@ -2899,10 +2892,7 @@ fun EditNoteDialog(
                         Icon(Icons.Default.Close, contentDescription = null)
                     }
                     Spacer(modifier = Modifier.weight(1f))
-                    IconButton(
-                        onClick = { isPinned = !isPinned },
-                        modifier = Modifier.size(40.dp).background(iconBubbleColor, CircleShape)
-                    ) {
+                    IconButton(onClick = { isPinned = !isPinned }) {
                         Icon(
                             Icons.Default.PushPin,
                             contentDescription = if (strings.isFa) "سنجاق به بالا" else "Pin to top",
@@ -2910,12 +2900,9 @@ fun EditNoteDialog(
                         )
                     }
                     Spacer(modifier = Modifier.width(6.dp))
-                    IconButton(
-                        onClick = {
-                            showNoteReminderPicker(contextEdit, reminderAt) { picked -> reminderAt = picked }
-                        },
-                        modifier = Modifier.size(40.dp).background(iconBubbleColor, CircleShape)
-                    ) {
+                    IconButton(onClick = {
+                        showNoteReminderPicker(contextEdit, reminderAt) { picked -> reminderAt = picked }
+                    }) {
                         Icon(
                             Icons.Default.Notifications,
                             contentDescription = if (strings.isFa) "یادآور" else "Reminder",
@@ -2933,8 +2920,7 @@ fun EditNoteDialog(
                                 append(noteBlocksToContent(blocks))
                             }
                             com.example.sync.NoteShareHelper.shareText(contextEdit, title.trim(), shareBody)
-                        },
-                        modifier = Modifier.size(40.dp).background(iconBubbleColor, CircleShape)
+                        }
                     ) {
                         Icon(Icons.Default.Share, contentDescription = if (strings.isFa) "اشتراک‌گذاری" else "Share")
                     }
