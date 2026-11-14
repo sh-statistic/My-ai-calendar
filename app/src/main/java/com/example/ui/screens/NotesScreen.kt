@@ -1,7 +1,5 @@
 package com.example.ui.screens
 
-import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.horizontalScroll
 import com.example.data.extractNoteBlockMedia
 import android.graphics.BitmapFactory
 import android.widget.Toast
@@ -20,6 +18,8 @@ import androidx.compose.foundation.border
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.activity.compose.BackHandler
 import androidx.compose.runtime.LaunchedEffect
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.combinedClickable
 import androidx.compose.material.icons.filled.Mic
@@ -98,6 +98,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.luminance
@@ -746,6 +747,27 @@ fun getAdaptiveNoteBorder(hex: String, isDark: Boolean): Color {
     return accent.copy(alpha = 0.35f)
 }
 
+// دیکود بندانگشتی بیرون از نخ اصلی انجام می‌شود تا اسکرول فهرست یادداشت‌ها گیر نکند
+private fun decodeNoteThumbnail(path: String): ImageBitmap? {
+    return try {
+        val f = File(path)
+        if (!f.exists()) {
+            null
+        } else {
+            val boundsOpts = BitmapFactory.Options().apply { inJustDecodeBounds = true }
+            BitmapFactory.decodeFile(path, boundsOpts)
+            var sample = 1
+            while (boundsOpts.outWidth / (sample * 2) >= 160 && boundsOpts.outHeight / (sample * 2) >= 160) {
+                sample *= 2
+            }
+            val opts = BitmapFactory.Options().apply { inSampleSize = sample }
+            BitmapFactory.decodeFile(path, opts)?.asImageBitmap()
+        }
+    } catch (_: Exception) {
+        null
+    }
+}
+
 private sealed interface CardStripItem {
     data class Img(val path: String) : CardStripItem
     object Aud : CardStripItem
@@ -866,45 +888,35 @@ fun NoteCard(
                 }
             }
             if (stripItems.isNotEmpty()) {
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .horizontalScroll(rememberScrollState()),
-                    horizontalArrangement = Arrangement.spacedBy(6.dp)
+                // همهٔ رسانه‌ها با چیدنِ سطری نشان داده می‌شوند؛ اسکرول افقیِ داخل کارت عملاً دست‌نیافتنی بود و عکس‌های بعد از ویس پنهان می‌ماندند
+                FlowRow(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(6.dp),
+                    verticalArrangement = Arrangement.spacedBy(6.dp)
                 ) {
                     stripItems.forEach { stripItem ->
                         when (stripItem) {
                             is CardStripItem.Img -> {
                                 val thumbPath = stripItem.path
-                                val thumbBitmap = remember(thumbPath, note.updatedAt) {
-                                    try {
-                                        val f = File(thumbPath)
-                                        if (!f.exists()) {
-                                            null
-                                        } else {
-                                            val boundsOpts = BitmapFactory.Options().apply { inJustDecodeBounds = true }
-                                            BitmapFactory.decodeFile(thumbPath, boundsOpts)
-                                            var sample = 1
-                                            while (boundsOpts.outWidth / (sample * 2) >= 160 && boundsOpts.outHeight / (sample * 2) >= 160) {
-                                                sample *= 2
-                                            }
-                                            val opts = BitmapFactory.Options().apply { inSampleSize = sample }
-                                            BitmapFactory.decodeFile(thumbPath, opts)?.asImageBitmap()
-                                        }
-                                    } catch (_: Exception) {
-                                        null
-                                    }
+                                var thumbBitmap by remember(thumbPath, note.updatedAt) { mutableStateOf<ImageBitmap?>(null) }
+                                LaunchedEffect(thumbPath, note.updatedAt) {
+                                    thumbBitmap = withContext(Dispatchers.IO) { decodeNoteThumbnail(thumbPath) }
                                 }
-                                if (thumbBitmap != null) {
-                                    Image(
-                                        bitmap = thumbBitmap,
-                                        contentDescription = null,
-                                        contentScale = ContentScale.Crop,
-                                        modifier = Modifier
-                                            .size(54.dp)
-                                            .clip(RoundedCornerShape(8.dp))
-                                            .border(0.6.dp, if (isDark) Color(0xFF2A2A32) else Color.Black.copy(alpha = 0.08f), RoundedCornerShape(8.dp))
-                                    )
+                                Box(
+                                    modifier = Modifier
+                                        .size(54.dp)
+                                        .clip(RoundedCornerShape(8.dp))
+                                        .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.35f))
+                                        .border(0.6.dp, if (isDark) Color(0xFF2A2A32) else Color.Black.copy(alpha = 0.08f), RoundedCornerShape(8.dp))
+                                ) {
+                                    thumbBitmap?.let { bmp ->
+                                        Image(
+                                            bitmap = bmp,
+                                            contentDescription = null,
+                                            contentScale = ContentScale.Crop,
+                                            modifier = Modifier.fillMaxSize()
+                                        )
+                                    }
                                 }
                             }
                             CardStripItem.Aud -> {
@@ -1001,8 +1013,8 @@ fun NoteCard(
                 CompositionLocalProvider(LocalMinimumInteractiveComponentSize provides Dp.Unspecified) {
                 FlowRow(
                     modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(4.dp),
-                    verticalArrangement = Arrangement.spacedBy(4.dp)
+                    horizontalArrangement = Arrangement.spacedBy(3.dp),
+                    verticalArrangement = Arrangement.spacedBy(3.dp)
                 ) {
                     tags.take(6).forEach { tagItem ->
                         val isIdea = tagItem == "ایده"
@@ -1021,7 +1033,7 @@ fun NoteCard(
                             )
                         ) {
                             Row(
-                                modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp),
+                                modifier = Modifier.padding(horizontal = 5.dp, vertical = 2.dp),
                                 verticalAlignment = Alignment.CenterVertically
                             ) {
                                 Text(

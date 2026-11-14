@@ -157,6 +157,11 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     private val _selectedDate = MutableStateFlow(todayJalali)
     val selectedDate: StateFlow<JalaliDate> = _selectedDate.asStateFlow()
 
+    // پالس ناوبری «امروز»: با هر بار فشردن دکمهٔ امروز یکی زیاد می‌شود؛ نماهای تقویم به این پالس گوش می‌دهند تا
+    // حتی وقتی تاریخ انتخابی از قبل «امروز» است (مثلاً کاربر فقط با سوایپ هفته‌ها را عوض کرده) باز هم به امروز بپرند.
+    private val _todayNavPulse = MutableStateFlow(0)
+    val todayNavPulse: StateFlow<Int> = _todayNavPulse.asStateFlow()
+
     private val _currentViewYear = MutableStateFlow(todayJalali.year)
     val currentViewYear: StateFlow<Int> = _currentViewYear.asStateFlow()
 
@@ -447,6 +452,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
 
     fun setToday() {
         val today = PersianCalendarHelper.getCurrentJalaliDate()
+        _todayNavPulse.value += 1
         _selectedDate.value = today
         _currentViewYear.value = today.year
         _currentViewMonth.value = today.month

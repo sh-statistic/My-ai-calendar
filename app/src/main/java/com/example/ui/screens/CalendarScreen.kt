@@ -3,6 +3,8 @@ package com.example.ui.screens
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.ExperimentalFoundationApi
+import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.pager.HorizontalPager
 import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.foundation.layout.Arrangement
@@ -38,7 +40,6 @@ import androidx.compose.material3.AssistChip
 import androidx.compose.material3.AssistChipDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
-import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -111,7 +112,20 @@ data class RecurringEditData(
     val colorHex: String
 )
 
+// کش کوچک سلول‌های ماه: هنگام ورق‌زدنِ سریع، ماه‌هایی که تازه دیده شده‌اند از صفر ساخته نمی‌شوند
+private val monthCellsCache = object : LinkedHashMap<String, List<DayCellInfo?>>(24, 0.75f, true) {
+    override fun removeEldestEntry(eldest: MutableMap.MutableEntry<String, List<DayCellInfo?>>): Boolean = size > 24
+}
+
 fun getMonthGridCells(year: Int, month: Int, occasionsVersion: Int): List<DayCellInfo?> {
+    val cacheKey = "$year-$month-$occasionsVersion"
+    synchronized(monthCellsCache) { monthCellsCache[cacheKey]?.let { return it } }
+    val cells = buildMonthGridCells(year, month)
+    synchronized(monthCellsCache) { monthCellsCache[cacheKey] = cells }
+    return cells
+}
+
+private fun buildMonthGridCells(year: Int, month: Int): List<DayCellInfo?> {
     val daysInMonth = PersianCalendarHelper.getDaysInJalaliMonth(year, month)
     val firstDayOfWeek = PersianCalendarHelper.getPersianDayOfWeek(year, month, 1)
     val list = ArrayList<DayCellInfo?>(42)
@@ -155,6 +169,7 @@ fun jalaliToCalendarPage(year: Int, month: Int): Int {
     return CALENDAR_PAGER_BASE_PAGE + (totalMonths - baseTotalMonths)
 }
 
+@OptIn(ExperimentalFoundationApi::class)
 @Composable
 fun CalendarScreen(
     viewModel: MainViewModel,
@@ -178,6 +193,7 @@ fun CalendarScreen(
 
     val today = PersianCalendarHelper.getCurrentJalaliDate()
     val occasionsVersion by viewModel.occasionsVersion.collectAsState()
+    val todayNavPulse by viewModel.todayNavPulse.collectAsState()
 
     val initialPage = remember { jalaliToCalendarPage(viewYear, viewMonth) }
     val pagerState = rememberPagerState(
@@ -190,6 +206,19 @@ fun CalendarScreen(
         snapshotFlow { pagerState.settledPage }.collect { page ->
             val (pYear, pMonth) = calendarPageToJalali(page)
             viewModel.setViewYearMonth(pYear, pMonth)
+        }
+    }
+
+    // دکمهٔ «امروز»: با پالس ناوبری هم همیشه عمل می‌کند؛ پرش دور فوری است و پرش نزدیک با انیمیشن
+    LaunchedEffect(todayNavPulse) {
+        if (todayNavPulse > 0) {
+            val targetPage = jalaliToCalendarPage(today.year, today.month)
+            val distance = kotlin.math.abs(targetPage - pagerState.currentPage)
+            if (distance <= 2) {
+                pagerState.animateScrollToPage(targetPage)
+            } else {
+                pagerState.scrollToPage(targetPage)
+            }
         }
     }
 
@@ -209,8 +238,8 @@ fun CalendarScreen(
     val selectedDayOfWeekIdx = PersianCalendarHelper.getPersianDayOfWeek(selectedDate.year, selectedDate.month, selectedDate.day)
     val selectedDayOfWeekName = strings.weekdayNames.getOrElse(selectedDayOfWeekIdx) { "" }
 
-    val selectedDayEvents = events.filter { it.persianDate == selectedDate.formatted }
-    val selectedDayTasks = tasks.filter { it.persianDueDate == selectedDate.formatted }
+    val selectedDayEvents = remember(events, selectedDate) { events.filter { it.persianDate == selectedDate.formatted } }
+    val selectedDayTasks = remember(tasks, selectedDate) { tasks.filter { it.persianDueDate == selectedDate.formatted } }
     val selectedDayOccasions = remember(selectedDate, occasionsVersion) {
         PersianOccasionsHelper.getOccasionsForDate(selectedDate.month, selectedDate.day, selectedDate.year)
     }
@@ -367,7 +396,13 @@ fun CalendarScreen(
                                                             )
                                                             else Modifier
                                                         )
-                                                        .clickable { viewModel.setSelectedDate(cell.jalaliDate) },
+                                                        .combinedClickable(
+                                                            onClick = { viewModel.setSelectedDate(cell.jalaliDate) },
+                                                            onLongClick = {
+                                                                viewModel.setSelectedDate(cell.jalaliDate)
+                                                                showAddEventDialog = true
+                                                            }
+                                                        ),
                                                     contentAlignment = Alignment.Center
                                                 ) {
                                                     Column(
@@ -832,17 +867,6 @@ fun CalendarScreen(
             }
         }
 
-        FloatingActionButton(
-            onClick = { showAddEventDialog = true },
-            containerColor = MaterialTheme.colorScheme.primary,
-            contentColor = MaterialTheme.colorScheme.onPrimary,
-            modifier = Modifier
-                .align(Alignment.BottomEnd)
-                .padding(16.dp)
-                .testTag("fab_add_event")
-        ) {
-            Icon(Icons.Default.Add, contentDescription = strings.addEvent)
-        }
     }
     }
 
