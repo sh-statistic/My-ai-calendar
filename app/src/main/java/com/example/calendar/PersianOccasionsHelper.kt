@@ -111,6 +111,7 @@ object PersianOccasionsHelper {
         "2-28" to listOf(PersianOccasion("روز بزرگداشت حکیم عمر خیام نیشابوری", isHoliday = false, isNational = true)),
 
         // خرداد
+        "2-30" to listOf(PersianOccasion("روز ملی جمعیت", isHoliday = false, isNational = true), PersianOccasion("روز شهدای خدمت", isHoliday = false, isNational = true)),
         "3-1" to listOf(PersianOccasion("روز بزرگداشت ملاصدرا / روز بهره‌وری", isHoliday = false)),
         "3-3" to listOf(PersianOccasion("روز آزادسازی خرمشهر / روز مقاومت، ایثار و پیروزی", isHoliday = false, isNational = true)),
         "3-4" to listOf(PersianOccasion("روز دزفول، روز مقاومت و پایداری", isHoliday = false)),
@@ -118,6 +119,7 @@ object PersianOccasionsHelper {
         "3-14" to listOf(PersianOccasion("رحلت حضرت امام خمینی (ره)", isHoliday = true, isNational = true)),
         "3-15" to listOf(PersianOccasion("قیام خونین ۱۵ خرداد", isHoliday = true, isNational = true)),
         "3-20" to listOf(PersianOccasion("روز ملی فرش دستباف / روز جهانی صنایع دستی", isHoliday = false)),
+        "3-23" to listOf(PersianOccasion("روز شهدای اقتدار و اتحاد ملی ایران", isHoliday = false, isNational = true)),
         "3-27" to listOf(PersianOccasion("روز جهاد کشاورزی / روز جهانی بیابان‌زدایی", isHoliday = false)),
         "3-31" to listOf(PersianOccasion("شهادت دکتر مصطفی چمران / روز بسیج اساتید", isHoliday = false)),
 
@@ -211,8 +213,14 @@ object PersianOccasionsHelper {
 
         // اسفند
         "12-5" to listOf(PersianOccasion("روز بزرگداشت خواجه نصیرالدین طوسی / روز مهندس", isHoliday = false, isNational = true)),
+        "12-8" to listOf(PersianOccasion("روز حمایت از بیماران نادر", isHoliday = false, isNational = true)),
+        "12-9" to listOf(PersianOccasion("شهادت امام مجاهد حضرت آیت‌الله العظمی سیدعلی حسینی خامنه‌ای (قدس الله نفسه الزکیه) به همراه خانواده، جمعی از فرماندهان ارشد نظامی و مسئولان کشور، شهدای مدارس میناب و سالن ورزشی لامرد در تجاوز آمریکایی ـ صهیونی (1404 هـ ش) و روز حماسه دفاع از ایران", isHoliday = false, isNational = true)),
+        "12-10" to listOf(PersianOccasion("روز بعثت مردم ایران", isHoliday = false, isNational = true)),
+        "12-11" to listOf(PersianOccasion("روز بزرگداشت شهدای دفاع مقدس سوم", isHoliday = false, isNational = true)),
+        "12-13" to listOf(PersianOccasion("روز شهدای ناوشکن دنا", isHoliday = false, isNational = true)),
         "12-14" to listOf(PersianOccasion("روز احسان و نیکوکاری (تاسیس کمیته امداد امام خمینی)", isHoliday = false)),
         "12-15" to listOf(PersianOccasion("روز درختکاری / آغاز هفته منابع طبیعی", isHoliday = false)),
+        "12-17" to listOf(PersianOccasion("انتخاب حضرت آیت‌الله سیدمجتبی حسینی خامنه‌ای (مدظله‌العالی) به رهبری انقلاب اسلامی توسط مجلس خبرگان (۱۴۰۴ هـ ش)", isHoliday = false, isNational = true)),
         "12-22" to listOf(PersianOccasion("روز بزرگداشت شهدا (تاسیس بنیاد شهید)", isHoliday = false)),
         "12-25" to listOf(PersianOccasion("پایان سرایش شاهنامه فردوسی / بزرگداشت پروین اعتصامی / شهادت شهردار باکری", isHoliday = false, isNational = true)),
         "12-29" to listOf(PersianOccasion("روز ملی شدن صنعت نفت ایران", isHoliday = true, isNational = true))
