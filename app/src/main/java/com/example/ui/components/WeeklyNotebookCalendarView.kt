@@ -70,6 +70,12 @@ import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.hapticfeedback.HapticFeedbackType
+import androidx.compose.ui.input.pointer.PointerInputScope
+import androidx.compose.ui.input.pointer.changedToDown
+import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.platform.LocalContext
@@ -93,6 +99,7 @@ import com.example.ui.MainViewModel
 import com.example.ui.rememberAppStrings
 import com.example.prayer.PrayerTimesCalculator
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withTimeoutOrNull
 import java.util.Calendar
 import java.util.TimeZone
 
@@ -152,6 +159,58 @@ fun getJalaliWeekOfYear(year: Int, month: Int, day: Int): Int {
     return (doy - 1 + startDow) / 7 + 1
 }
 
+// نگه‌داشتنِ لازم برای باز شدن صفحهٔ روز در نمای هفتگی: عمداً از نگه‌داشتنِ معمول سیستم طولانی‌تر است
+private const val WEEK_DAY_HOLD_MILLIS = 800L
+
+// لمس کوتاه فقط روز را انتخاب می‌کند؛ صفحهٔ روز (افزودن رویداد و وظیفه) فقط با نگه‌داشتنِ طولانی باز می‌شود
+// تا با هر لمس ساده‌ای نپرد. رد شدن انگشت از حد لغزش یعنی «ورق زدن» و هیچ عملی انجام نمی‌شود.
+private suspend fun PointerInputScope.detectDayHoldGestures(onTap: () -> Unit, onHold: () -> Unit) {
+    awaitPointerEventScope {
+        while (true) {
+            val downEvent = awaitPointerEvent()
+            val down = downEvent.changes.firstOrNull { it.changedToDown() } ?: continue
+            val downPosition = down.position
+            var moved = false
+            var released = false
+            val heldLongEnough = withTimeoutOrNull(WEEK_DAY_HOLD_MILLIS) {
+                var done = false
+                while (!done) {
+                    val event = awaitPointerEvent()
+                    for (change in event.changes) {
+                        if ((change.position - downPosition).getDistance() > viewConfiguration.touchSlop) {
+                            moved = true
+                        }
+                    }
+                    if (event.changes.all { !it.pressed }) {
+                        released = true
+                        done = true
+                    }
+                }
+                true
+            } == null
+            when {
+                heldLongEnough && !moved -> {
+                    onHold()
+                    // تا رها شدن انگشت صبر می‌کنیم تا همین نگه‌داشتن دوباره خوانده نشود
+                    var waiting = true
+                    while (waiting) {
+                        val event = awaitPointerEvent()
+                        if (event.changes.all { !it.pressed }) waiting = false
+                    }
+                }
+                released && !moved -> onTap()
+                !released -> {
+                    var waiting = true
+                    while (waiting) {
+                        val event = awaitPointerEvent()
+                        if (event.changes.all { !it.pressed }) waiting = false
+                    }
+                }
+            }
+        }
+    }
+}
+
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun WeeklyNotebookCalendarView(
@@ -166,7 +225,9 @@ fun WeeklyNotebookCalendarView(
     val events by viewModel.activeEvents.collectAsState()
     val tasks by viewModel.activeTasks.collectAsState()
     val occasionsVersion by viewModel.occasionsVersion.collectAsState()
+    val todayNavPulse by viewModel.todayNavPulse.collectAsState()
     val strings = rememberAppStrings()
+    val haptic = LocalHapticFeedback.current
     val context = LocalContext.current
     val coroutineScope = rememberCoroutineScope()
 
@@ -178,6 +239,19 @@ fun WeeklyNotebookCalendarView(
         initialPage = initialPage,
         pageCount = { 30000 }
     )
+
+    // دکمهٔ «امروز»: با پالس ناوبری کار می‌کند، نه فقط تغییر تاریخ، تا حتی وقتی تاریخ انتخابی از قبل امروز است هم همیشه و فوری بپرد
+    LaunchedEffect(todayNavPulse) {
+        if (todayNavPulse > 0) {
+            val targetPage = jalaliToWeekPage(PersianCalendarHelper.getCurrentJalaliDate())
+            val distance = kotlin.math.abs(targetPage - pagerState.currentPage)
+            if (distance <= 2) {
+                pagerState.animateScrollToPage(targetPage)
+            } else {
+                pagerState.scrollToPage(targetPage)
+            }
+        }
+    }
 
     // Sync external selectedDate changes (like Today button) to pager
     LaunchedEffect(selectedDate) {
@@ -213,6 +287,7 @@ fun WeeklyNotebookCalendarView(
         HorizontalPager(
             state = pagerState,
             modifier = Modifier.fillMaxSize(),
+            beyondViewportPageCount = 1,
             key = { it }
         ) { page ->
             val saturday = remember(page) { weekPageToSaturday(page) }
@@ -262,8 +337,21 @@ fun WeeklyNotebookCalendarView(
             val gridBorderColor = MaterialTheme.colorScheme.outline.copy(alpha = if (isDarkTheme) 0.55f else 0.75f)
             val shamsiColumnBg = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = if (isDarkTheme) 0.5f else 0.65f)
 
+            // حس ورق خوردن کاغذ هنگام سوایپ: چرخش خیلی ملایم دور محور عمودی + کمرنگ شدن لبه‌ها
+            // آفست داخل خود لایهٔ گرافیکی خوانده می‌شود تا حین سوایپ بازترکیبی (recomposition) رخ ندهد
             Card(
-                modifier = Modifier.fillMaxSize(),
+                modifier = Modifier
+                    .fillMaxSize()
+                    .graphicsLayer {
+                        val pageOffset = (pagerState.currentPage - page) + pagerState.currentPageOffsetFraction
+                        val fraction = pageOffset.coerceIn(-1f, 1f)
+                        rotationY = fraction * 7f
+                        cameraDistance = 14f * density
+                        alpha = 1f - kotlin.math.abs(fraction) * 0.18f
+                        val flipScale = 1f - kotlin.math.abs(fraction) * 0.03f
+                        scaleX = flipScale
+                        scaleY = flipScale
+                    },
                 colors = CardDefaults.cardColors(
                     containerColor = MaterialTheme.colorScheme.surface
                 ),
@@ -326,7 +414,9 @@ fun WeeklyNotebookCalendarView(
                     ) {
                         weekDates.forEachIndexed { idx, day ->
                             val isFriday = (idx == 6)
-                            val isHoliday = isFriday || PersianOccasionsHelper.isHoliday(day.month, day.day, day.year)
+                            val isHoliday = remember(day, occasionsVersion) {
+                                isFriday || PersianOccasionsHelper.isHoliday(day.month, day.day, day.year)
+                            }
                             val isSelected = (day.formatted == selectedDate.formatted)
                             val isToday = (day.formatted == todayJalali.formatted)
 
@@ -364,9 +454,15 @@ fun WeeklyNotebookCalendarView(
                                         Modifier
                                     }
                                 )
-                                .clickable {
-                                    viewModel.setSelectedDate(day)
-                                    sheetDate = day
+                                .pointerInput(day) {
+                                    detectDayHoldGestures(
+                                        onTap = { viewModel.setSelectedDate(day) },
+                                        onHold = {
+                                            haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                                            viewModel.setSelectedDate(day)
+                                            sheetDate = day
+                                        }
+                                    )
                                 }
 
                             Row(

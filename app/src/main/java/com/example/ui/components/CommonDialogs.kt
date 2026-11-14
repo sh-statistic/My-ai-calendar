@@ -2625,6 +2625,8 @@ fun AddNoteDialog(
                         horizontalArrangement = Arrangement.spacedBy(14.dp),
                         verticalAlignment = Alignment.CenterVertically
                     ) {
+                        // دایره‌های رنگ دقیقاً بالای دکمه‌های نوار ابزار (همان سمت دکمهٔ پالت) می‌نشینند، نه جدا در سمت مخالف صفحه
+                        Spacer(modifier = Modifier.weight(1f))
                         val isDarkBar = MaterialTheme.colorScheme.background.luminance() < 0.5f
 
                     noteColors.forEach { hex ->
@@ -3153,7 +3155,8 @@ fun EditNoteDialog(
                         horizontalArrangement = Arrangement.spacedBy(14.dp),
                         verticalAlignment = Alignment.CenterVertically
                     ) {
-
+                    // دایره‌های رنگ دقیقاً بالای دکمه‌های نوار ابزار (همان سمت دکمهٔ پالت) می‌نشینند، نه جدا در سمت مخالف صفحه
+                    Spacer(modifier = Modifier.weight(1f))
                     noteColors.forEach { hex ->
                         val col = getAdaptiveNoteColor(hex, isDark)
                         val isSelected = selectedColor == hex
