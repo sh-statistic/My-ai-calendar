@@ -568,7 +568,14 @@ private fun NoteMediaBlock(
             }
             SubcomposeLayout(
                 modifier = Modifier
-                    .fillMaxWidth()
+                    .then(
+                        if (isDrawing) {
+                            Modifier.fillMaxWidth()
+                        } else {
+                            // عکس کامل دیده می‌شود ولی کوچک‌تر از پهنای کامل یادداشت، وسط قاب
+                            Modifier.fillMaxWidth(0.72f).align(Alignment.TopCenter)
+                        }
+                    )
                     .clip(RoundedCornerShape(14.dp))
                     .then(
                         if (isDrawing) {

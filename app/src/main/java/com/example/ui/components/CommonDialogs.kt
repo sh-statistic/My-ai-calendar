@@ -2273,6 +2273,7 @@ fun AddNoteDialog(
 
     var reminderAt by remember { mutableStateOf(0L) }
     var showAddMenu by remember { mutableStateOf(false) }
+    var showColorPicker by remember { mutableStateOf(false) }
 
     // درج بلوک تازه (عکس/نقاشی) دقیقاً در جای نشانگر متن فعال؛ متن از همان نقطه دو تکه می‌شود
     fun insertBlocksAtFocus(newBlocks: List<NoteBlockState>) {
@@ -2319,6 +2320,13 @@ fun AddNoteDialog(
         MaterialTheme.colorScheme.background.luminance() < 0.5f
     )
 
+    // هالهٔ دکمه‌های ویرایشگر از خانوادهٔ رنگ خود یادداشت است، مثل گوگل کیپ
+    val iconBubbleColor = if (MaterialTheme.colorScheme.background.luminance() < 0.5f) {
+        androidx.compose.ui.graphics.lerp(editorBgAdd, Color.White, 0.18f)
+    } else {
+        androidx.compose.ui.graphics.lerp(editorBgAdd, Color.Black, 0.07f)
+    }
+
     val contextAdd = LocalContext.current
 
     val scopeAdd = androidx.compose.runtime.rememberCoroutineScope()
@@ -2352,6 +2360,30 @@ fun AddNoteDialog(
                     }
                     Spacer(modifier = Modifier.weight(1f))
                     IconButton(
+                        onClick = { isPinned = !isPinned },
+                        modifier = Modifier.size(40.dp).background(iconBubbleColor, CircleShape)
+                    ) {
+                        Icon(
+                            Icons.Default.PushPin,
+                            contentDescription = if (strings.isFa) "سنجاق به بالا" else "Pin to top",
+                            tint = if (isPinned) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                    Spacer(modifier = Modifier.width(6.dp))
+                    IconButton(
+                        onClick = {
+                            showNoteReminderPicker(contextAdd, reminderAt) { picked -> reminderAt = picked }
+                        },
+                        modifier = Modifier.size(40.dp).background(iconBubbleColor, CircleShape)
+                    ) {
+                        Icon(
+                            Icons.Default.Notifications,
+                            contentDescription = if (strings.isFa) "یادآور" else "Reminder",
+                            tint = if (reminderAt > 0) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                    Spacer(modifier = Modifier.width(6.dp))
+                    IconButton(
                         onClick = {
                             val shareBody = buildString {
                                 if (title.isNotBlank()) {
@@ -2361,7 +2393,8 @@ fun AddNoteDialog(
                                 append(noteBlocksToContent(blocks))
                             }
                             com.example.sync.NoteShareHelper.shareText(contextAdd, title.trim(), shareBody)
-                        }
+                        },
+                        modifier = Modifier.size(40.dp).background(iconBubbleColor, CircleShape)
                     ) {
                         Icon(Icons.Default.Share, contentDescription = if (strings.isFa) "اشتراک‌گذاری" else "Share")
                     }
@@ -2586,16 +2619,21 @@ fun AddNoteDialog(
 
                 }
             }
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .align(Alignment.BottomCenter)
-                        .padding(horizontal = 16.dp, vertical = 6.dp),
-                    horizontalArrangement = Arrangement.spacedBy(10.dp),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    val isDarkBar = MaterialTheme.colorScheme.background.luminance() < 0.5f
-                    Row(horizontalArrangement = Arrangement.spacedBy(14.dp)) {
+            Column(
+                modifier = Modifier
+                    .align(Alignment.BottomCenter)
+                    .fillMaxWidth()
+            ) {
+                if (showColorPicker) {
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 16.dp, vertical = 6.dp),
+                        horizontalArrangement = Arrangement.spacedBy(14.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        val isDarkBar = MaterialTheme.colorScheme.background.luminance() < 0.5f
+
                     noteColors.forEach { hex ->
                         val col = getAdaptiveNoteColor(hex, isDarkBar)
                         val isSelected = selectedColor == hex
@@ -2623,9 +2661,28 @@ fun AddNoteDialog(
                         }
                     }
                     }
+                }
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 16.dp, vertical = 6.dp),
+                    horizontalArrangement = Arrangement.spacedBy(10.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
                     Spacer(modifier = Modifier.weight(1f))
+                    IconButton(
+                        onClick = { showColorPicker = !showColorPicker },
+                        modifier = Modifier.size(40.dp).background(iconBubbleColor, CircleShape)
+                    ) {
+                        Icon(
+                            Icons.Default.Palette,
+                            contentDescription = if (strings.isFa) "رنگ پس‌زمینه" else "Background color",
+                            tint = if (showColorPicker) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+
                     Box {
-                        IconButton(onClick = { showAddMenu = true }, modifier = Modifier.size(40.dp).background(MaterialTheme.colorScheme.surface.copy(alpha = 0.55f), CircleShape)) {
+                        IconButton(onClick = { showAddMenu = true }, modifier = Modifier.size(40.dp).background(iconBubbleColor, CircleShape)) {
                             Icon(
                                 Icons.Default.Add,
                                 contentDescription = if (strings.isFa) "افزودن به یادداشت" else "Add to note",
@@ -2671,26 +2728,8 @@ fun AddNoteDialog(
                             )
                         }
                     }
-                    IconButton(
-                        onClick = {
-                            showNoteReminderPicker(contextAdd, reminderAt) { picked -> reminderAt = picked }
-                        },
-                        modifier = Modifier.size(40.dp).background(MaterialTheme.colorScheme.surface.copy(alpha = 0.55f), CircleShape)
-                    ) {
-                        Icon(
-                            Icons.Default.Notifications,
-                            contentDescription = if (strings.isFa) "یادآور" else "Reminder",
-                            tint = if (reminderAt > 0) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant
-                        )
-                    }
-                    IconButton(onClick = { isPinned = !isPinned }, modifier = Modifier.size(40.dp).background(MaterialTheme.colorScheme.surface.copy(alpha = 0.55f), CircleShape)) {
-                        Icon(
-                            Icons.Default.PushPin,
-                            contentDescription = if (strings.isFa) "سنجاق به بالا" else "Pin to top",
-                            tint = if (isPinned) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant
-                        )
-                    }
                 }
+            }
             }
         }
 
@@ -2743,6 +2782,7 @@ fun EditNoteDialog(
     // چک‌لیست حالا بلوک درون‌خطی است و از buildInitialNoteBlocks می‌آید
     var reminderAt by remember { mutableStateOf(initialNote.reminderAt) }
     var showAddMenu by remember { mutableStateOf(false) }
+    var showColorPicker by remember { mutableStateOf(false) }
 
     val isDark = MaterialTheme.colorScheme.background.luminance() < 0.5f
     val noteColors = listOf("#FEF3C7", "#DCFCE7", "#E0F2FE", "#FCE7F3", "#F3E8FF", "#F1F5F9")
@@ -2820,6 +2860,13 @@ fun EditNoteDialog(
 
     val editorBgEdit = getAdaptiveNoteColor(selectedColor, isDark)
 
+    // هالهٔ دکمه‌های ویرایشگر از خانوادهٔ رنگ خود یادداشت است، مثل گوگل کیپ
+    val iconBubbleColor = if (isDark) {
+        androidx.compose.ui.graphics.lerp(editorBgEdit, Color.White, 0.18f)
+    } else {
+        androidx.compose.ui.graphics.lerp(editorBgEdit, Color.Black, 0.07f)
+    }
+
     val contextEdit = LocalContext.current
 
     val scopeEdit = androidx.compose.runtime.rememberCoroutineScope()
@@ -2853,6 +2900,30 @@ fun EditNoteDialog(
                     }
                     Spacer(modifier = Modifier.weight(1f))
                     IconButton(
+                        onClick = { isPinned = !isPinned },
+                        modifier = Modifier.size(40.dp).background(iconBubbleColor, CircleShape)
+                    ) {
+                        Icon(
+                            Icons.Default.PushPin,
+                            contentDescription = if (strings.isFa) "سنجاق به بالا" else "Pin to top",
+                            tint = if (isPinned) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                    Spacer(modifier = Modifier.width(6.dp))
+                    IconButton(
+                        onClick = {
+                            showNoteReminderPicker(contextEdit, reminderAt) { picked -> reminderAt = picked }
+                        },
+                        modifier = Modifier.size(40.dp).background(iconBubbleColor, CircleShape)
+                    ) {
+                        Icon(
+                            Icons.Default.Notifications,
+                            contentDescription = if (strings.isFa) "یادآور" else "Reminder",
+                            tint = if (reminderAt > 0) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                    Spacer(modifier = Modifier.width(6.dp))
+                    IconButton(
                         onClick = {
                             val shareBody = buildString {
                                 if (title.isNotBlank()) {
@@ -2862,7 +2933,8 @@ fun EditNoteDialog(
                                 append(noteBlocksToContent(blocks))
                             }
                             com.example.sync.NoteShareHelper.shareText(contextEdit, title.trim(), shareBody)
-                        }
+                        },
+                        modifier = Modifier.size(40.dp).background(iconBubbleColor, CircleShape)
                     ) {
                         Icon(Icons.Default.Share, contentDescription = if (strings.isFa) "اشتراک‌گذاری" else "Share")
                     }
@@ -3082,15 +3154,20 @@ fun EditNoteDialog(
 
                 }
             }
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .align(Alignment.BottomCenter)
-                        .padding(horizontal = 16.dp, vertical = 6.dp),
-                    horizontalArrangement = Arrangement.spacedBy(10.dp),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Row(horizontalArrangement = Arrangement.spacedBy(14.dp)) {
+            Column(
+                modifier = Modifier
+                    .align(Alignment.BottomCenter)
+                    .fillMaxWidth()
+            ) {
+                if (showColorPicker) {
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 16.dp, vertical = 6.dp),
+                        horizontalArrangement = Arrangement.spacedBy(14.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+
                     noteColors.forEach { hex ->
                         val col = getAdaptiveNoteColor(hex, isDark)
                         val isSelected = selectedColor == hex
@@ -3118,9 +3195,28 @@ fun EditNoteDialog(
                         }
                     }
                     }
+                }
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 16.dp, vertical = 6.dp),
+                    horizontalArrangement = Arrangement.spacedBy(10.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
                     Spacer(modifier = Modifier.weight(1f))
+                    IconButton(
+                        onClick = { showColorPicker = !showColorPicker },
+                        modifier = Modifier.size(40.dp).background(iconBubbleColor, CircleShape)
+                    ) {
+                        Icon(
+                            Icons.Default.Palette,
+                            contentDescription = if (strings.isFa) "رنگ پس‌زمینه" else "Background color",
+                            tint = if (showColorPicker) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+
                     Box {
-                        IconButton(onClick = { showAddMenu = true }, modifier = Modifier.size(40.dp).background(MaterialTheme.colorScheme.surface.copy(alpha = 0.55f), CircleShape)) {
+                        IconButton(onClick = { showAddMenu = true }, modifier = Modifier.size(40.dp).background(iconBubbleColor, CircleShape)) {
                             Icon(
                                 Icons.Default.Add,
                                 contentDescription = if (strings.isFa) "افزودن به یادداشت" else "Add to note",
@@ -3166,26 +3262,8 @@ fun EditNoteDialog(
                             )
                         }
                     }
-                    IconButton(
-                        onClick = {
-                            showNoteReminderPicker(contextEdit, reminderAt) { picked -> reminderAt = picked }
-                        },
-                        modifier = Modifier.size(40.dp).background(MaterialTheme.colorScheme.surface.copy(alpha = 0.55f), CircleShape)
-                    ) {
-                        Icon(
-                            Icons.Default.Notifications,
-                            contentDescription = if (strings.isFa) "یادآور" else "Reminder",
-                            tint = if (reminderAt > 0) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant
-                        )
-                    }
-                    IconButton(onClick = { isPinned = !isPinned }, modifier = Modifier.size(40.dp).background(MaterialTheme.colorScheme.surface.copy(alpha = 0.55f), CircleShape)) {
-                        Icon(
-                            Icons.Default.PushPin,
-                            contentDescription = if (strings.isFa) "سنجاق به بالا" else "Pin to top",
-                            tint = if (isPinned) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant
-                        )
-                    }
                 }
+            }
             }
         }
 
