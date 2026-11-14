@@ -491,9 +491,7 @@
             "hMonth": 12,
             "hDay": 3,
             "isHoliday": false,
-            "occasions": [
-                "روز ملی جمعیت - روز شهدای خدمت"
-            ]
+            "occasions": []
         },
         "31": {
             "hYear": 1447,
@@ -689,9 +687,7 @@
             "hMonth": 12,
             "hDay": 27,
             "isHoliday": false,
-            "occasions": [
-                "روز شهدای اقتدار - اتحاد ملی ایران"
-            ]
+            "occasions": []
         },
         "24": {
             "hYear": 1447,
@@ -2785,7 +2781,7 @@
             "hDay": 20,
             "isHoliday": false,
             "occasions": [
-                "شب قدر - روز حمایت از بیماران نادر"
+                "شب قدر"
             ]
         },
         "9": {
