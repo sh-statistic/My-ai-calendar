@@ -21,7 +21,9 @@ data class OfficialDayData(
 object PersianOccasionsHelper {
 
     private var appContext: android.content.Context? = null
-    private val officialDataCache = mutableMapOf<Int, Map<String, OfficialDayData>>()
+    // Concurrent because OccasionsDownloader invalidates entries from its
+    // background thread while loaders read/write on UI threads.
+    private val officialDataCache = java.util.concurrent.ConcurrentHashMap<Int, Map<String, OfficialDayData>>()
 
     fun init(context: android.content.Context) {
         appContext = context.applicationContext
@@ -30,10 +32,26 @@ object PersianOccasionsHelper {
 
     fun loadOfficialDataForYear(context: android.content.Context, year: Int) {
         appContext = context.applicationContext
+        // Consider a silent background refresh of this year and the
+        // current/next year (throttled inside OccasionsDownloader). Done
+        // before the cache check so it is considered on every load call.
+        val currentYear = try {
+            PersianCalendarHelper.getCurrentJalaliDate().year
+        } catch (e: Exception) {
+            year
+        }
+        OccasionsDownloader.maybeRefresh(context, listOf(year, currentYear, currentYear + 1))
         if (officialDataCache.containsKey(year)) return
         try {
             val fileName = "occasions_$year.json"
-            val jsonString = context.assets.open(fileName).bufferedReader().use { it.readText() }
+            // A downloaded copy (background-fetched from the occasions-data
+            // branch) wins over the bundled asset; the asset is the fallback.
+            val downloaded = OccasionsDownloader.localFile(context, year)
+            val jsonString = if (downloaded.exists()) {
+                downloaded.readText()
+            } else {
+                context.assets.open(fileName).bufferedReader().use { it.readText() }
+            }
             val jsonObject = org.json.JSONObject(jsonString)
             val yearMap = mutableMapOf<String, OfficialDayData>()
             val months = jsonObject.keys()
@@ -61,6 +79,11 @@ object PersianOccasionsHelper {
             // File not found or parse error - cache empty map so we don't try to reload repeatedly
             officialDataCache[year] = emptyMap()
         }
+    }
+
+    /** Drops a year's cached official data so the next read reloads it from disk. */
+    fun invalidateYearCache(year: Int) {
+        officialDataCache.remove(year)
     }
 
     private fun ensureYearLoaded(year: Int) {
