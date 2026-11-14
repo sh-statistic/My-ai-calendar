@@ -17,9 +17,12 @@ import java.util.zip.ZipOutputStream
  * Layout:
  *  - `data.json`     — the [SyncData] JSON with every base64 media map left null.
  *  - `manifest.json` — where each media file belongs (note id, kind, block key).
- *  - `media/<n>`     — the raw media files themselves (drawings, images, voice),
- *                      copied byte for byte; drawing stroke sidecars ride along
- *                      as `media/<n>.sidecar` text entries.
+ *  - `media/<n>.<ext>` — the raw media files themselves (drawings, images, voice),
+ *                      copied byte for byte, each with its real file extension so
+ *                      any tool (or AI) opening the archive knows what it is;
+ *                      drawing stroke sidecars ride along as `.sidecar` entries.
+ *  - `README.txt`    — a plain-language explanation of this archive, so the data
+ *                      stays fully readable and rebuildable even without the app.
  *
  * Nothing is base64-inflated and nothing needs to be held as one huge String for
  * the UI: writing streams file by file. Reading materializes the entries on a
@@ -90,6 +93,10 @@ object BackupArchive {
         }
         val manifest = JSONArray()
         ZipOutputStream(out.buffered()).use { zip ->
+            zip.putNextEntry(ZipEntry("README.txt"))
+            zip.write(README_TEXT.toByteArray(Charsets.UTF_8))
+            zip.closeEntry()
+
             zip.putNextEntry(ZipEntry("data.json"))
             zip.write(dataBytes)
             zip.closeEntry()
@@ -99,7 +106,12 @@ object BackupArchive {
             // Manifest is written after the entries are named but before their bytes;
             // entry names are index-based, so they are known up front.
             media.forEachIndexed { index, item ->
-                val entryName = "media/%04d".format(index)
+                val extension = item.file.extension.trim()
+                val entryName = if (extension.isNotEmpty()) {
+                    "media/%04d.%s".format(index, extension)
+                } else {
+                    "media/%04d".format(index)
+                }
                 val obj = JSONObject()
                 obj.put("noteId", item.noteId)
                 obj.put("kind", item.kind)
@@ -113,7 +125,12 @@ object BackupArchive {
             zip.closeEntry()
 
             media.forEachIndexed { index, item ->
-                val entryName = "media/%04d".format(index)
+                val extension = item.file.extension.trim()
+                val entryName = if (extension.isNotEmpty()) {
+                    "media/%04d.%s".format(index, extension)
+                } else {
+                    "media/%04d".format(index)
+                }
                 zip.putNextEntry(ZipEntry(entryName))
                 item.file.inputStream().buffered().use { input -> input.copyTo(zip) }
                 zip.closeEntry()
@@ -230,6 +247,49 @@ object BackupArchive {
             noteBlockDrawingSidecars = blockDrawingSidecars.ifEmpty { null }
         )
     }
+
+
+    /**
+     * Written into every archive as README.txt: the portability contract. The user's
+     * data must stay readable and rebuildable even if the app itself is gone — any
+     * person or AI with this file must be able to reconstruct everything from the
+     * archive alone, using only this explanation.
+     */
+    private const val README_TEXT = """Hamgam Calendar - Backup Archive
+====================================
+
+This file is a complete backup of one user's data from the Hamgam calendar app.
+It is a standard ZIP archive. You do NOT need the app to read it.
+
+CONTENTS
+- data.json ......... All data as plain JSON (UTF-8): events, tasks, notes and
+                      app settings. Media files are NOT embedded in it; they
+                      are separate files in this archive (see manifest.json).
+- manifest.json ..... A list mapping every media file in this archive to the
+                      note it belongs to. Each entry has:
+                        noteId ...... the "id" of the note in data.json
+                        kind ........ drawing | image | audio |
+                                      blockImage | blockDrawing | blockAudio
+                        entry ....... the media file's name in this archive
+                        sidecarEntry  (drawings only) a small JSON with the
+                                      drawing's editable strokes; the drawing
+                                      itself is the image file beside it
+                        blockKey .... (block media only) the path the media
+                                      had inside its note's content
+- media/ ............ The media files themselves, with real extensions
+                      (.jpg photos, .png drawings, .m4a voice notes).
+- README.txt ........ This file.
+
+TO REBUILD THE DATA ANYWHERE
+1. Read data.json for the events, tasks and notes.
+2. Use manifest.json to attach each file in media/ to its note.
+
+Persian summary:
+این فایل، پشتیبان کامل داده‌های یک کاربر از برنامه «تقویم همگام» است.
+یک فایل فشرده استاندارد است و برای خواندنش به خود برنامه نیازی نیست.
+داده‌ها در data.json، فایل‌های عکس و صوت و نقاشی در پوشه media
+و نقشه اتصال هر فایل به یادداشتش در manifest.json است.
+"""
 
     /** Reports read progress as a fraction of the archive's total byte size. */
     private class CountingInputStream(
