@@ -362,6 +362,12 @@ fun SyncScreen(
                     Toast.makeText(context, msg, Toast.LENGTH_SHORT).show()
                     if (ok) showBackupDialog = false
                 }
+            },
+            onImportFile = { file ->
+                viewModel.importBackupFile(file) { ok, msg ->
+                    Toast.makeText(context, msg, Toast.LENGTH_SHORT).show()
+                    if (ok) showBackupDialog = false
+                }
             }
         )
     }

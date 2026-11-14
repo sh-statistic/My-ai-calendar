@@ -941,6 +941,12 @@ fun SettingsScreen(
                     Toast.makeText(context, msg, Toast.LENGTH_SHORT).show()
                 }
                 showBackupDialog = false
+            },
+            onImportFile = { file ->
+                viewModel.importBackupFile(file) { success, msg ->
+                    Toast.makeText(context, msg, Toast.LENGTH_SHORT).show()
+                }
+                showBackupDialog = false
             }
         )
     }
