@@ -22,6 +22,7 @@ import androidx.activity.compose.BackHandler
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.combinedClickable
+import androidx.compose.material.icons.filled.Mic
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -838,21 +839,28 @@ fun NoteCard(
 
             // نوار بندانگشتیِ همهٔ عکس‌ها و طرح‌های یادداشت، بالای کارت: کاربر بدون باز کردنِ یادداشت
             // و اسکرول کردنِ متن بلندش می‌فهمد کدام عکس توی کدام یادداشت است.
-            val thumbPaths = remember(note.blocksJson, note.imagePath, note.drawingPath, note.updatedAt) {
-                val fromBlocks = extractNoteBlockMedia(note.blocksJson)
-                    .filter { it.kind == "i" || it.kind == "d" }
-                    .mapNotNull { it.path }
-                val candidates = if (fromBlocks.isNotEmpty()) {
-                    fromBlocks
+            val (thumbPaths, audioCount) = remember(note.blocksJson, note.imagePath, note.drawingPath, note.audioPath, note.updatedAt) {
+                val media = extractNoteBlockMedia(note.blocksJson)
+                val imgsFromBlocks = media.filter { it.kind == "i" || it.kind == "d" }.mapNotNull { it.path }
+                val audsFromBlocks = media.filter { it.kind == "a" }.mapNotNull { it.path }
+                val useBlocks = imgsFromBlocks.isNotEmpty() || audsFromBlocks.isNotEmpty()
+                val imgCandidates = if (useBlocks) {
+                    imgsFromBlocks
                 } else {
                     listOfNotNull(
                         note.drawingPath?.takeIf { it.isNotBlank() },
                         note.imagePath?.takeIf { it.isNotBlank() }
                     )
                 }
-                candidates.filter { runCatching { File(it).exists() }.getOrDefault(false) }
+                val audCandidates = if (useBlocks) {
+                    audsFromBlocks
+                } else {
+                    listOfNotNull(note.audioPath?.takeIf { it.isNotBlank() })
+                }
+                val existing: (String) -> Boolean = { runCatching { File(it).exists() }.getOrDefault(false) }
+                Pair(imgCandidates.filter(existing), audCandidates.count(existing))
             }
-            if (thumbPaths.isNotEmpty()) {
+            if (thumbPaths.isNotEmpty() || audioCount > 0) {
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
@@ -888,6 +896,24 @@ fun NoteCard(
                                     .size(54.dp)
                                     .clip(RoundedCornerShape(8.dp))
                                     .border(0.6.dp, if (isDark) Color(0xFF2A2A32) else Color.Black.copy(alpha = 0.08f), RoundedCornerShape(8.dp))
+                            )
+                        }
+                    }
+                    // فایل‌های صوتی عکس ندارن؛ بعد از عکس‌ها با آیکون میکروفون نشون داده می‌شن
+                    repeat(audioCount) {
+                        Box(
+                            modifier = Modifier
+                                .size(54.dp)
+                                .clip(RoundedCornerShape(8.dp))
+                                .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.55f))
+                                .border(0.6.dp, if (isDark) Color(0xFF2A2A32) else Color.Black.copy(alpha = 0.08f), RoundedCornerShape(8.dp)),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Icon(
+                                Icons.Default.Mic,
+                                contentDescription = if (strings.isFa) "یادداشت صوتی" else "Voice note",
+                                tint = MaterialTheme.colorScheme.primary,
+                                modifier = Modifier.size(22.dp)
                             )
                         }
                     }

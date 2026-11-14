@@ -2625,7 +2625,7 @@ fun AddNoteDialog(
                     }
                     Spacer(modifier = Modifier.weight(1f))
                     Box {
-                        IconButton(onClick = { showAddMenu = true }) {
+                        IconButton(onClick = { showAddMenu = true }, modifier = Modifier.size(40.dp).background(MaterialTheme.colorScheme.surface.copy(alpha = 0.55f), CircleShape)) {
                             Icon(
                                 Icons.Default.Add,
                                 contentDescription = if (strings.isFa) "افزودن به یادداشت" else "Add to note",
@@ -2671,16 +2671,19 @@ fun AddNoteDialog(
                             )
                         }
                     }
-                    IconButton(onClick = {
-                        showNoteReminderPicker(contextAdd, reminderAt) { picked -> reminderAt = picked }
-                    }) {
+                    IconButton(
+                        onClick = {
+                            showNoteReminderPicker(contextAdd, reminderAt) { picked -> reminderAt = picked }
+                        },
+                        modifier = Modifier.size(40.dp).background(MaterialTheme.colorScheme.surface.copy(alpha = 0.55f), CircleShape)
+                    ) {
                         Icon(
                             Icons.Default.Notifications,
                             contentDescription = if (strings.isFa) "یادآور" else "Reminder",
                             tint = if (reminderAt > 0) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant
                         )
                     }
-                    IconButton(onClick = { isPinned = !isPinned }) {
+                    IconButton(onClick = { isPinned = !isPinned }, modifier = Modifier.size(40.dp).background(MaterialTheme.colorScheme.surface.copy(alpha = 0.55f), CircleShape)) {
                         Icon(
                             Icons.Default.PushPin,
                             contentDescription = if (strings.isFa) "سنجاق به بالا" else "Pin to top",
@@ -3117,7 +3120,7 @@ fun EditNoteDialog(
                     }
                     Spacer(modifier = Modifier.weight(1f))
                     Box {
-                        IconButton(onClick = { showAddMenu = true }) {
+                        IconButton(onClick = { showAddMenu = true }, modifier = Modifier.size(40.dp).background(MaterialTheme.colorScheme.surface.copy(alpha = 0.55f), CircleShape)) {
                             Icon(
                                 Icons.Default.Add,
                                 contentDescription = if (strings.isFa) "افزودن به یادداشت" else "Add to note",
@@ -3163,16 +3166,19 @@ fun EditNoteDialog(
                             )
                         }
                     }
-                    IconButton(onClick = {
-                        showNoteReminderPicker(contextEdit, reminderAt) { picked -> reminderAt = picked }
-                    }) {
+                    IconButton(
+                        onClick = {
+                            showNoteReminderPicker(contextEdit, reminderAt) { picked -> reminderAt = picked }
+                        },
+                        modifier = Modifier.size(40.dp).background(MaterialTheme.colorScheme.surface.copy(alpha = 0.55f), CircleShape)
+                    ) {
                         Icon(
                             Icons.Default.Notifications,
                             contentDescription = if (strings.isFa) "یادآور" else "Reminder",
                             tint = if (reminderAt > 0) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant
                         )
                     }
-                    IconButton(onClick = { isPinned = !isPinned }) {
+                    IconButton(onClick = { isPinned = !isPinned }, modifier = Modifier.size(40.dp).background(MaterialTheme.colorScheme.surface.copy(alpha = 0.55f), CircleShape)) {
                         Icon(
                             Icons.Default.PushPin,
                             contentDescription = if (strings.isFa) "سنجاق به بالا" else "Pin to top",
