@@ -167,7 +167,8 @@ fun SettingsScreen(
     var showPairingDialog by remember { mutableStateOf(false) }
     var showBackupDialog by remember { mutableStateOf(false) }
     var showShareAppDialog by remember { mutableStateOf(false) }
-    var backupJsonContent by remember { mutableStateOf("") }
+    var backupExportFile by remember { mutableStateOf<java.io.File?>(null) }
+    var isExportingBackup by remember { mutableStateOf(false) }
     var showFajrCityDialog by remember { mutableStateOf(false) }
     var occasionToEditInSettings by remember { mutableStateOf<com.example.calendar.PersianOccasion?>(null) }
     var customOccasionsVersion by remember { mutableStateOf(0) }
@@ -536,8 +537,22 @@ fun SettingsScreen(
                         )
                     }
                     Row {
-                        TextButton(onClick = { backupJsonContent = ""; showBackupDialog = true }) { Text(strings.importBackup, fontSize = 11.sp) }
-                        TextButton(onClick = { viewModel.exportBackupJson { json -> backupJsonContent = json; showBackupDialog = true } }) { Text(strings.exportBackup, fontSize = 11.sp) }
+                        TextButton(onClick = { backupExportFile = null; showBackupDialog = true }) { Text(strings.importBackup, fontSize = 11.sp) }
+                        TextButton(
+                            enabled = !isExportingBackup,
+                            onClick = {
+                                isExportingBackup = true
+                                viewModel.exportBackupToFile { file ->
+                                    isExportingBackup = false
+                                    if (file != null) {
+                                        backupExportFile = file
+                                        showBackupDialog = true
+                                    } else {
+                                        Toast.makeText(context, if (strings.isFa) "ساخت فایل پشتیبان ناموفق بود" else "Could not create the backup file", Toast.LENGTH_SHORT).show()
+                                    }
+                                }
+                            }
+                        ) { Text(if (isExportingBackup) (if (strings.isFa) "در حال ساخت…" else "Working…") else strings.exportBackup, fontSize = 11.sp) }
                     }
                 }
 
@@ -920,7 +935,7 @@ fun SettingsScreen(
 
     if (showBackupDialog) {
         JsonBackupDialog(
-            jsonString = backupJsonContent,
+            backupFile = backupExportFile,
             onDismiss = { showBackupDialog = false },
             onImport = { json ->
                 viewModel.importBackupJson(json) { success, msg ->

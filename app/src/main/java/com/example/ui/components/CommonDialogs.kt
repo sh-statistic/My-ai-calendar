@@ -3412,44 +3412,51 @@ fun PairingInfoDialog(
 
 @Composable
 fun JsonBackupDialog(
-    jsonString: String,
+    backupFile: File?,
     onDismiss: () -> Unit,
     onImport: (String) -> Unit
 ) {
     val strings = rememberAppStrings()
     val context = androidx.compose.ui.platform.LocalContext.current
+    val scope = rememberCoroutineScope()
     var importText by remember { mutableStateOf("") }
-    var activeTab by remember(jsonString) { mutableStateOf(if (jsonString.isBlank()) 1 else 0) }
-    val clipboardManager: ClipboardManager = LocalClipboardManager.current
-    var copiedMessage by remember { mutableStateOf(false) }
-    val detectedAutoBackup = remember {
-        com.example.update.AppUpdateManager.getLatestSafetyBackup(context)
+    var activeTab by remember(backupFile) { mutableStateOf(if (backupFile == null) 1 else 0) }
+    // Load the auto-backup off the main thread: reading a multi-megabyte backup file
+    // during composition was one of the causes of this dialog freezing on open.
+    var detectedAutoBackup by remember { mutableStateOf<String?>(null) }
+    androidx.compose.runtime.LaunchedEffect(Unit) {
+        detectedAutoBackup = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+            com.example.update.AppUpdateManager.getLatestSafetyBackup(context)
+        }
     }
 
     val openBackupFileLauncher = androidx.activity.compose.rememberLauncherForActivityResult(
         contract = androidx.activity.result.contract.ActivityResultContracts.OpenDocument()
     ) { uri ->
         if (uri != null) {
-            try {
-                val content = context.contentResolver.openInputStream(uri)
-                    ?.bufferedReader()
-                    ?.use { it.readText() }
-                if (!content.isNullOrBlank()) {
-                    importText = content
-                    onImport(content)
-                } else {
+            scope.launch {
+                try {
+                    val content = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+                        context.contentResolver.openInputStream(uri)
+                            ?.bufferedReader()
+                            ?.use { it.readText() }
+                    }
+                    if (!content.isNullOrBlank()) {
+                        onImport(content)
+                    } else {
                     android.widget.Toast.makeText(
                         context,
                         if (strings.isFa) "فایل انتخاب‌شده خالی است" else "Selected file is empty",
+                            android.widget.Toast.LENGTH_SHORT
+                        ).show()
+                    }
+                } catch (e: Exception) {
+                    android.widget.Toast.makeText(
+                        context,
+                        if (strings.isFa) "خطا در خواندن فایل: ${e.localizedMessage}" else "Error reading file: ${e.localizedMessage}",
                         android.widget.Toast.LENGTH_SHORT
                     ).show()
                 }
-            } catch (e: Exception) {
-                android.widget.Toast.makeText(
-                    context,
-                    if (strings.isFa) "خطا در خواندن فایل: ${e.localizedMessage}" else "Error reading file: ${e.localizedMessage}",
-                    android.widget.Toast.LENGTH_SHORT
-                ).show()
             }
         }
     }
@@ -3457,22 +3464,27 @@ fun JsonBackupDialog(
     val saveBackupFileLauncher = androidx.activity.compose.rememberLauncherForActivityResult(
         contract = androidx.activity.result.contract.ActivityResultContracts.CreateDocument("application/json")
     ) { uri ->
-        if (uri != null && jsonString.isNotBlank()) {
-            try {
-                context.contentResolver.openOutputStream(uri)?.use { out ->
-                    out.write(jsonString.toByteArray(Charsets.UTF_8))
+        val sourceFile = backupFile
+        if (uri != null && sourceFile != null) {
+            scope.launch {
+                try {
+                    kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+                        context.contentResolver.openOutputStream(uri)?.use { out ->
+                            sourceFile.inputStream().use { input -> input.copyTo(out) }
+                        }
+                    }
+                    android.widget.Toast.makeText(
+                        context,
+                        if (strings.isFa) "فایل پشتیبان با موفقیت ذخیره شد ✓" else "Backup file saved successfully ✓",
+                        android.widget.Toast.LENGTH_SHORT
+                    ).show()
+                } catch (e: Exception) {
+                    android.widget.Toast.makeText(
+                        context,
+                        if (strings.isFa) "خطا در ذخیره فایل: ${e.localizedMessage}" else "Error saving file: ${e.localizedMessage}",
+                        android.widget.Toast.LENGTH_SHORT
+                    ).show()
                 }
-                android.widget.Toast.makeText(
-                    context,
-                    if (strings.isFa) "فایل پشتیبان با موفقیت ذخیره شد ✓" else "Backup file saved successfully ✓",
-                    android.widget.Toast.LENGTH_SHORT
-                ).show()
-            } catch (e: Exception) {
-                android.widget.Toast.makeText(
-                    context,
-                    if (strings.isFa) "خطا در ذخیره فایل: ${e.localizedMessage}" else "Error saving file: ${e.localizedMessage}",
-                    android.widget.Toast.LENGTH_SHORT
-                ).show()
             }
         }
     }
@@ -3504,35 +3516,36 @@ fun JsonBackupDialog(
                 }
 
                 if (activeTab == 0) {
-                    Text(if (strings.isFa) "کد JSON کلیه رویدادها، وظایف، یادداشت‌ها و نقطه‌های عمر شما:" else "JSON code of all events, tasks, notes, and life grid:", style = MaterialTheme.typography.bodySmall)
-                    OutlinedTextField(
-                        value = jsonString,
-                        onValueChange = {},
-                        readOnly = true,
-                        maxLines = 7,
-                        modifier = Modifier.fillMaxWidth()
+                    // The backup is delivered as a FILE, never as text: rendering a
+                    // multi-megabyte JSON (media as base64) in a text field froze the UI.
+                    val sizeText = if (backupFile != null) {
+                        val kb = backupFile.length() / 1024.0
+                        if (kb >= 1024) String.format("%.1f MB", kb / 1024.0) else String.format("%.0f KB", kb)
+                    } else ""
+                    Text(
+                        if (backupFile != null) {
+                            if (strings.isFa) "فایل پشتیبان همهٔ رویدادها، وظیفه‌ها، یادداشت‌ها و نقطه‌های عمر شما آماده است. حجم فایل: $sizeText" else "Your backup file with all events, tasks, notes and life grid points is ready. File size: $sizeText"
+                        } else {
+                            if (strings.isFa) "هنوز فایل پشتیبانی ساخته نشده است؛ از دکمهٔ «خروجی» در تنظیمات یا صفحهٔ همگام‌سازی استفاده کنید." else "No backup file has been created yet; use the Export button in Settings or the Sync page."
+                        },
+                        style = MaterialTheme.typography.bodySmall
                     )
                     Button(
                         onClick = {
-                            com.example.update.AppUpdateManager.performSafetyBackup(context, jsonString)
-                            saveBackupFileLauncher.launch("MyCalendar_SafetyBackup.json")
+                            val fileToSave = backupFile
+                            if (fileToSave != null) {
+                                scope.launch {
+                                    kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+                                        com.example.update.AppUpdateManager.performSafetyBackupFromFile(context, fileToSave)
+                                    }
+                                    saveBackupFileLauncher.launch("MyCalendar_SafetyBackup.json")
+                                }
+                            }
                         },
-                        enabled = jsonString.isNotBlank(),
+                        enabled = backupFile != null,
                         modifier = Modifier.fillMaxWidth()
                     ) {
                         Text(if (strings.isFa) "💾 ذخیره فایل پشتیبان در گوشی (Downloads)" else "💾 Save Backup File to Phone")
-                    }
-                    androidx.compose.material3.OutlinedButton(
-                        onClick = {
-                            clipboardManager.setText(AnnotatedString(jsonString))
-                            copiedMessage = true
-                        },
-                        enabled = jsonString.isNotBlank(),
-                        modifier = Modifier.fillMaxWidth()
-                    ) {
-                        Icon(Icons.Default.ContentCopy, contentDescription = null)
-                        Spacer(modifier = Modifier.width(6.dp))
-                        Text(if (copiedMessage) (if (strings.isFa) "کپی شد!" else "Copied!") else (if (strings.isFa) "کپی کد پشتیبان در حافظه" else "Copy backup code"))
                     }
                 } else {
                     Surface(
@@ -3567,10 +3580,11 @@ fun JsonBackupDialog(
                                 )
                             }
 
-                            if (!detectedAutoBackup.isNullOrBlank()) {
+                            val autoBackupContent = detectedAutoBackup
+                            if (!autoBackupContent.isNullOrBlank()) {
                                 androidx.compose.material3.OutlinedButton(
                                     onClick = {
-                                        onImport(detectedAutoBackup)
+                                        onImport(autoBackupContent)
                                     },
                                     modifier = Modifier.fillMaxWidth()
                                 ) {

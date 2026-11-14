@@ -1473,127 +1473,168 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     // Backup & Restore
+    /**
+     * Builds the complete backup JSON. Runs synchronously; callers invoke it on the IO
+     * dispatcher. Kept separate from delivery on purpose: a media-heavy backup can be
+     * tens of megabytes, so it should be written to a file (see [exportBackupToFile])
+     * instead of travelling through UI state as one giant String.
+     */
+    private fun buildBackupJson(): String {
+        val app = getApplication<Application>()
+        val baseSyncData = repository.getFullSyncData("Android-Backup")
+
+        // 1. Drawing Base64 for whiteboard notes (+ فایل خط‌های نقاشی کنارش تا بعد از ریکاوری قابل ویرایش بماند)
+        val drawingsMap = mutableMapOf<String, String>()
+        val drawingSidecarsMap = mutableMapOf<String, String>()
+        for (note in baseSyncData.notes) {
+            if (!note.drawingPath.isNullOrBlank()) {
+                try {
+                    val file = File(note.drawingPath)
+                    if (file.exists() && file.isFile) {
+                        val bytes = file.readBytes()
+                        val b64 = android.util.Base64.encodeToString(bytes, android.util.Base64.NO_WRAP)
+                        drawingsMap[note.id] = b64
+                        val jsonFile = File(note.drawingPath.replace(".png", ".json"))
+                        if (jsonFile.exists() && jsonFile.isFile) {
+                            drawingSidecarsMap[note.id] = jsonFile.readText()
+                        }
+                    }
+                } catch (e: Exception) {
+                    e.printStackTrace()
+                }
+            }
+        }
+
+        // 1b. Image & audio Base64 for rich-content notes
+        val imagesMap = mutableMapOf<String, String>()
+        val audiosMap = mutableMapOf<String, String>()
+        for (note in baseSyncData.notes) {
+            if (!note.imagePath.isNullOrBlank()) {
+                try {
+                    val file = File(note.imagePath)
+                    if (file.exists() && file.isFile) {
+                        val b64 = android.util.Base64.encodeToString(file.readBytes(), android.util.Base64.NO_WRAP)
+                        imagesMap[note.id] = b64
+                    }
+                } catch (e: Exception) {
+                    e.printStackTrace()
+                }
+            }
+            if (!note.audioPath.isNullOrBlank()) {
+                try {
+                    val file = File(note.audioPath)
+                    if (file.exists() && file.isFile) {
+                        val b64 = android.util.Base64.encodeToString(file.readBytes(), android.util.Base64.NO_WRAP)
+                        audiosMap[note.id] = b64
+                    }
+                } catch (e: Exception) {
+                    e.printStackTrace()
+                }
+            }
+        }
+
+        // 1c. Base64 for inline block media (photos/drawings/voice inside the note text flow)
+        val blockImagesMap = mutableMapOf<String, MutableMap<String, String>>()
+        val blockDrawingsMap = mutableMapOf<String, MutableMap<String, String>>()
+        val blockAudiosMap = mutableMapOf<String, MutableMap<String, String>>()
+        val blockDrawingSidecarsMap = mutableMapOf<String, MutableMap<String, String>>()
+        for (note in baseSyncData.notes) {
+            for (media in com.example.data.extractNoteBlockMedia(note.blocksJson)) {
+                val mediaPath = media.path ?: continue
+                try {
+                    val file = File(mediaPath)
+                    if (file.exists() && file.isFile) {
+                        val b64 = android.util.Base64.encodeToString(file.readBytes(), android.util.Base64.NO_WRAP)
+                        val target = when (media.kind) {
+                            "i" -> blockImagesMap
+                            "a" -> blockAudiosMap
+                            else -> blockDrawingsMap
+                        }
+                        target.getOrPut(note.id) { mutableMapOf() }[mediaPath] = b64
+                        if (media.kind == "d") {
+                            val jsonFile = File(mediaPath.replace(".png", ".json"))
+                            if (jsonFile.exists() && jsonFile.isFile) {
+                                blockDrawingSidecarsMap.getOrPut(note.id) { mutableMapOf() }[mediaPath] =
+                                    jsonFile.readText()
+                            }
+                        }
+                    }
+                } catch (e: Exception) {
+                    e.printStackTrace()
+                }
+            }
+        }
+
+        // 2. Custom Occasions
+        val (occData, occHiddenData) = PersianOccasionsHelper.exportCustomOccasionsRaw(app)
+
+        // 3. App preferences (hamgam_app_preferences, hamgam_prayer_prefs, hijri_offset_prefs)
+        // hamgam_gemini_prefs is intentionally excluded for security
+        fun getPrefsMap(prefsName: String): Map<String, Any?> {
+            val p = app.getSharedPreferences(prefsName, android.content.Context.MODE_PRIVATE)
+            return p.all
+        }
+
+        val appPrefsMap = getPrefsMap("hamgam_app_preferences")
+        val prayerPrefsMap = getPrefsMap("hamgam_prayer_prefs")
+        val hijriOffsetPrefsMap = getPrefsMap("hijri_offset_prefs")
+
+        val syncData = baseSyncData.copy(
+            mementoMoriJson = mementoManager.exportToJson(),
+            noteDrawingsBase64 = if (drawingsMap.isNotEmpty()) drawingsMap else null,
+            noteImagesBase64 = if (imagesMap.isNotEmpty()) imagesMap else null,
+            noteAudiosBase64 = if (audiosMap.isNotEmpty()) audiosMap else null,
+            noteBlockImagesBase64 = if (blockImagesMap.isNotEmpty()) blockImagesMap else null,
+            noteBlockDrawingsBase64 = if (blockDrawingsMap.isNotEmpty()) blockDrawingsMap else null,
+            noteBlockAudiosBase64 = if (blockAudiosMap.isNotEmpty()) blockAudiosMap else null,
+            noteDrawingSidecars = if (drawingSidecarsMap.isNotEmpty()) drawingSidecarsMap else null,
+            noteBlockDrawingSidecars = if (blockDrawingSidecarsMap.isNotEmpty()) blockDrawingSidecarsMap else null,
+            customOccasionsData = occData,
+            customOccasionsHiddenData = occHiddenData,
+            appPreferences = if (appPrefsMap.isNotEmpty()) appPrefsMap else null,
+            prayerPreferences = if (prayerPrefsMap.isNotEmpty()) prayerPrefsMap else null,
+            hijriOffsetPreferences = if (hijriOffsetPrefsMap.isNotEmpty()) hijriOffsetPrefsMap else null
+        )
+        val json = syncData.toJsonString()
+        logMessage("پشتیبان کامل JSON با موفقیت تولید شد")
+        return json
+    }
+
     fun exportBackupJson(onResult: (String) -> Unit) {
         viewModelScope.launch(Dispatchers.IO) {
-            val app = getApplication<Application>()
-            val baseSyncData = repository.getFullSyncData("Android-Backup")
-
-            // 1. Drawing Base64 for whiteboard notes (+ فایل خط‌های نقاشی کنارش تا بعد از ریکاوری قابل ویرایش بماند)
-            val drawingsMap = mutableMapOf<String, String>()
-            val drawingSidecarsMap = mutableMapOf<String, String>()
-            for (note in baseSyncData.notes) {
-                if (!note.drawingPath.isNullOrBlank()) {
-                    try {
-                        val file = File(note.drawingPath)
-                        if (file.exists() && file.isFile) {
-                            val bytes = file.readBytes()
-                            val b64 = android.util.Base64.encodeToString(bytes, android.util.Base64.NO_WRAP)
-                            drawingsMap[note.id] = b64
-                            val jsonFile = File(note.drawingPath.replace(".png", ".json"))
-                            if (jsonFile.exists() && jsonFile.isFile) {
-                                drawingSidecarsMap[note.id] = jsonFile.readText()
-                            }
-                        }
-                    } catch (e: Exception) {
-                        e.printStackTrace()
-                    }
-                }
-            }
-
-            // 1b. Image & audio Base64 for rich-content notes
-            val imagesMap = mutableMapOf<String, String>()
-            val audiosMap = mutableMapOf<String, String>()
-            for (note in baseSyncData.notes) {
-                if (!note.imagePath.isNullOrBlank()) {
-                    try {
-                        val file = File(note.imagePath)
-                        if (file.exists() && file.isFile) {
-                            val b64 = android.util.Base64.encodeToString(file.readBytes(), android.util.Base64.NO_WRAP)
-                            imagesMap[note.id] = b64
-                        }
-                    } catch (e: Exception) {
-                        e.printStackTrace()
-                    }
-                }
-                if (!note.audioPath.isNullOrBlank()) {
-                    try {
-                        val file = File(note.audioPath)
-                        if (file.exists() && file.isFile) {
-                            val b64 = android.util.Base64.encodeToString(file.readBytes(), android.util.Base64.NO_WRAP)
-                            audiosMap[note.id] = b64
-                        }
-                    } catch (e: Exception) {
-                        e.printStackTrace()
-                    }
-                }
-            }
-
-            // 1c. Base64 for inline block media (photos/drawings/voice inside the note text flow)
-            val blockImagesMap = mutableMapOf<String, MutableMap<String, String>>()
-            val blockDrawingsMap = mutableMapOf<String, MutableMap<String, String>>()
-            val blockAudiosMap = mutableMapOf<String, MutableMap<String, String>>()
-            val blockDrawingSidecarsMap = mutableMapOf<String, MutableMap<String, String>>()
-            for (note in baseSyncData.notes) {
-                for (media in com.example.data.extractNoteBlockMedia(note.blocksJson)) {
-                    val mediaPath = media.path ?: continue
-                    try {
-                        val file = File(mediaPath)
-                        if (file.exists() && file.isFile) {
-                            val b64 = android.util.Base64.encodeToString(file.readBytes(), android.util.Base64.NO_WRAP)
-                            val target = when (media.kind) {
-                                "i" -> blockImagesMap
-                                "a" -> blockAudiosMap
-                                else -> blockDrawingsMap
-                            }
-                            target.getOrPut(note.id) { mutableMapOf() }[mediaPath] = b64
-                            if (media.kind == "d") {
-                                val jsonFile = File(mediaPath.replace(".png", ".json"))
-                                if (jsonFile.exists() && jsonFile.isFile) {
-                                    blockDrawingSidecarsMap.getOrPut(note.id) { mutableMapOf() }[mediaPath] =
-                                        jsonFile.readText()
-                                }
-                            }
-                        }
-                    } catch (e: Exception) {
-                        e.printStackTrace()
-                    }
-                }
-            }
-
-            // 2. Custom Occasions
-            val (occData, occHiddenData) = PersianOccasionsHelper.exportCustomOccasionsRaw(app)
-
-            // 3. App preferences (hamgam_app_preferences, hamgam_prayer_prefs, hijri_offset_prefs)
-            // hamgam_gemini_prefs is intentionally excluded for security
-            fun getPrefsMap(prefsName: String): Map<String, Any?> {
-                val p = app.getSharedPreferences(prefsName, android.content.Context.MODE_PRIVATE)
-                return p.all
-            }
-
-            val appPrefsMap = getPrefsMap("hamgam_app_preferences")
-            val prayerPrefsMap = getPrefsMap("hamgam_prayer_prefs")
-            val hijriOffsetPrefsMap = getPrefsMap("hijri_offset_prefs")
-
-            val syncData = baseSyncData.copy(
-                mementoMoriJson = mementoManager.exportToJson(),
-                noteDrawingsBase64 = if (drawingsMap.isNotEmpty()) drawingsMap else null,
-                noteImagesBase64 = if (imagesMap.isNotEmpty()) imagesMap else null,
-                noteAudiosBase64 = if (audiosMap.isNotEmpty()) audiosMap else null,
-                noteBlockImagesBase64 = if (blockImagesMap.isNotEmpty()) blockImagesMap else null,
-                noteBlockDrawingsBase64 = if (blockDrawingsMap.isNotEmpty()) blockDrawingsMap else null,
-                noteBlockAudiosBase64 = if (blockAudiosMap.isNotEmpty()) blockAudiosMap else null,
-                noteDrawingSidecars = if (drawingSidecarsMap.isNotEmpty()) drawingSidecarsMap else null,
-                noteBlockDrawingSidecars = if (blockDrawingSidecarsMap.isNotEmpty()) blockDrawingSidecarsMap else null,
-                customOccasionsData = occData,
-                customOccasionsHiddenData = occHiddenData,
-                appPreferences = if (appPrefsMap.isNotEmpty()) appPrefsMap else null,
-                prayerPreferences = if (prayerPrefsMap.isNotEmpty()) prayerPrefsMap else null,
-                hijriOffsetPreferences = if (hijriOffsetPrefsMap.isNotEmpty()) hijriOffsetPrefsMap else null
-            )
-            val json = syncData.toJsonString()
-            logMessage("پشتیبان کامل JSON با موفقیت تولید شد")
+            val json = buildBackupJson()
             withContext(Dispatchers.Main) {
                 onResult(json)
+            }
+        }
+    }
+
+    /**
+     * File-based export: builds the backup and writes it into a cache file in chunks,
+     * then delivers only that File. The backup content never enters Compose state and
+     * is never rendered as text (rendering it froze the UI on large backups).
+     */
+    fun exportBackupToFile(onResult: (File?) -> Unit) {
+        viewModelScope.launch(Dispatchers.IO) {
+            val file = try {
+                val json = buildBackupJson()
+                val app = getApplication<Application>()
+                val target = File(app.cacheDir, "MyCalendar_SafetyBackup.json")
+                target.bufferedWriter(Charsets.UTF_8).use { writer ->
+                    var index = 0
+                    while (index < json.length) {
+                        val chunkEnd = minOf(index + 65536, json.length)
+                        writer.write(json, index, chunkEnd - index)
+                        index = chunkEnd
+                    }
+                }
+                target
+            } catch (e: Exception) {
+                e.printStackTrace()
+                null
+            }
+            withContext(Dispatchers.Main) {
+                onResult(file)
             }
         }
     }
@@ -2076,12 +2117,14 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 return@launch
             }
 
-            exportBackupJson { json ->
-                val saved = AppUpdateManager.performSafetyBackup(context, json)
-                if (saved) {
-                    logMessage("پشتیبان اضطراری پیش از به‌روزرسانی ذخیره شد ✓")
-                }
+            exportBackupToFile { backupFile ->
                 viewModelScope.launch {
+                    val saved = backupFile != null && withContext(Dispatchers.IO) {
+                        AppUpdateManager.performSafetyBackupFromFile(context, backupFile)
+                    }
+                    if (saved) {
+                        logMessage("پشتیبان اضطراری پیش از به‌روزرسانی ذخیره شد ✓")
+                    }
                     _updateDownloadState.value = UpdateDownloadState.Downloading(0f, 0L, 0L)
                     val result = AppUpdateManager.downloadApkWithProgress(
                         context = context,

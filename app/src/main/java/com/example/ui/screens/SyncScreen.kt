@@ -83,7 +83,8 @@ fun SyncScreen(
 
     var showPairingDialog by remember { mutableStateOf(false) }
     var showBackupDialog by remember { mutableStateOf(false) }
-    var backupJsonContent by remember { mutableStateOf("") }
+    var backupExportFile by remember { mutableStateOf<java.io.File?>(null) }
+    var isExportingBackup by remember { mutableStateOf(false) }
 
     val networkInfo = NetworkUtils.getNetworkInfo(context)
     val serverUrl = "http://$serverIp:$serverPort"
@@ -262,10 +263,15 @@ fun SyncScreen(
                     horizontalArrangement = Arrangement.spacedBy(10.dp)
                 ) {
                     Button(
+                        enabled = !isExportingBackup,
                         onClick = {
-                            viewModel.exportBackupJson { json ->
-                                backupJsonContent = json
-                                showBackupDialog = true
+                            isExportingBackup = true
+                            viewModel.exportBackupToFile { file ->
+                                isExportingBackup = false
+                                if (file != null) {
+                                    backupExportFile = file
+                                    showBackupDialog = true
+                                }
                             }
                         },
                         modifier = Modifier.weight(1f)
@@ -277,7 +283,7 @@ fun SyncScreen(
 
                     OutlinedButton(
                         onClick = {
-                            backupJsonContent = ""
+                            backupExportFile = null
                             showBackupDialog = true
                         },
                         modifier = Modifier.weight(1f)
@@ -349,7 +355,7 @@ fun SyncScreen(
 
     if (showBackupDialog) {
         JsonBackupDialog(
-            jsonString = backupJsonContent,
+            backupFile = backupExportFile,
             onDismiss = { showBackupDialog = false },
             onImport = { json ->
                 viewModel.importBackupJson(json) { ok, msg ->

@@ -541,6 +541,93 @@ object AppUpdateManager {
         }
     }
 
+    /**
+     * File-based variant of [performSafetyBackup]: copies an already-written backup file
+     * into the same persistent locations without ever loading its content into memory.
+     * The export pipeline produces a File (not a String) so a media-heavy backup of tens
+     * of megabytes never becomes one giant in-memory String on the UI path, and never
+     * lands in SharedPreferences either. Restore detection still works because
+     * [getLatestSafetyBackup] falls back to the external file and the public Downloads copy.
+     */
+    fun performSafetyBackupFromFile(context: Context, backupFile: File): Boolean {
+        if (!backupFile.exists() || backupFile.length() == 0L) return false
+        val isMeaningful = fileHasMeaningfulBackupContent(backupFile)
+        return try {
+            // 1. Save in app external files directory
+            val extDir = context.getExternalFilesDir(null)
+            if (extDir != null) {
+                val file = File(extDir, "safety_backup.json")
+                if (isMeaningful || !fileHasMeaningfulBackupContent(file)) {
+                    backupFile.inputStream().use { input ->
+                        file.outputStream().use { output -> input.copyTo(output) }
+                    }
+                }
+            }
+
+            // 2. Save in public Downloads directory so it survives app uninstall (only when backup has real data)
+            if (isMeaningful) {
+                try {
+                    val fileName = "MyCalendar_SafetyBackup.json"
+                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+                        val resolver = context.contentResolver
+                        val collection = MediaStore.Downloads.EXTERNAL_CONTENT_URI
+                        val projection = arrayOf(MediaStore.Downloads._ID)
+                        val selection = "${MediaStore.Downloads.DISPLAY_NAME} = ?"
+                        val selectionArgs = arrayOf(fileName)
+                        var existingUri: Uri? = null
+                        resolver.query(collection, projection, selection, selectionArgs, null)?.use { cursor ->
+                            if (cursor.moveToFirst()) {
+                                val id = cursor.getLong(cursor.getColumnIndexOrThrow(MediaStore.Downloads._ID))
+                                existingUri = android.content.ContentUris.withAppendedId(collection, id)
+                            }
+                        }
+                        val targetUri = existingUri ?: run {
+                            val values = ContentValues().apply {
+                                put(MediaStore.Downloads.DISPLAY_NAME, fileName)
+                                put(MediaStore.Downloads.MIME_TYPE, "application/json")
+                                put(MediaStore.Downloads.RELATIVE_PATH, Environment.DIRECTORY_DOWNLOADS)
+                            }
+                            resolver.insert(collection, values)
+                        }
+                        if (targetUri != null) {
+                            resolver.openOutputStream(targetUri, "wt")?.use { out ->
+                                backupFile.inputStream().use { input -> input.copyTo(out) }
+                            }
+                        } else {
+                            Log.w(TAG, "Failed to create or resolve MediaStore URI for $fileName")
+                        }
+                    } else {
+                        if (!hasStoragePermissionForBackup(context)) {
+                            Log.w(TAG, "WRITE_EXTERNAL_STORAGE permission not granted on API ${Build.VERSION.SDK_INT}; public Downloads write may fail")
+                        }
+                        val downloadsDir = Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS)
+                        if (downloadsDir.exists() || downloadsDir.mkdirs()) {
+                            val publicFile = File(downloadsDir, fileName)
+                            backupFile.inputStream().use { input ->
+                                publicFile.outputStream().use { output -> input.copyTo(output) }
+                            }
+                        }
+                    }
+                } catch (e: Exception) {
+                    Log.e(TAG, "Error writing safety backup file to Downloads: ${e.message}", e)
+                }
+            }
+
+            Log.i(TAG, "Safety backup (from file) successfully saved! (hasData=$isMeaningful)")
+            true
+        } catch (e: Exception) {
+            Log.e(TAG, "Failed to create safety backup from file: ${e.message}", e)
+            false
+        }
+    }
+
+    private fun fileHasMeaningfulBackupContent(file: File): Boolean {
+        if (!file.exists() || file.length() == 0L) return false
+        // A backup larger than 2 MB certainly carries real content; never parse it whole here.
+        if (file.length() > 2_000_000L) return true
+        return try { hasMeaningfulBackupContent(file.readText()) } catch (_: Exception) { false }
+    }
+
     private val safetyBackupFileNameRegex = Regex("""^MyCalendar_SafetyBackup( \(\d+\))?\.json$""")
 
     /**
