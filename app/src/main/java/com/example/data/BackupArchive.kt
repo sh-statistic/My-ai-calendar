@@ -262,9 +262,19 @@ This file is a complete backup of one user's data from the Hamgam calendar app.
 It is a standard ZIP archive. You do NOT need the app to read it.
 
 CONTENTS
-- data.json ......... All data as plain JSON (UTF-8): events, tasks, notes and
-                      app settings. Media files are NOT embedded in it; they
-                      are separate files in this archive (see manifest.json).
+- data.json ......... All of the user's data as plain JSON (UTF-8):
+                        events ................ the calendar events
+                        tasks ................. the to-do tasks
+                        notes ................. the notes (their media files
+                                                are in media/, see below)
+                        customOccasionsData and customOccasionsHiddenData
+                                              ... the occasions the user added,
+                                                edited or hid (stored as text)
+                        mementoMoriJson ....... the life-grid points (as text)
+                        appPreferences and the other preference fields
+                                              ... the app settings
+                      Media files are NOT embedded in data.json; they are
+                      separate files in this archive (see manifest.json).
 - manifest.json ..... A list mapping every media file in this archive to the
                       note it belongs to. Each entry has:
                         noteId ...... the "id" of the note in data.json
@@ -287,8 +297,9 @@ TO REBUILD THE DATA ANYWHERE
 Persian summary:
 این فایل، پشتیبان کامل داده‌های یک کاربر از برنامه «تقویم همگام» است.
 یک فایل فشرده استاندارد است و برای خواندنش به خود برنامه نیازی نیست.
-داده‌ها در data.json، فایل‌های عکس و صوت و نقاشی در پوشه media
-و نقشه اتصال هر فایل به یادداشتش در manifest.json است.
+همه داده‌ها — رویدادها، وظیفه‌ها، یادداشت‌ها، مناسبت‌هایی که خود کاربر
+ساخته و نقطه‌های عمر — در data.json است، فایل‌های عکس و صوت و نقاشی
+در پوشه media و نقشه اتصال هر فایل به یادداشتش در manifest.json است.
 """
 
     /** Reports read progress as a fraction of the archive's total byte size. */
