@@ -273,6 +273,10 @@ CONTENTS
                         mementoMoriJson ....... the life-grid points (as text)
                         appPreferences and the other preference fields
                                               ... the app settings
+                      Reminders live ON their items, never separately:
+                      a note's reminder time is its "reminderAt" field
+                      (epoch milliseconds, 0 = no reminder), and an event's
+                      alarm rings at the event's own persianDate + startTime.
                       Media files are NOT embedded in data.json; they are
                       separate files in this archive (see manifest.json).
 - manifest.json ..... A list mapping every media file in this archive to the
