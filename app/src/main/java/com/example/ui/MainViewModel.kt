@@ -1617,6 +1617,15 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     }
 
 
+    /** Live progress of a backup export/restore, observed by the backup screens. */
+    sealed interface BackupWork {
+        data object Idle : BackupWork
+        data class Active(val isImport: Boolean, val fraction: Float?) : BackupWork
+    }
+
+    private val _backupWork = MutableStateFlow<BackupWork>(BackupWork.Idle)
+    val backupWork: StateFlow<BackupWork> = _backupWork.asStateFlow()
+
     fun exportBackupJson(onResult: (String) -> Unit) {
         viewModelScope.launch(Dispatchers.IO) {
             val json = buildBackupJson()
@@ -1633,12 +1642,15 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
      */
     fun exportBackupToFile(onResult: (File?) -> Unit) {
         viewModelScope.launch(Dispatchers.IO) {
+            _backupWork.value = BackupWork.Active(isImport = false, fraction = 0f)
             val file = try {
                 val parts = buildBackupParts()
                 val app = getApplication<Application>()
                 val target = File(app.cacheDir, "MyCalendar_SafetyBackup.zip")
                 target.outputStream().buffered().use { out ->
-                    com.example.data.BackupArchive.write(parts.base.toJsonString(), parts.media, out)
+                    com.example.data.BackupArchive.write(parts.base.toJsonString(), parts.media, out) { fraction ->
+                        _backupWork.value = BackupWork.Active(isImport = false, fraction = fraction)
+                    }
                 }
                 logMessage("پشتیبان کامل (بستهٔ فشرده) با موفقیت تولید شد")
                 target
@@ -1646,6 +1658,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 e.printStackTrace()
                 null
             }
+            _backupWork.value = BackupWork.Idle
             withContext(Dispatchers.Main) {
                 onResult(file)
             }
@@ -1831,16 +1844,21 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
 
     fun importBackupJson(jsonStr: String, onComplete: (Boolean, String) -> Unit) {
         viewModelScope.launch(Dispatchers.IO) {
+            _backupWork.value = BackupWork.Active(isImport = true, fraction = null)
+            val done: (Boolean, String) -> Unit = { ok, msg ->
+                _backupWork.value = BackupWork.Idle
+                onComplete(ok, msg)
+            }
             val parsed = try {
                 SyncData.fromJsonString(jsonStr)
             } catch (e: Exception) {
                 logMessage("خطا در پردازش فایل پشتیبان: ${e.localizedMessage}")
                 withContext(Dispatchers.Main) {
-                    onComplete(false, "فایل پشتیبان نامعتبر است")
+                    done(false, "فایل پشتیبان نامعتبر است")
                 }
                 return@launch
             }
-            importSyncData(parsed, onComplete)
+            importSyncData(parsed, done)
         }
     }
 
@@ -1851,27 +1869,38 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
      */
     fun importBackupFile(file: File, onComplete: (Boolean, String) -> Unit) {
         viewModelScope.launch(Dispatchers.IO) {
+            val done: (Boolean, String) -> Unit = { ok, msg ->
+                _backupWork.value = BackupWork.Idle
+                onComplete(ok, msg)
+            }
             try {
                 if (com.example.data.BackupArchive.isArchive(file)) {
-                    val archive = file.inputStream().use { com.example.data.BackupArchive.read(it) }
+                    _backupWork.value = BackupWork.Active(isImport = true, fraction = 0f)
+                    val archive = file.inputStream().use {
+                        com.example.data.BackupArchive.read(it, file.length()) { fraction ->
+                            _backupWork.value = BackupWork.Active(isImport = true, fraction = fraction)
+                        }
+                    }
                     val syncData = com.example.data.BackupArchive.toSyncData(archive) {
                         android.util.Base64.encodeToString(it, android.util.Base64.NO_WRAP)
                     }
-                    importSyncData(syncData, onComplete)
+                    _backupWork.value = BackupWork.Active(isImport = true, fraction = null)
+                    importSyncData(syncData, done)
                 } else {
+                    _backupWork.value = BackupWork.Active(isImport = true, fraction = null)
                     val text = file.readText()
                     if (text.isBlank()) {
                         withContext(Dispatchers.Main) {
-                            onComplete(false, "فایل انتخاب‌شده خالی است")
+                            done(false, "فایل انتخاب‌شده خالی است")
                         }
                         return@launch
                     }
-                    importSyncData(SyncData.fromJsonString(text), onComplete)
+                    importSyncData(SyncData.fromJsonString(text), done)
                 }
             } catch (e: Exception) {
                 logMessage("خطا در پردازش فایل پشتیبان: ${e.localizedMessage}")
                 withContext(Dispatchers.Main) {
-                    onComplete(false, "فایل پشتیبان نامعتبر است")
+                    done(false, "فایل پشتیبان نامعتبر است")
                 }
             }
         }

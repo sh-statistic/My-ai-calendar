@@ -123,10 +123,7 @@ class ShareNoteActivity : ComponentActivity() {
                 try {
                     val dir = File(filesDir, "notes_images").apply { mkdirs() }
                     val file = File(dir, "shared_" + UUID.randomUUID().toString() + ".jpg")
-                    contentResolver.openInputStream(uri)?.use { input ->
-                        file.outputStream().use { output -> input.copyTo(output) }
-                    }
-                    if (file.exists() && file.length() > 0) file.absolutePath else null
+                    if (com.example.ui.components.saveUriImageCompressed(this@ShareNoteActivity, uri, file)) file.absolutePath else null
                 } catch (_: Exception) {
                     null
                 }

@@ -933,6 +933,37 @@ fun SettingsScreen(
         )
     }
 
+    val backupWork by viewModel.backupWork.collectAsState()
+    val activeBackupWork = backupWork as? MainViewModel.BackupWork.Active
+    if (activeBackupWork != null) {
+        AlertDialog(
+            onDismissRequest = {},
+            title = {
+                Text(
+                    if (activeBackupWork.isImport) {
+                        if (strings.isFa) "در حال برگردوندن بکاپ" else "Restoring backup"
+                    } else {
+                        if (strings.isFa) "در حال ساخت بکاپ" else "Creating backup"
+                    }
+                )
+            },
+            text = {
+                Column {
+                    val fraction = activeBackupWork.fraction
+                    if (fraction != null) {
+                        LinearProgressIndicator(progress = { fraction }, modifier = Modifier.fillMaxWidth())
+                        Spacer(modifier = Modifier.height(8.dp))
+                        val pctText = "${(fraction * 100).toInt()}%"
+                        Text(if (strings.isFa) PersianCalendarHelper.toPersianDigits(pctText) else pctText, fontSize = 13.sp)
+                    } else {
+                        LinearProgressIndicator(modifier = Modifier.fillMaxWidth())
+                    }
+                }
+            },
+            confirmButton = {}
+        )
+    }
+
     if (showBackupDialog) {
         JsonBackupDialog(
             backupFile = backupExportFile,
