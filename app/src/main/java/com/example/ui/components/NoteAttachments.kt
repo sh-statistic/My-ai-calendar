@@ -1,5 +1,8 @@
 package com.example.ui.components
 
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.foundation.gestures.rememberTransformableState
+import androidx.compose.foundation.gestures.transformable
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.ui.unit.Constraints
@@ -25,6 +28,7 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.aspectRatio
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
@@ -42,6 +46,8 @@ import androidx.compose.foundation.gestures.detectDragGesturesAfterLongPress
 import androidx.compose.foundation.layout.offset
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.SubcomposeLayout
+import androidx.compose.ui.window.Dialog
+import androidx.compose.ui.window.DialogProperties
 import androidx.compose.ui.unit.IntSize
 import kotlin.math.roundToInt
 import androidx.compose.material.icons.Icons
@@ -78,6 +84,8 @@ import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.graphics.SolidColor
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
@@ -546,6 +554,7 @@ private fun NoteMediaBlock(
             null
         }
     }
+    var showPhotoViewer by remember(block.path) { mutableStateOf(false) }
     Box(modifier = Modifier.fillMaxWidth()) {
         if (bitmap != null) {
             // قاب جمع‌وجور داخل یادداشت ترکیبی: کشیدنِ عادی = اسکرول خودِ یادداشت؛
@@ -572,8 +581,8 @@ private fun NoteMediaBlock(
                         if (isDrawing) {
                             Modifier.clickable { onOpenDrawing(block) }
                         } else {
-                            // ضربه روی عکس فقط مصرف می‌شود تا صفحه‌کلید الکی باز نشود
-                            Modifier.clickable { }
+                            // ضربه روی عکس نمای بزرگش را باز می‌کند تا جزئیاتش دیده شود
+                            Modifier.clickable { showPhotoViewer = true }
                         }
                     )
                     .then(
@@ -603,7 +612,7 @@ private fun NoteMediaBlock(
                         modifier = Modifier.fillMaxWidth()
                     )
                 }.first().measure(constraints.copy(minHeight = 0, maxHeight = Constraints.Infinity))
-                val frameH = minOf(imgPlaceable.height, 430.dp.roundToPx())
+                val frameH = if (isDrawing) minOf(imgPlaceable.height, 430.dp.roundToPx()) else imgPlaceable.height
                 maxPanPx = imgPlaceable.height - frameH
                 layout(constraints.maxWidth, frameH) {
                     imgPlaceable.place(0, -panPx.roundToInt())
@@ -634,6 +643,52 @@ private fun NoteMediaBlock(
                         color = MaterialTheme.colorScheme.primary,
                         fontWeight = FontWeight.Medium
                     )
+                }
+            }
+        }
+        if (!isDrawing && showPhotoViewer && bitmap != null) {
+            Dialog(
+                onDismissRequest = { showPhotoViewer = false },
+                properties = DialogProperties(usePlatformDefaultWidth = false)
+            ) {
+                Box(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .background(Color.Black)
+                ) {
+                    var zoomScale by remember { mutableFloatStateOf(1f) }
+                    var zoomOffset by remember { mutableStateOf(Offset.Zero) }
+                    val transformState = rememberTransformableState { zoomChange, panChange, _ ->
+                        zoomScale = (zoomScale * zoomChange).coerceIn(1f, 5f)
+                        zoomOffset = if (zoomScale <= 1f) Offset.Zero else zoomOffset + panChange
+                    }
+                    Image(
+                        bitmap = bitmap,
+                        contentDescription = if (isFa) "عکس" else "Photo",
+                        contentScale = ContentScale.Fit,
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .transformable(transformState)
+                            .graphicsLayer(
+                                scaleX = zoomScale,
+                                scaleY = zoomScale,
+                                translationX = zoomOffset.x,
+                                translationY = zoomOffset.y
+                            )
+                    )
+                    IconButton(
+                        onClick = { showPhotoViewer = false },
+                        modifier = Modifier
+                            .align(Alignment.TopEnd)
+                            .padding(12.dp)
+                            .background(Color.Black.copy(alpha = 0.45f), CircleShape)
+                    ) {
+                        Icon(
+                            Icons.Default.Close,
+                            contentDescription = if (isFa) "بستن" else "Close",
+                            tint = Color.White
+                        )
+                    }
                 }
             }
         }
