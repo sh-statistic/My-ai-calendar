@@ -746,6 +746,11 @@ fun getAdaptiveNoteBorder(hex: String, isDark: Boolean): Color {
     return accent.copy(alpha = 0.35f)
 }
 
+private sealed interface CardStripItem {
+    data class Img(val path: String) : CardStripItem
+    object Aud : CardStripItem
+}
+
 @OptIn(ExperimentalFoundationApi::class, ExperimentalLayoutApi::class)
 @Composable
 fun NoteCard(
@@ -839,82 +844,86 @@ fun NoteCard(
 
             // نوار بندانگشتیِ همهٔ عکس‌ها و طرح‌های یادداشت، بالای کارت: کاربر بدون باز کردنِ یادداشت
             // و اسکرول کردنِ متن بلندش می‌فهمد کدام عکس توی کدام یادداشت است.
-            val (thumbPaths, audioCount) = remember(note.blocksJson, note.imagePath, note.drawingPath, note.audioPath, note.updatedAt) {
+            val stripItems = remember(note.blocksJson, note.imagePath, note.drawingPath, note.audioPath, note.updatedAt) {
                 val media = extractNoteBlockMedia(note.blocksJson)
-                val imgsFromBlocks = media.filter { it.kind == "i" || it.kind == "d" }.mapNotNull { it.path }
-                val audsFromBlocks = media.filter { it.kind == "a" }.mapNotNull { it.path }
-                val useBlocks = imgsFromBlocks.isNotEmpty() || audsFromBlocks.isNotEmpty()
-                val imgCandidates = if (useBlocks) {
-                    imgsFromBlocks
-                } else {
-                    listOfNotNull(
-                        note.drawingPath?.takeIf { it.isNotBlank() },
-                        note.imagePath?.takeIf { it.isNotBlank() }
-                    )
-                }
-                val audCandidates = if (useBlocks) {
-                    audsFromBlocks
-                } else {
-                    listOfNotNull(note.audioPath?.takeIf { it.isNotBlank() })
-                }
                 val existing: (String) -> Boolean = { runCatching { File(it).exists() }.getOrDefault(false) }
-                Pair(imgCandidates.filter(existing), audCandidates.count(existing))
+                if (media.isNotEmpty()) {
+                    // ترتیب واقعی بلوک‌ها حفظ می‌شود: صدای وسط عکس‌ها، وسط همان عکس‌ها می‌آید
+                    media.mapNotNull { block ->
+                        val path = block.path
+                        when {
+                            (block.kind == "i" || block.kind == "d") && !path.isNullOrBlank() && existing(path) -> CardStripItem.Img(path)
+                            block.kind == "a" && !path.isNullOrBlank() && existing(path) -> CardStripItem.Aud
+                            else -> null
+                        }
+                    }
+                } else {
+                    buildList {
+                        note.drawingPath?.takeIf { it.isNotBlank() && existing(it) }?.let { add(CardStripItem.Img(it)) }
+                        note.imagePath?.takeIf { it.isNotBlank() && existing(it) }?.let { add(CardStripItem.Img(it)) }
+                        note.audioPath?.takeIf { it.isNotBlank() && existing(it) }?.let { add(CardStripItem.Aud) }
+                    }
+                }
             }
-            if (thumbPaths.isNotEmpty() || audioCount > 0) {
+            if (stripItems.isNotEmpty()) {
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
                         .horizontalScroll(rememberScrollState()),
                     horizontalArrangement = Arrangement.spacedBy(6.dp)
                 ) {
-                    thumbPaths.forEach { thumbPath ->
-                        val thumbBitmap = remember(thumbPath, note.updatedAt) {
-                            try {
-                                val f = File(thumbPath)
-                                if (!f.exists()) {
-                                    null
-                                } else {
-                                    val boundsOpts = BitmapFactory.Options().apply { inJustDecodeBounds = true }
-                                    BitmapFactory.decodeFile(thumbPath, boundsOpts)
-                                    var sample = 1
-                                    while (boundsOpts.outWidth / (sample * 2) >= 160 && boundsOpts.outHeight / (sample * 2) >= 160) {
-                                        sample *= 2
+                    stripItems.forEach { stripItem ->
+                        when (stripItem) {
+                            is CardStripItem.Img -> {
+                                val thumbPath = stripItem.path
+                                val thumbBitmap = remember(thumbPath, note.updatedAt) {
+                                    try {
+                                        val f = File(thumbPath)
+                                        if (!f.exists()) {
+                                            null
+                                        } else {
+                                            val boundsOpts = BitmapFactory.Options().apply { inJustDecodeBounds = true }
+                                            BitmapFactory.decodeFile(thumbPath, boundsOpts)
+                                            var sample = 1
+                                            while (boundsOpts.outWidth / (sample * 2) >= 160 && boundsOpts.outHeight / (sample * 2) >= 160) {
+                                                sample *= 2
+                                            }
+                                            val opts = BitmapFactory.Options().apply { inSampleSize = sample }
+                                            BitmapFactory.decodeFile(thumbPath, opts)?.asImageBitmap()
+                                        }
+                                    } catch (_: Exception) {
+                                        null
                                     }
-                                    val opts = BitmapFactory.Options().apply { inSampleSize = sample }
-                                    BitmapFactory.decodeFile(thumbPath, opts)?.asImageBitmap()
                                 }
-                            } catch (_: Exception) {
-                                null
+                                if (thumbBitmap != null) {
+                                    Image(
+                                        bitmap = thumbBitmap,
+                                        contentDescription = null,
+                                        contentScale = ContentScale.Crop,
+                                        modifier = Modifier
+                                            .size(54.dp)
+                                            .clip(RoundedCornerShape(8.dp))
+                                            .border(0.6.dp, if (isDark) Color(0xFF2A2A32) else Color.Black.copy(alpha = 0.08f), RoundedCornerShape(8.dp))
+                                    )
+                                }
                             }
-                        }
-                        if (thumbBitmap != null) {
-                            Image(
-                                bitmap = thumbBitmap,
-                                contentDescription = null,
-                                contentScale = ContentScale.Crop,
-                                modifier = Modifier
-                                    .size(54.dp)
-                                    .clip(RoundedCornerShape(8.dp))
-                                    .border(0.6.dp, if (isDark) Color(0xFF2A2A32) else Color.Black.copy(alpha = 0.08f), RoundedCornerShape(8.dp))
-                            )
-                        }
-                    }
-                    // فایل‌های صوتی عکس ندارن؛ بعد از عکس‌ها با آیکون میکروفون نشون داده می‌شن
-                    repeat(audioCount) {
-                        Box(
-                            modifier = Modifier
-                                .size(54.dp)
-                                .clip(RoundedCornerShape(8.dp))
-                                .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.55f))
-                                .border(0.6.dp, if (isDark) Color(0xFF2A2A32) else Color.Black.copy(alpha = 0.08f), RoundedCornerShape(8.dp)),
-                            contentAlignment = Alignment.Center
-                        ) {
-                            Icon(
-                                Icons.Default.Mic,
-                                contentDescription = if (strings.isFa) "یادداشت صوتی" else "Voice note",
-                                tint = MaterialTheme.colorScheme.primary,
-                                modifier = Modifier.size(22.dp)
-                            )
+                            CardStripItem.Aud -> {
+                                Box(
+                                    modifier = Modifier
+                                        .size(54.dp)
+                                        .clip(RoundedCornerShape(8.dp))
+                                        .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.55f))
+                                        .border(0.6.dp, if (isDark) Color(0xFF2A2A32) else Color.Black.copy(alpha = 0.08f), RoundedCornerShape(8.dp)),
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    Icon(
+                                        Icons.Default.Mic,
+                                        contentDescription = if (strings.isFa) "یادداشت صوتی" else "Voice note",
+                                        tint = MaterialTheme.colorScheme.primary,
+                                        modifier = Modifier.size(22.dp)
+                                    )
+                                }
+                            }
                         }
                     }
                 }
