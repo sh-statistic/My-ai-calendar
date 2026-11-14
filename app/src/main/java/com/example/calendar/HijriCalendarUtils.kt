@@ -34,14 +34,14 @@ object HijriCalendarUtils {
     )
 
     /**
-     * لیست تمام مناسبت‌های مذهبی تعطیل رسمی
-     * این تاریخ‌ها در تقویم قمری ثابت هستند و هرگز تغییر نمی‌کنند.
+     * لیست مناسبت‌های مذهبی بر اساس تاریخ ثابت قمری؛ تعطیل‌های رسمی با isHoliday = true
+     * و مناسبت‌های غیرتعطیل با isHoliday = false مشخص شده‌اند.
      */
     val HIJRI_OCCASIONS = listOf(
         // ─── محرم (ماه ۱) ───
         HijriOccasion(1, 9, "تاسوعای حسینی"),
         HijriOccasion(1, 10, "عاشورای حسینی"),
-        HijriOccasion(1, 12, "شهادت حضرت امام زین‌العابدین (ع)"),
+        HijriOccasion(1, 12, "شهادت حضرت امام زین‌العابدین (ع)", isHoliday = false), // مناسبت است، تعطیل رسمی نیست
 
         // ─── صفر (ماه ۲) ───
         HijriOccasion(2, 20, "اربعین حسینی"),
@@ -72,7 +72,120 @@ object HijriCalendarUtils {
 
         // ─── ذی‌الحجه (ماه ۱۲) ───
         HijriOccasion(12, 10, "عید سعید قربان"),
-        HijriOccasion(12, 18, "عید سعید غدیر خم")
+        HijriOccasion(12, 18, "عید سعید غدیر خم"),
+
+        // ─── مناسبت‌های غیرتعطیل (از تقویم رسمی؛ داده بادصبا) ───
+        // ─── محرم (غیرتعطیل) ───
+        HijriOccasion(1, 1, "آغاز سال هجری قمری", isHoliday = false),
+        HijriOccasion(1, 1, "روز شعر و ادبیات آیینی", isHoliday = false),
+        HijriOccasion(1, 1, "روز بزرگداشت محتشم کاشانی", isHoliday = false),
+        HijriOccasion(1, 2, "ورود امام حسین علیه السلام به کربلا (61 هـ ق)", isHoliday = false),
+        HijriOccasion(1, 2, "روز امر به معروف و نهی از منکر", isHoliday = false),
+        HijriOccasion(1, 11, "روز تجلیل از اسرا و مفقودان", isHoliday = false),
+        HijriOccasion(1, 12, "ورود اسیران کربلا به کوفه(61 هـ ق)", isHoliday = false),
+        HijriOccasion(1, 25, "شهادت حضرت امام زین العابدین علیه السلام (95 هـ ق - به روایتی)", isHoliday = false),
+        HijriOccasion(1, 25, "یادروز قیام مردم سیستان به خون خواهی شهدای کربلا (62 هـ ق)", isHoliday = false),
+        // ─── صفر (غیرتعطیل) ───
+        HijriOccasion(2, 3, "ولادت حضرت امام محمدباقر علیه السلام( 57 هـ ق - به روایتی)", isHoliday = false),
+        HijriOccasion(2, 5, "شهادت حضرت رقیه (س) دختر سه ساله امام حسین علیه السلام(61 هـ ق)", isHoliday = false),
+        HijriOccasion(2, 7, "شهادت حضرت امام حسن مجتبی علیه السلام (50 هـ ق) (به روایتی)", isHoliday = false),
+        HijriOccasion(2, 7, "روز بزرگداشت سلمان فارسی", isHoliday = false),
+        HijriOccasion(2, 9, "شهادت عمار بن یاسر(37 هـ ق)", isHoliday = false),
+        HijriOccasion(2, 20, "ورود جابربن عبدالله انصاری به کربلا (61 هـ ق)", isHoliday = false),
+        // ─── ربیع‌الاول (غیرتعطیل) ───
+        HijriOccasion(3, 1, "هجرت حضرت رسول اکرم صلی الله علیه و آله از مکه به مدینه", isHoliday = false),
+        HijriOccasion(3, 1, "شهادت حضرت امام حسن عسکری علیه السلام (به روایتی)", isHoliday = false),
+        HijriOccasion(3, 4, "خروج حضرت رسول اکرم صلی الله علیه و آله از غار(ثور) و حرکت به سوی مدینه (1 هـ ق)", isHoliday = false),
+        HijriOccasion(3, 5, "وفات سکینه خاتون دختر امام حسین علیه السلام (117 هـ ق)", isHoliday = false),
+        HijriOccasion(3, 10, "ازدواج رسول اکرم صلی الله علیه و آله با حضرت خدیجه کبری سلام الله علیها", isHoliday = false),
+        HijriOccasion(3, 12, "ولادت حضرت رسول اکرم صلی الله علیه و آله به روایت اهل سنت(53 سال قبل از هجرت) -  آغاز هفته وحدت", isHoliday = false),
+        HijriOccasion(3, 16, "روز وقف", isHoliday = false),
+        HijriOccasion(3, 22, "غزوه بنی النضیر", isHoliday = false),
+        HijriOccasion(3, 26, "صلح حضرت امام حسن مجتبی علیه السلام (41 هـ ق)", isHoliday = false),
+        // ─── ربیع‌الثانی (غیرتعطیل) ───
+        HijriOccasion(4, 4, "ولادت حضرت عبدالعظیم حسنی علیه السلام", isHoliday = false),
+        HijriOccasion(4, 8, "ولادت حضرت امام حسن عسکری علیه السلام (232 هـ ق)", isHoliday = false),
+        HijriOccasion(4, 10, "وفات حضرت معصومه سلام الله علیها (201 هـ ق)", isHoliday = false),
+        HijriOccasion(4, 10, "میلاد حضرت امام حسن عسکری علیه السلام به روایتی (232 هـ ق)", isHoliday = false),
+        // ─── جمادی‌الاول (غیرتعطیل) ───
+        HijriOccasion(5, 5, "ولادت حضرت زینب سلام الله علیها (5 هـ ق) و روز پرستار", isHoliday = false),
+        HijriOccasion(5, 10, "جنگ جمل(36 هـ ق)", isHoliday = false),
+        HijriOccasion(5, 13, "شهادت حضرت فاطمة زهرا سلام االله علیها (11 هـ ق) به روایتی", isHoliday = false),
+        HijriOccasion(5, 15, "ولادت حضرت سجاد علیه السلام به روایتی (38 هـ ق)", isHoliday = false),
+        HijriOccasion(5, 27, "رحلت حضرت عبدالمطلب (ع) جد پیامبر اکرم حضرت محمد صلی الله علیه و آله", isHoliday = false),
+        // ─── جمادی‌الثانی (غیرتعطیل) ───
+        HijriOccasion(6, 13, "سالروز وفات حضرت ام البنین سلام الله علیها", isHoliday = false),
+        HijriOccasion(6, 13, "روز تکریم مادران و همسران شهدا", isHoliday = false),
+        HijriOccasion(6, 20, "ولادت حضرت فاطمه زهرا سلام الله علیها (هشتم قبل از هجرت) و روز زن", isHoliday = false),
+        HijriOccasion(6, 20, "تولد حضرت امام خمینی(رحمة الله علیه) رهبر کبیر انقلاب اسلامی(1320 هـ ق)", isHoliday = false),
+        HijriOccasion(6, 29, "رحلت حضرت ام کلثوم سلام الله علیها، دختر بزرگوار امام علی علیه اسلام و حضرت فاطمه زهرا سلام الله علیها", isHoliday = false),
+        // ─── رجب (غیرتعطیل) ───
+        HijriOccasion(7, 1, "ولادت حضرت امام محمد باقر علیه السلام (57 هـ ق)", isHoliday = false),
+        HijriOccasion(7, 1, "شروع ماه رجب", isHoliday = false),
+        HijriOccasion(7, 3, "شهادت حضرت امام علی النقی الهادی علیه السلام (254 هـ ق)", isHoliday = false),
+        HijriOccasion(7, 6, "لیلة الرغائب (شب آرزوها)", isHoliday = false),
+        HijriOccasion(7, 10, "ولادت حضرت امام محمد تقی علیه السلام (جواد الائمه) (195 هـ ق)", isHoliday = false),
+        HijriOccasion(7, 13, "آغاز ایام البیض (اعتکاف)", isHoliday = false),
+        HijriOccasion(7, 15, "ارتحال حضرت زینب سلام الله علیها (62 هـ ق)", isHoliday = false),
+        HijriOccasion(7, 15, "تغییر قبله مسلمین از بیت المقدس به مکه معظمه(2 هـ ق)", isHoliday = false),
+        HijriOccasion(7, 18, "وفات ابراهیم فرزند پیامبر اکرم صلی الله علیه و آله (10 هـ ق)", isHoliday = false),
+        HijriOccasion(7, 24, "فتح خیبر توسط حضرت امیرالمومنین علی علیه السلام (7 هـ ق)", isHoliday = false),
+        HijriOccasion(7, 25, "شهادت حضرت امام موسی کاظم علیه السلام (183 هـ ق)", isHoliday = false),
+        HijriOccasion(7, 26, "وفات حضرت ابوطالب عموی پیامبر اکرم (صلی الله علیه و آله) و پدر امیرالمومنین علیه السلام (3 سال قبل از هجرت)", isHoliday = false),
+        // ─── شعبان (غیرتعطیل) ───
+        HijriOccasion(8, 3, "ولادت حضرت امام حسین علیه السلام ( 4 هـ ق) و روز پاسدار", isHoliday = false),
+        HijriOccasion(8, 4, "ولادت حضرت ابوالفضل العباس علیه السلام ( 26 هـ ق) و روز جانباز", isHoliday = false),
+        HijriOccasion(8, 5, "ولادت حضرت امام زین العابدین علیه السلام 38 ه ق- روز صحیفه سجادیه", isHoliday = false),
+        HijriOccasion(8, 11, "ولادت حضرت علی اکبر علیه السلام (33 هـ ق) و روز جوان", isHoliday = false),
+        HijriOccasion(8, 15, "روز جهانی مستضعفان", isHoliday = false),
+        HijriOccasion(8, 15, "روز سربازان گمنام امام زمان(عجل الله تعالی فرجه)", isHoliday = false),
+        HijriOccasion(8, 19, "غزوه بنی المصطلق(6 هـ ق)", isHoliday = false),
+        // ─── رمضان (غیرتعطیل) ───
+        HijriOccasion(9, 1, "شروع ماه رمضان", isHoliday = false),
+        HijriOccasion(9, 7, "روز جهانی قدس (آخرین جمعه ماه رمضان)", isHoliday = false),
+        HijriOccasion(9, 10, "وفات حضرت خدیجه کبری سلام الله علیها (3 سال قبل از هجرت)", isHoliday = false),
+        HijriOccasion(9, 15, "ولادت حضرت امام حسن مجتبی علیه السلام (3هـ ق)", isHoliday = false),
+        HijriOccasion(9, 15, "روز اکرام و تکریم خیرین", isHoliday = false),
+        HijriOccasion(9, 17, "معراج رسول اکرم (صلی الله علیه و آله)  (6 ماه قبل از هجرت)", isHoliday = false),
+        HijriOccasion(9, 17, "جنگ بدر(2 هـ ق)", isHoliday = false),
+        HijriOccasion(9, 18, "اولین شب قدر", isHoliday = false),
+        HijriOccasion(9, 19, "ضربت خوردن حضرت علی علیه السلام (40 هـ ق)", isHoliday = false),
+        HijriOccasion(9, 19, "روز نهج البلاغه", isHoliday = false),
+        HijriOccasion(9, 20, "فتح مکه(8 هـ ق)", isHoliday = false),
+        HijriOccasion(9, 20, "دومین شب قدر", isHoliday = false),
+        HijriOccasion(9, 22, "سومین شب قدر", isHoliday = false),
+        // ─── شوال (غیرتعطیل) ───
+        HijriOccasion(10, 5, "ورود جناب مسلم ابن عقیل به کوفه(60 هـ ق)", isHoliday = false),
+        HijriOccasion(10, 8, "تخریب قبور ائمه بقیع علیهم السلام", isHoliday = false),
+        HijriOccasion(10, 15, "شهادت حضرت حمزه (3 هـ ق)", isHoliday = false),
+        HijriOccasion(10, 15, "وفات حضرت عبدالعظیم حسنی (252 هـ ق)", isHoliday = false),
+        HijriOccasion(10, 17, "غزوه خندق (5 هـ ق)", isHoliday = false),
+        HijriOccasion(10, 17, "روز فرهنگ پهلوانی و ورزش زورخانه ای", isHoliday = false),
+        HijriOccasion(10, 21, "فتح اندلس به دست مسلمانان (92 هـ ق)", isHoliday = false),
+        // ─── ذی‌القعده (غیرتعطیل) ───
+        HijriOccasion(11, 1, "روز میلاد حضرت معصومه (س) و روز دختران - آغاز دهه کرامت", isHoliday = false),
+        HijriOccasion(11, 5, "روز تجلیل از امامزادگان و بقاع متبرکه", isHoliday = false),
+        HijriOccasion(11, 5, "روز بزرگداشت حضرت صالح بن موسی کاظم علیه السلام", isHoliday = false),
+        HijriOccasion(11, 6, "روز بزرگداشت حضرت احمدبن موسی شاهچراغ علیه السلام", isHoliday = false),
+        HijriOccasion(11, 11, "ولادت حضرت امام رضا علیه السلام (148 هـ ق)", isHoliday = false),
+        HijriOccasion(11, 23, "شهادت حضرت امام رضا علیه السلام به روایتی (202 هـ ق)", isHoliday = false),
+        HijriOccasion(11, 23, "غزوه بنی قریظه", isHoliday = false),
+        HijriOccasion(11, 25, "روز دحوالارض-حرکت امام رضا از مدینه به سمت خراسان(200 هـ ق)", isHoliday = false),
+        HijriOccasion(11, 29, "شهادت حضرت امام محمد تقی علیه السلام (جواد الائمه)  (220 هـ ق)", isHoliday = false),
+        // ─── ذی‌الحجه (غیرتعطیل) ───
+        HijriOccasion(12, 1, "روز ازدواج", isHoliday = false),
+        HijriOccasion(12, 1, "سالروز ازدواج حضرت امام علی علیه السلام و حضرت فاطمه سلام االله علیها ( 2 هـ ق)", isHoliday = false),
+        HijriOccasion(12, 3, "ورود پیامبر اکرم (صلی الله علیه و آله)به مکه در سفر حجه الوداع(10 هـ ق)", isHoliday = false),
+        HijriOccasion(12, 6, "شهادت مظلومانه زائران خانه خدا به دست ماموران آل سعود (1366 ه ش برابر با 6 ذی الحجه 1407 هـ ق)", isHoliday = false),
+        HijriOccasion(12, 7, "شهادت حضرت  امام محمد باقر علیه السلام (114 هـ ق)", isHoliday = false),
+        HijriOccasion(12, 8, "حرکت حضرت امام حسین علیه السلام از مکه بسوی کربلا (60 هـ ق)", isHoliday = false),
+        HijriOccasion(12, 9, "روز عرفه (روز نیایش)", isHoliday = false),
+        HijriOccasion(12, 9, "شهادت مسلم بن عقیل و هانی ابن عروه(60 هـ ق)", isHoliday = false),
+        HijriOccasion(12, 15, "ولادت حضرت امام علی النقی الهادی علیه السلام (212 هـ ق)", isHoliday = false),
+        HijriOccasion(12, 20, "ولادت حضرت امام موسی کاظم علیه السلام (128 هـ ق)", isHoliday = false),
+        HijriOccasion(12, 22, "شهادت میثم تمار(60 هـ ق)", isHoliday = false),
+        HijriOccasion(12, 24, "روز مباهله پیامبر اسلام صلی الله علیه و آله (10 هـ ق)", isHoliday = false),
+        HijriOccasion(12, 25, "روز خانواده و تکریم بازنشستگان", isHoliday = false),
     )
 
     // ========== تبدیل تقویم جلالی (شمسی) ↔ عدد روز ژولیَن (JDN) ==========
@@ -205,8 +318,10 @@ object HijriCalendarUtils {
 
     /**
      * محاسبه تمام مناسبت‌های مذهبی (قمری) برای یک سال شمسی مشخص.
-     * تاریخ‌های قمری ثابت هستند و این تابع آن‌ها را به صورت خودکار
-     * به تاریخ شمسی معادل تبدیل می‌کند.
+     *
+     * جایگذاری از همان مسیر تبدیل [persianToIslamic] انجام می‌شود که تاریخ قمری
+     * نمایشی را تولید می‌کند؛ بنابراین مناسبت هر روز دقیقاً روی تاریخی می‌نشیند
+     * که کاربر در تقویم می‌بیند و دو مسیر هرگز از هم جدا نمی‌شوند.
      *
      * @param jalaliYear سال شمسی (مثلاً ۱۴۰۵)
      * @return نگاشت از "ماه-روز" شمسی به لیست مناسبت‌ها
@@ -215,39 +330,37 @@ object HijriCalendarUtils {
         cache[jalaliYear]?.let { return it }
 
         val result = mutableMapOf<String, MutableList<PersianOccasion>>()
+        val byHijriDay = HIJRI_OCCASIONS.groupBy { it.hijriMonth to it.hijriDay }
 
-        // محاسبه محدوده JDN برای این سال شمسی
-        val yearStart = persianToJdn(jalaliYear, 1, 1)
-        val lastDay = if (isPersianLeapYear(jalaliYear)) 30 else 29
-        val yearEnd = persianToJdn(jalaliYear, 12, lastDay)
-
-        // پیدا کردن سال‌های قمری که با این سال شمسی همپوشانی دارند
-        val hijriStart = jdnToIslamic(yearStart)
-        val hijriEnd = jdnToIslamic(yearEnd)
-
-        // برای هر سال قمری همپوشان، مناسبت‌ها را محاسبه کن
-        for (hijriYear in hijriStart.year..hijriEnd.year) {
-            for (occasion in HIJRI_OCCASIONS) {
-                val jdn = islamicToJdn(hijriYear, occasion.hijriMonth, occasion.hijriDay)
-                val adjustedJdn = jdn - HijriOffsetManager.currentOffset
-
-                // آیا این تاریخ در محدوده سال شمسی ماست؟
-                if (adjustedJdn in yearStart..yearEnd) {
-                    val jalaliDate = jdnToPersian(adjustedJdn)
-                    val key = "${jalaliDate.month}-${jalaliDate.day}"
-
-                    val persianOccasion = PersianOccasion(
-                        title = occasion.title,
-                        isHoliday = occasion.isHoliday,
-                        isReligious = true
+        var month = 1
+        var day = 1
+        val daysInYear = if (isPersianLeapYear(jalaliYear)) 366 else 365
+        repeat(daysInYear) {
+            val hijri = persianToIslamic(jalaliYear, month, day)
+            byHijriDay[hijri.month to hijri.day]?.let { todays ->
+                val list = result.getOrPut("$month-$day") { mutableListOf() }
+                for (occasion in todays) {
+                    list.add(
+                        PersianOccasion(
+                            title = occasion.title,
+                            isHoliday = occasion.isHoliday,
+                            isReligious = true
+                        )
                     )
-
-                    result.getOrPut(key) { mutableListOf() }.add(persianOccasion)
                 }
+            }
+            val daysInMonth = when {
+                month <= 6 -> 31
+                month <= 11 -> 30
+                else -> if (isPersianLeapYear(jalaliYear)) 30 else 29
+            }
+            day++
+            if (day > daysInMonth) {
+                day = 1
+                month++
             }
         }
 
-        // ذخیره در کش
         cache[jalaliYear] = result
         return result
     }
