@@ -3419,7 +3419,7 @@ fun JsonBackupDialog(
 ) {
     val strings = rememberAppStrings()
     val context = androidx.compose.ui.platform.LocalContext.current
-    val scope = rememberCoroutineScope()
+    val scope = androidx.compose.runtime.rememberCoroutineScope()
     var importText by remember { mutableStateOf("") }
     var activeTab by remember(backupFile) { mutableStateOf(if (backupFile == null) 1 else 0) }
     // Load the auto-backup off the main thread: reading a multi-megabyte backup file
