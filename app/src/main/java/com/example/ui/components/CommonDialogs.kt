@@ -3469,7 +3469,7 @@ fun JsonBackupDialog(
     }
 
     val saveBackupFileLauncher = androidx.activity.compose.rememberLauncherForActivityResult(
-        contract = androidx.activity.result.contract.ActivityResultContracts.CreateDocument("application/json")
+        contract = androidx.activity.result.contract.ActivityResultContracts.CreateDocument("application/zip")
     ) { uri ->
         val sourceFile = backupFile
         if (uri != null && sourceFile != null) {
@@ -3498,7 +3498,7 @@ fun JsonBackupDialog(
 
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text(if (strings.isFa) "پشتیبان‌گیری و بازیابی آفلاین JSON" else "Offline JSON Backup & Restore", fontWeight = FontWeight.Bold) },
+        title = { Text(if (strings.isFa) "پشتیبان‌گیری و بازیابی آفلاین" else "Offline Backup & Restore", fontWeight = FontWeight.Bold) },
         text = {
             Column(
                 modifier = Modifier
@@ -3545,7 +3545,7 @@ fun JsonBackupDialog(
                                     kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
                                         com.example.update.AppUpdateManager.performSafetyBackupFromFile(context, fileToSave)
                                     }
-                                    saveBackupFileLauncher.launch("MyCalendar_SafetyBackup.zip")
+                                    saveBackupFileLauncher.launch("MyCalendar_Backup.zip")
                                 }
                             }
                         },
