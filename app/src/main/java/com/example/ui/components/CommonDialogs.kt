@@ -2339,7 +2339,8 @@ fun AddNoteDialog(
     BackHandler { handleExit() }
 
     Surface(modifier = Modifier.fillMaxSize().clickable(interactionSource = remember { MutableInteractionSource() }, indication = null) {}, color = editorBgAdd) {
-            Column(modifier = Modifier.fillMaxSize().statusBarsPadding().windowInsetsPadding(WindowInsets.ime.union(WindowInsets.navigationBars))) {
+            Box(modifier = Modifier.fillMaxSize().statusBarsPadding().windowInsetsPadding(WindowInsets.ime.union(WindowInsets.navigationBars))) {
+            Column(modifier = Modifier.fillMaxSize()) {
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
@@ -2584,20 +2585,23 @@ fun AddNoteDialog(
                 }
 
                 }
+            }
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(horizontal = 16.dp, vertical = 10.dp),
+                        .align(Alignment.BottomCenter)
+                        .padding(horizontal = 16.dp, vertical = 6.dp),
                     horizontalArrangement = Arrangement.spacedBy(10.dp),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     val isDarkBar = MaterialTheme.colorScheme.background.luminance() < 0.5f
+                    Row(horizontalArrangement = Arrangement.spacedBy(14.dp)) {
                     noteColors.forEach { hex ->
                         val col = getAdaptiveNoteColor(hex, isDarkBar)
                         val isSelected = selectedColor == hex
                         Box(
                             modifier = Modifier
-                                .size(30.dp)
+                                .size(26.dp)
                                 .clip(CircleShape)
                                 .background(col)
                                 .clickable { selectedColor = hex }
@@ -2617,6 +2621,7 @@ fun AddNoteDialog(
                                 )
                             }
                         }
+                    }
                     }
                     Spacer(modifier = Modifier.weight(1f))
                     Box {
@@ -2832,7 +2837,8 @@ fun EditNoteDialog(
     BackHandler { handleExit() }
 
     Surface(modifier = Modifier.fillMaxSize().clickable(interactionSource = remember { MutableInteractionSource() }, indication = null) {}, color = editorBgEdit) {
-            Column(modifier = Modifier.fillMaxSize().statusBarsPadding().windowInsetsPadding(WindowInsets.ime.union(WindowInsets.navigationBars))) {
+            Box(modifier = Modifier.fillMaxSize().statusBarsPadding().windowInsetsPadding(WindowInsets.ime.union(WindowInsets.navigationBars))) {
+            Column(modifier = Modifier.fillMaxSize()) {
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
@@ -3072,19 +3078,22 @@ fun EditNoteDialog(
                 }
 
                 }
+            }
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(horizontal = 16.dp, vertical = 10.dp),
+                        .align(Alignment.BottomCenter)
+                        .padding(horizontal = 16.dp, vertical = 6.dp),
                     horizontalArrangement = Arrangement.spacedBy(10.dp),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
+                    Row(horizontalArrangement = Arrangement.spacedBy(14.dp)) {
                     noteColors.forEach { hex ->
                         val col = getAdaptiveNoteColor(hex, isDark)
                         val isSelected = selectedColor == hex
                         Box(
                             modifier = Modifier
-                                .size(30.dp)
+                                .size(26.dp)
                                 .clip(CircleShape)
                                 .background(col)
                                 .clickable { selectedColor = hex }
@@ -3104,6 +3113,7 @@ fun EditNoteDialog(
                                 )
                             }
                         }
+                    }
                     }
                     Spacer(modifier = Modifier.weight(1f))
                     Box {
