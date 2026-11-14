@@ -476,7 +476,7 @@ object AppUpdateManager {
             // 3. Save in public Downloads directory so it survives app uninstall (only when backup has real data)
             if (isMeaningful) {
                 try {
-                    val fileName = publicBackupName
+                    val fileName = "MyCalendar_SafetyBackup.json"
                     if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
                         val resolver = context.contentResolver
                         // Check if an entry with this name already exists in Downloads
@@ -495,7 +495,7 @@ object AppUpdateManager {
                         val targetUri = existingUri ?: run {
                             val values = ContentValues().apply {
                                 put(MediaStore.Downloads.DISPLAY_NAME, fileName)
-                                put(MediaStore.Downloads.MIME_TYPE, publicBackupMime)
+                                put(MediaStore.Downloads.MIME_TYPE, "application/json")
                                 put(MediaStore.Downloads.RELATIVE_PATH, Environment.DIRECTORY_DOWNLOADS)
                             }
                             resolver.insert(collection, values)
@@ -563,7 +563,7 @@ object AppUpdateManager {
             // 2. Save in public Downloads directory so it survives app uninstall (only when backup has real data)
             if (isMeaningful) {
                 try {
-                    val fileName = "MyCalendar_SafetyBackup.json"
+                    val fileName = publicBackupName
                     if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
                         val resolver = context.contentResolver
                         val collection = MediaStore.Downloads.EXTERNAL_CONTENT_URI
@@ -580,7 +580,7 @@ object AppUpdateManager {
                         val targetUri = existingUri ?: run {
                             val values = ContentValues().apply {
                                 put(MediaStore.Downloads.DISPLAY_NAME, fileName)
-                                put(MediaStore.Downloads.MIME_TYPE, "application/json")
+                                put(MediaStore.Downloads.MIME_TYPE, publicBackupMime)
                                 put(MediaStore.Downloads.RELATIVE_PATH, Environment.DIRECTORY_DOWNLOADS)
                             }
                             resolver.insert(collection, values)

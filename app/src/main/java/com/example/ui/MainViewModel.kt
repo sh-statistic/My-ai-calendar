@@ -1286,7 +1286,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
      * it. No media bytes are read here; each container builder embeds them its own
      * way (base64 maps for the legacy JSON, raw entries for the ZIP archive).
      */
-    private fun buildBackupParts(): BackupParts {
+    private suspend fun buildBackupParts(): BackupParts {
         val app = getApplication<Application>()
         val baseSyncData = repository.getFullSyncData("Android-Backup")
 
@@ -1392,7 +1392,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
      * format through [com.example.data.BackupArchive.toSyncData], so both containers
      * always carry identical content.
      */
-    private fun buildBackupJson(): String {
+    private suspend fun buildBackupJson(): String {
         val parts = buildBackupParts()
         val resolved = parts.media.mapNotNull { item ->
             try {
