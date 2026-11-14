@@ -19,6 +19,14 @@ class AppRepository(private val database: AppDatabase) {
     fun getEventsByDate(persianDate: String): Flow<List<EventEntity>> =
         eventDao.getEventsByDate(persianDate)
 
+    suspend fun getEventsByRecurrenceId(recurrenceId: String): List<EventEntity> = withContext(Dispatchers.IO) {
+        eventDao.getEventsByRecurrenceId(recurrenceId)
+    }
+
+    suspend fun getEventsByRecurrenceIdFromDate(recurrenceId: String, fromPersianDate: String): List<EventEntity> = withContext(Dispatchers.IO) {
+        eventDao.getEventsByRecurrenceIdFromDate(recurrenceId, fromPersianDate)
+    }
+
     // Events
     suspend fun insertEvent(event: EventEntity) = withContext(Dispatchers.IO) {
         eventDao.insertEvent(event.copy(updatedAt = System.currentTimeMillis()))

@@ -690,6 +690,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         } else if (nlpResult is com.example.chat.OfflineNLPProcessor.NLPResult.AddEvent) {
             viewModelScope.launch(Dispatchers.IO) {
                 repository.insertEvent(nlpResult.event)
+                EventAlarmScheduler.scheduleEventAlarm(getApplication(), nlpResult.event)
                 val updatedList = _chatMessages.value.toMutableList()
                 updatedList.add(
                     ChatMessage(
@@ -978,6 +979,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                     }
                     if (!alreadyExists) {
                         repository.insertEvent(event)
+                        EventAlarmScheduler.scheduleEventAlarm(getApplication(), event)
                         existing.add(event)
                         added++
                     }
@@ -1105,7 +1107,9 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
 
             viewModelScope.launch {
                 repository.insertEvents(eventsList)
-                eventsList.firstOrNull()?.let {
+                // Every occurrence row needs its own alarm; scheduling only the
+                // first row leaves all later occurrences silent.
+                eventsList.forEach {
                     EventAlarmScheduler.scheduleEventAlarm(getApplication(), it)
                 }
                 logMessage("رویداد تکرارشونده (${effectiveConfig.getSummaryText(true)}) با موفقیت ثبت شد (${eventsList.size} نوبت): $title")
@@ -1130,6 +1134,10 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
 
     fun deleteRecurringEventsFromDate(recurrenceId: String, fromPersianDate: String) {
         viewModelScope.launch {
+            // Cancel the alarms of the affected rows first, or they ring as ghosts.
+            repository.getEventsByRecurrenceIdFromDate(recurrenceId, fromPersianDate).forEach {
+                EventAlarmScheduler.cancelEventAlarm(getApplication(), it.id)
+            }
             repository.deleteRecurringEventsFromDate(recurrenceId, fromPersianDate)
             logMessage("رویدادهای تکرارشونده از تاریخ $fromPersianDate به بعد حذف شدند")
         }
@@ -1137,6 +1145,9 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
 
     fun deleteAllRecurringEvents(recurrenceId: String) {
         viewModelScope.launch {
+            repository.getEventsByRecurrenceId(recurrenceId).forEach {
+                EventAlarmScheduler.cancelEventAlarm(getApplication(), it.id)
+            }
             repository.deleteAllRecurringEvents(recurrenceId)
             logMessage("تمام تکرارهای این رویداد حذف شدند")
         }
@@ -1153,6 +1164,10 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         colorHex: String
     ) {
         viewModelScope.launch {
+            // Reschedule: cancel the old alarms, update, then arm the new ones.
+            repository.getEventsByRecurrenceIdFromDate(recurrenceId, fromPersianDate).forEach {
+                EventAlarmScheduler.cancelEventAlarm(getApplication(), it.id)
+            }
             repository.updateRecurringEventsFromDate(
                 recurrenceId = recurrenceId,
                 fromPersianDate = fromPersianDate,
@@ -1163,6 +1178,9 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 category = category,
                 colorHex = colorHex
             )
+            repository.getEventsByRecurrenceIdFromDate(recurrenceId, fromPersianDate).forEach {
+                EventAlarmScheduler.scheduleEventAlarm(getApplication(), it)
+            }
             logMessage("رویدادهای تکرارشونده از تاریخ $fromPersianDate به بعد به‌روزرسانی شدند")
         }
     }
@@ -1177,6 +1195,9 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         colorHex: String
     ) {
         viewModelScope.launch {
+            repository.getEventsByRecurrenceId(recurrenceId).forEach {
+                EventAlarmScheduler.cancelEventAlarm(getApplication(), it.id)
+            }
             repository.updateAllRecurringEvents(
                 recurrenceId = recurrenceId,
                 title = title,
@@ -1186,6 +1207,9 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 category = category,
                 colorHex = colorHex
             )
+            repository.getEventsByRecurrenceId(recurrenceId).forEach {
+                EventAlarmScheduler.scheduleEventAlarm(getApplication(), it)
+            }
             logMessage("تمام تکرارهای این رویداد به‌روزرسانی شدند")
         }
     }
@@ -1776,6 +1800,14 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                     }
                 } catch (e: Exception) {
                     e.printStackTrace()
+                }
+
+                // 2c. Restored events have no AlarmManager registrations; re-arm them all.
+                // Guarded separately so an alarm problem can never fail the restore itself.
+                try {
+                    EventAlarmScheduler.rearmAll(app, repository.allActiveEvents.first())
+                } catch (e: Exception) {
+                    logMessage("تنظیم دوباره زنگ‌های رویدادها بعد از بازیابی انجام نشد: ${e.message}")
                 }
 
                 // 3. Restore Memento Mori (a failure here must not void the merge above)
