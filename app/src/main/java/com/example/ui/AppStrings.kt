@@ -221,6 +221,8 @@ interface AppStrings {
     val feedbackNeedInternet: String
     val feedbackEmpty: String
     val feedbackPhotoFailed: String
+    val feedbackCrashAttached: String
+    val feedbackRemoveCrash: String
     val selectCityForPrayerTimes: String
     fun daysOffsetLabel(offset: Int): String
 
@@ -473,6 +475,8 @@ object FaStrings : AppStrings {
     override val feedbackNeedInternet: String = "لطفا ابتدا اینترنت وصل کنید"
     override val feedbackEmpty: String = "اول نظرت رو بنویس"
     override val feedbackPhotoFailed: String = "این عکس پیوست نشد"
+    override val feedbackCrashAttached: String = "گزارش خطای فنی برنامه پیوست شد"
+    override val feedbackRemoveCrash: String = "حذف گزارش"
     override val selectCityForPrayerTimes: String = "انتخاب شهر برای اوقات شرعی"
     override fun daysOffsetLabel(offset: Int): String = when {
         offset > 0 -> "+${formatDigits(offset.toString())} روز"
@@ -760,6 +764,8 @@ object EnStrings : AppStrings {
     override val feedbackNeedInternet: String = "Please connect to the internet first"
     override val feedbackEmpty: String = "Write your feedback first"
     override val feedbackPhotoFailed: String = "Couldn't attach that photo"
+    override val feedbackCrashAttached: String = "The app's crash report is attached"
+    override val feedbackRemoveCrash: String = "Remove report"
     override val selectCityForPrayerTimes: String = "Select City for Prayer Times"
     override fun daysOffsetLabel(offset: Int): String = when {
         offset > 0 -> "+$offset days"

@@ -35,7 +35,8 @@ object FeedbackSender {
         contact: String,
         appVersion: String,
         device: String,
-        photoBase64: String?
+        photoBase64: String?,
+        crashLog: String? = null
     ): String {
         val json = JSONObject()
         json.put("text", text.trim().take(MAX_TEXT_LENGTH))
@@ -43,6 +44,7 @@ object FeedbackSender {
         json.put("appVersion", appVersion)
         json.put("device", device)
         if (photoBase64 != null) json.put("photoBase64", photoBase64)
+        if (crashLog != null) json.put("crashLog", crashLog)
         return json.toString()
     }
 
@@ -67,7 +69,7 @@ object FeedbackSender {
                     android.util.Base64.encodeToString(it, android.util.Base64.NO_WRAP)
                 }
                 val payload = buildPayloadJson(
-                    item.text, item.contact, item.appVersion, item.device, photoB64
+                    item.text, item.contact, item.appVersion, item.device, photoB64, item.crashLog
                 )
                 val conn = URL(ENDPOINT).openConnection() as HttpURLConnection
                 conn.requestMethod = "POST"

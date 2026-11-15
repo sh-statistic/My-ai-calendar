@@ -16,6 +16,7 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.AddAPhoto
+import androidx.compose.material.icons.filled.BugReport
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.Icon
@@ -37,6 +38,7 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import com.example.feedback.CrashLogStore
 import com.example.feedback.FeedbackOutbox
 import com.example.feedback.FeedbackSender
 import com.example.ui.AppStrings
@@ -64,6 +66,9 @@ fun FeedbackDialog(
     var text by remember { mutableStateOf(draft.first) }
     var contact by remember { mutableStateOf(draft.second) }
     var photoBytes by remember { mutableStateOf<ByteArray?>(null) }
+    // A stored technical crash report (only the app's own error, no user
+    // data) is offered as an attachment; the user sees it and can remove it.
+    var crashLog by remember { mutableStateOf(CrashLogStore.peek(context)) }
 
     val photoBitmap = remember(photoBytes) {
         photoBytes?.let { BitmapFactory.decodeByteArray(it, 0, it.size) }
@@ -145,6 +150,28 @@ fun FeedbackDialog(
                         }
                     }
                 }
+                if (crashLog != null) {
+                    Spacer(modifier = Modifier.height(10.dp))
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        Icon(Icons.Default.BugReport, contentDescription = null, modifier = Modifier.size(18.dp))
+                        Text(
+                            strings.feedbackCrashAttached,
+                            color = MaterialTheme.colorScheme.primary,
+                            fontWeight = FontWeight.Bold
+                        )
+                        TextButton(onClick = {
+                            // "Remove" means remove: the stored report is
+                            // discarded, not just detached from this send.
+                            crashLog = null
+                            scope.launch(Dispatchers.IO) { CrashLogStore.discard(context) }
+                        }) {
+                            Text(strings.feedbackRemoveCrash)
+                        }
+                    }
+                }
             }
         },
         confirmButton = {
@@ -168,9 +195,13 @@ fun FeedbackDialog(
                     val queuedText = text
                     val queuedContact = contact
                     val queuedPhoto = photoBytes
+                    val queuedCrash = crashLog
                     scope.launch {
                         withContext(Dispatchers.IO) {
-                            FeedbackOutbox.enqueue(context, queuedText, queuedContact, queuedPhoto)
+                            FeedbackOutbox.enqueue(context, queuedText, queuedContact, queuedPhoto, queuedCrash)
+                            // The report has been handed over with this
+                            // feedback; do not attach it again next time.
+                            if (queuedCrash != null) CrashLogStore.clear(context, queuedCrash)
                             FeedbackOutbox.scheduleFlush(context)
                         }
                         FeedbackSender.clearDraft(context)

@@ -32,7 +32,8 @@ object FeedbackOutbox {
         val contact: String,
         val appVersion: String,
         val device: String,
-        val photoFileName: String?
+        val photoFileName: String?,
+        val crashLog: String? = null
     )
 
     private const val PREFS = "feedback_outbox"
@@ -52,6 +53,7 @@ object FeedbackOutbox {
             obj.put("appVersion", item.appVersion)
             obj.put("device", item.device)
             if (item.photoFileName != null) obj.put("photoFileName", item.photoFileName)
+            if (item.crashLog != null) obj.put("crashLog", item.crashLog)
             array.put(obj)
         }
         return array.toString()
@@ -73,7 +75,8 @@ object FeedbackOutbox {
                         contact = obj.optString("contact"),
                         appVersion = obj.optString("appVersion"),
                         device = obj.optString("device"),
-                        photoFileName = obj.optString("photoFileName").ifBlank { null }
+                        photoFileName = obj.optString("photoFileName").ifBlank { null },
+                        crashLog = obj.optString("crashLog").ifBlank { null }
                     )
                 )
             }
@@ -115,7 +118,8 @@ object FeedbackOutbox {
         context: Context,
         text: String,
         contact: String,
-        photoJpeg: ByteArray?
+        photoJpeg: ByteArray?,
+        crashLog: String? = null
     ): PendingFeedback {
         val id = UUID.randomUUID().toString()
         var photoFileName: String? = null
@@ -134,7 +138,8 @@ object FeedbackOutbox {
             contact = contact,
             appVersion = FeedbackSender.appVersionName(context),
             device = FeedbackSender.deviceLabel(),
-            photoFileName = photoFileName
+            photoFileName = photoFileName,
+            crashLog = crashLog
         )
         saveAll(context, loadAll(context) + item)
         return item
