@@ -59,10 +59,10 @@ object AnnouncementNotifier {
         )
 
         val builder = NotificationCompat.Builder(context, CHANNEL_ID)
-            .setSmallIcon(android.R.drawable.ic_dialog_info)
-            .setContentTitle(if (isFa) "📣 پیام تازه" else "📣 New message")
-            .setContentText(announcement.text)
-            .setStyle(NotificationCompat.BigTextStyle().bigText(announcement.text))
+            .setSmallIcon(android.R.drawable.stat_notify_chat)
+            .setContentTitle(if (isFa) "\u200F📣 پیام تازه از برنامه" else "📣 New message from the app")
+            .setContentText(rtl(announcement.text))
+            .setStyle(NotificationCompat.BigTextStyle().bigText(rtl(announcement.text)))
             .setPriority(NotificationCompat.PRIORITY_HIGH)
             .setCategory(NotificationCompat.CATEGORY_MESSAGE)
             .setVisibility(NotificationCompat.VISIBILITY_PUBLIC)
@@ -91,6 +91,29 @@ object AnnouncementNotifier {
             // marked seen by the caller, matching the update notifier's stance.
         }
     }
+
+    /**
+     * True when a notification can actually reach the user right now:
+     * the app's notifications are enabled and this channel is not muted.
+     * The check worker only counts an announcement as seen when this is
+     * true, so an announcement fetched while notifications were off is
+     * not lost — it is shown by a later check once they are on.
+     */
+    fun canPost(context: Context): Boolean {
+        if (!NotificationManagerCompat.from(context).areNotificationsEnabled()) return false
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            val manager = context.getSystemService(Context.NOTIFICATION_SERVICE)
+                as? NotificationManager ?: return false
+            val channel = manager.getNotificationChannel(CHANNEL_ID)
+            if (channel != null && channel.importance == NotificationManager.IMPORTANCE_NONE) {
+                return false
+            }
+        }
+        return true
+    }
+
+    /** Right-to-left mark first, so Persian text renders right-aligned. */
+    private fun rtl(text: String): String = "\u200F" + text
 
     /** Thumb icons for like/dislike options; other labels are text-only. */
     private fun thumbIconFor(label: String): Int = when {

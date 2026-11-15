@@ -70,11 +70,15 @@ object AnnouncementClient {
     }
 
     /** True when the relay accepted and tallied the vote. */
-    suspend fun vote(id: String, option: Int): Boolean = withContext(Dispatchers.IO) {
+    suspend fun vote(id: String, option: Int, device: String, appVersion: String): Boolean = withContext(Dispatchers.IO) {
         try {
             val payload = JSONObject()
                 .put("id", id)
                 .put("option", option)
+                // So the developer's tally message can say which device and
+                // app version the vote came from (his request, 2026-11-15).
+                .put("device", device)
+                .put("appVersion", appVersion)
                 .toString()
             val conn = URL(VOTE_URL).openConnection() as HttpURLConnection
             conn.requestMethod = "POST"

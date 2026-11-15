@@ -23,12 +23,16 @@ class AnnouncementCheckWorker(
                     val announcement = result.announcement
                     if (AnnouncementStore.shouldShow(announcement, AnnouncementStore.lastSeenId(applicationContext))) {
                         val fresh = announcement!!
-                        // Mark seen BEFORE showing: a duplicate run or a
-                        // process death can then never show it twice, and a
-                        // failed post still counts as seen (the update
-                        // flow's stance).
-                        AnnouncementStore.markSeen(applicationContext, fresh.id)
-                        AnnouncementNotifier.show(applicationContext, fresh)
+                        if (AnnouncementNotifier.canPost(applicationContext)) {
+                            // Mark seen BEFORE showing: a duplicate run or a
+                            // process death can then never show it twice.
+                            // But only when it can really be shown — while
+                            // notifications are off the announcement stays
+                            // unseen, so a later check shows it once they
+                            // are turned on instead of it being lost.
+                            AnnouncementStore.markSeen(applicationContext, fresh.id)
+                            AnnouncementNotifier.show(applicationContext, fresh)
+                        }
                     }
                     Result.success()
                 }

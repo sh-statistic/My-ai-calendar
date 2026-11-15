@@ -19,7 +19,12 @@ class AnnouncementVoteWorker(
         val id = inputData.getString(KEY_ID) ?: return Result.success()
         val option = inputData.getInt(KEY_OPTION, -1)
         if (option < 0) return Result.success()
-        val delivered = AnnouncementClient.vote(id, option)
+        val delivered = AnnouncementClient.vote(
+            id,
+            option,
+            com.example.feedback.FeedbackSender.deviceLabel(),
+            com.example.feedback.FeedbackSender.appVersionName(applicationContext)
+        )
         return when {
             delivered -> Result.success()
             // A lost vote after several tries is acceptable; never loop
