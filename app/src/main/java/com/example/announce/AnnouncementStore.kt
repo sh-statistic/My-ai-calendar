@@ -23,10 +23,15 @@ object AnnouncementStore {
             announcement.id.isNotBlank() &&
             announcement.id !in seenIds
 
+    /** Announcement ids start with their publish time in millis (a random
+     *  suffix may follow), which is what "newest" sorts by. */
+    private fun idOrder(id: String): Long =
+        id.substringBefore('-').toLongOrNull() ?: 0L
+
     /** Pure merge (unit-tested): adds an id, keeping only the newest ids. */
     fun addSeen(seenIds: Set<String>, id: String): Set<String> {
         if (id.isBlank()) return seenIds
-        val merged = (seenIds + id).sortedByDescending { it.toLongOrNull() ?: 0L }
+        val merged = (seenIds + id).sortedByDescending { idOrder(it) }
         return merged.take(MAX_SEEN).toSet()
     }
 
@@ -34,7 +39,7 @@ object AnnouncementStore {
     fun encodeSeen(seenIds: Set<String>): String {
         val array = JSONArray()
         // Sorted so the stored form is deterministic.
-        for (id in seenIds.sortedByDescending { it.toLongOrNull() ?: 0L }) array.put(id)
+        for (id in seenIds.sortedByDescending { idOrder(it) }) array.put(id)
         return array.toString()
     }
 

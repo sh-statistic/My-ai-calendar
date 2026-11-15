@@ -86,8 +86,21 @@ object AnnouncementClient {
         }
     }
 
-    /** True when the relay accepted and tallied the vote. */
-    suspend fun vote(id: String, option: Int, device: String, appVersion: String): Boolean = withContext(Dispatchers.IO) {
+    /** What one vote delivery attempt concluded. */
+    enum class VoteResult {
+        /** The relay tallied the vote. */
+        DELIVERED,
+
+        /** The relay says this vote can never land (the announcement is
+         *  gone or the vote is invalid) — retrying is pointless. */
+        GONE,
+
+        /** A transient failure (network, relay 5xx) — worth a retry. */
+        FAILED
+    }
+
+    /** Delivers one vote to the relay and reports how it concluded. */
+    suspend fun vote(id: String, option: Int, device: String, appVersion: String): VoteResult = withContext(Dispatchers.IO) {
         try {
             val payload = JSONObject()
                 .put("id", id)
@@ -104,13 +117,19 @@ object AnnouncementClient {
             conn.doOutput = true
             conn.setRequestProperty("Content-Type", "application/json; charset=utf-8")
             conn.outputStream.use { it.write(payload.toByteArray(Charsets.UTF_8)) }
-            if (conn.responseCode !in 200..299) {
-                false
-            } else {
-                JSONObject(conn.inputStream.bufferedReader().readText()).optBoolean("ok", false)
+            when {
+                conn.responseCode in 200..299 -> {
+                    val ok = JSONObject(conn.inputStream.bufferedReader().readText())
+                        .optBoolean("ok", false)
+                    if (ok) VoteResult.DELIVERED else VoteResult.FAILED
+                }
+                // 404 (announcement deleted) and 400 (invalid vote) are
+                // permanent: the vote's moment has passed, stop quietly.
+                conn.responseCode == 404 || conn.responseCode == 400 -> VoteResult.GONE
+                else -> VoteResult.FAILED
             }
         } catch (e: Exception) {
-            false
+            VoteResult.FAILED
         }
     }
 }

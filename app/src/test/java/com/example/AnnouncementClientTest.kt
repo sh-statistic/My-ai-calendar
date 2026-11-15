@@ -103,4 +103,16 @@ class AnnouncementClientTest {
         assertFalse("10" in seen)
         assertTrue("11" in seen)
     }
+
+    @Test
+    fun seenSet_ordersSuffixedIdsByTheirTimePrefix() {
+        var seen: Set<String> = emptySet()
+        seen = AnnouncementStore.addSeen(seen, "2000-bbbbbbbb")
+        seen = AnnouncementStore.addSeen(seen, "1000-aaaaaaaa")
+        seen = AnnouncementStore.addSeen(seen, "3000-cccccccc")
+        assertEquals(
+            listOf("3000-cccccccc", "2000-bbbbbbbb", "1000-aaaaaaaa"),
+            AnnouncementStore.decodeSeen(AnnouncementStore.encodeSeen(seen)).toList()
+        )
+    }
 }

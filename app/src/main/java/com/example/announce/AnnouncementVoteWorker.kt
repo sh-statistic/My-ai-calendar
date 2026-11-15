@@ -19,18 +19,22 @@ class AnnouncementVoteWorker(
         val id = inputData.getString(KEY_ID) ?: return Result.success()
         val option = inputData.getInt(KEY_OPTION, -1)
         if (option < 0) return Result.success()
-        val delivered = AnnouncementClient.vote(
+        val result = AnnouncementClient.vote(
             id,
             option,
             com.example.feedback.FeedbackSender.deviceLabel(),
             com.example.feedback.FeedbackSender.appVersionName(applicationContext)
         )
-        return when {
-            delivered -> Result.success()
-            // A lost vote after several tries is acceptable; never loop
-            // forever. The cap matches FeedbackFlushWorker's.
-            runAttemptCount < 10 -> Result.retry()
-            else -> Result.success()
+        return when (result) {
+            // Tallied — done. Gone — the announcement was deleted or the
+            // vote is invalid; retrying can never change that, so the
+            // vote closes quietly instead of knocking ten more times.
+            AnnouncementClient.VoteResult.DELIVERED,
+            AnnouncementClient.VoteResult.GONE -> Result.success()
+            AnnouncementClient.VoteResult.FAILED ->
+                // A lost vote after several tries is acceptable; never loop
+                // forever. The cap matches FeedbackFlushWorker's.
+                if (runAttemptCount < 10) Result.retry() else Result.success()
         }
     }
 
