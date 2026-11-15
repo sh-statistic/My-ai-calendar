@@ -43,10 +43,12 @@ import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
@@ -186,6 +188,7 @@ fun CalendarScreen(
 
     var showAddEventDialog by remember { mutableStateOf(false) }
     var showAddTaskDialog by remember { mutableStateOf(false) }
+    var showDayAddChooser by remember { mutableStateOf(false) }
     var eventToEdit by remember { mutableStateOf<EventEntity?>(null) }
     var taskToEdit by remember { mutableStateOf<TaskEntity?>(null) }
     var recurringEventToDelete by remember { mutableStateOf<EventEntity?>(null) }
@@ -400,7 +403,7 @@ fun CalendarScreen(
                                                             onClick = { viewModel.setSelectedDate(cell.jalaliDate) },
                                                             onLongClick = {
                                                                 viewModel.setSelectedDate(cell.jalaliDate)
-                                                                showAddEventDialog = true
+                                                                showDayAddChooser = true
                                                             }
                                                         ),
                                                     contentAlignment = Alignment.Center
@@ -886,6 +889,41 @@ fun CalendarScreen(
                     recurrenceConfig = recurrenceConfig
                 )
                 showAddEventDialog = false
+            }
+        )
+    }
+
+    if (showDayAddChooser) {
+        AlertDialog(
+            onDismissRequest = { showDayAddChooser = false },
+            title = { Text(strings.addChooserTitle, fontWeight = FontWeight.Bold) },
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    OutlinedButton(
+                        onClick = {
+                            showDayAddChooser = false
+                            showAddEventDialog = true
+                        },
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Text(strings.newEvent)
+                    }
+                    OutlinedButton(
+                        onClick = {
+                            showDayAddChooser = false
+                            showAddTaskDialog = true
+                        },
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Text(strings.newTask)
+                    }
+                }
+            },
+            confirmButton = {},
+            dismissButton = {
+                TextButton(onClick = { showDayAddChooser = false }) {
+                    Text(strings.cancel)
+                }
             }
         )
     }

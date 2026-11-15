@@ -211,6 +211,7 @@ interface AppStrings {
     val checkNewVersion: String
     val shareAppWithOthers: String
     val feedbackTitle: String
+    val addChooserTitle: String
     val feedbackHint: String
     val feedbackContactHint: String
     val feedbackAttachPhoto: String
@@ -466,7 +467,8 @@ object FaStrings : AppStrings {
     override val checkingForUpdate: String = "در حال بررسی..."
     override val checkNewVersion: String = "بررسی نسخه جدید"
     override val shareAppWithOthers: String = "ارسال نرم‌افزار به دیگران"
-    override val feedbackTitle: String = "ارسال نظر و پیشنهاد"
+    override val feedbackTitle: String = "ارسال نظر و پیشنهاد یا گزارش خطا"
+    override val addChooserTitle: String = "چه چیزی می‌خواهید ثبت کنید؟"
     override val feedbackHint: String = "نظر، پیشنهاد یا اشکالی که دیدی بنویس"
     override val feedbackContactHint: String = "راه تماس (اختیاری)"
     override val feedbackAttachPhoto: String = "افزودن عکس"
@@ -757,7 +759,8 @@ object EnStrings : AppStrings {
     override val checkingForUpdate: String = "Checking..."
     override val checkNewVersion: String = "Check for Updates"
     override val shareAppWithOthers: String = "Share App with Others"
-    override val feedbackTitle: String = "Send Feedback"
+    override val feedbackTitle: String = "Send Feedback, Suggestions or a Bug Report"
+    override val addChooserTitle: String = "What do you want to add?"
     override val feedbackHint: String = "Write your comment, suggestion, or a bug you found"
     override val feedbackContactHint: String = "Contact (optional)"
     override val feedbackAttachPhoto: String = "Attach photo"

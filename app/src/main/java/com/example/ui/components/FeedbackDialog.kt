@@ -22,6 +22,7 @@ import androidx.compose.material3.Button
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -89,6 +90,18 @@ fun FeedbackDialog(
         }
     }
 
+    // In the dark theme the default field outline nearly vanishes against
+    // the dialog background, so the boxes read as one blob (Sadra's phone
+    // test). A filled container one step off the dialog surface plus a
+    // stronger resting border keeps every field clearly separate, day
+    // and night.
+    val fieldColors = OutlinedTextFieldDefaults.colors(
+        focusedContainerColor = MaterialTheme.colorScheme.surfaceVariant,
+        unfocusedContainerColor = MaterialTheme.colorScheme.surfaceVariant,
+        focusedBorderColor = MaterialTheme.colorScheme.primary,
+        unfocusedBorderColor = MaterialTheme.colorScheme.onSurfaceVariant
+    )
+
     AlertDialog(
         onDismissRequest = onDismiss,
         title = { Text(strings.feedbackTitle, fontWeight = FontWeight.Bold) },
@@ -104,7 +117,8 @@ fun FeedbackDialog(
                     minLines = 4,
                     maxLines = 8,
                     modifier = Modifier.fillMaxWidth(),
-                    shape = RoundedCornerShape(12.dp)
+                    shape = RoundedCornerShape(12.dp),
+                    colors = fieldColors
                 )
                 Spacer(modifier = Modifier.height(10.dp))
                 OutlinedTextField(
@@ -116,7 +130,8 @@ fun FeedbackDialog(
                     placeholder = { Text(strings.feedbackContactHint) },
                     singleLine = true,
                     modifier = Modifier.fillMaxWidth(),
-                    shape = RoundedCornerShape(12.dp)
+                    shape = RoundedCornerShape(12.dp),
+                    colors = fieldColors
                 )
                 Spacer(modifier = Modifier.height(10.dp))
                 if (photoBytes == null) {
