@@ -68,4 +68,18 @@ class FeedbackSenderTest {
         assertTrue(json.getBoolean("autoCrash"))
         assertEquals("TRACE", json.getString("crashLog"))
     }
+
+    @Test
+    fun payload_carriesClientIdForRelayDedupe() {
+        val withId = JSONObject(
+            FeedbackSender.buildPayloadJson(
+                "سلام", "", "1.0.4", "dev", null, clientId = "entry-123"
+            )
+        )
+        assertEquals("entry-123", withId.getString("clientId"))
+        val withoutId = JSONObject(
+            FeedbackSender.buildPayloadJson("سلام", "", "1.0.4", "dev", null)
+        )
+        assertFalse(withoutId.has("clientId"))
+    }
 }

@@ -37,7 +37,8 @@ object FeedbackSender {
         device: String,
         photoBase64: String?,
         crashLog: String? = null,
-        autoCrash: Boolean = false
+        autoCrash: Boolean = false,
+        clientId: String? = null
     ): String {
         val json = JSONObject()
         json.put("text", text.trim().take(MAX_TEXT_LENGTH))
@@ -47,6 +48,10 @@ object FeedbackSender {
         if (photoBase64 != null) json.put("photoBase64", photoBase64)
         if (crashLog != null) json.put("crashLog", crashLog)
         if (autoCrash) json.put("autoCrash", true)
+        // The outbox entry's own id: the relay remembers delivered ids, so
+        // a retry after a slow or lost response is confirmed WITHOUT the
+        // developer receiving a second copy.
+        if (clientId != null) json.put("clientId", clientId)
         return json.toString()
     }
 
@@ -72,12 +77,15 @@ object FeedbackSender {
                 }
                 val payload = buildPayloadJson(
                     item.text, item.contact, item.appVersion, item.device, photoB64,
-                    item.crashLog, item.autoCrash
+                    item.crashLog, item.autoCrash, item.id
                 )
                 val conn = URL(ENDPOINT).openConnection() as HttpURLConnection
                 conn.requestMethod = "POST"
                 conn.connectTimeout = 15_000
-                conn.readTimeout = 20_000
+                // The relay fans out to two services and the GitHub leg can
+                // be slow; wait long enough for its real answer instead of
+                // timing out after the message already went through.
+                conn.readTimeout = 45_000
                 conn.doOutput = true
                 conn.setRequestProperty("Content-Type", "application/json; charset=utf-8")
                 conn.outputStream.use { it.write(payload.toByteArray(Charsets.UTF_8)) }
