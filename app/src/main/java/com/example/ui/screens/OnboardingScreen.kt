@@ -25,8 +25,6 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -100,7 +98,6 @@ fun OnboardingScreen(
 
     // Step 2: Prayer Times City
     var selectedCityName by remember { mutableStateOf("تهران") }
-    var citySearchQuery by remember { mutableStateOf("") }
 
     // Step 3: Life Grid & Birth Date
     var userBirthYearText by remember { mutableStateOf("") }
@@ -231,8 +228,6 @@ fun OnboardingScreen(
                         )
                         1 -> CityStep(
                             selectedCityName = selectedCityName,
-                            searchQuery = citySearchQuery,
-                            onSearchQueryChange = { citySearchQuery = it },
                             onSelectCity = { selectedCityName = it },
                             isRtl = isRtl
                         )
@@ -422,16 +417,9 @@ private fun LanguageCard(
 @Composable
 private fun CityStep(
     selectedCityName: String,
-    searchQuery: String,
-    onSearchQueryChange: (String) -> Unit,
     onSelectCity: (String) -> Unit,
     isRtl: Boolean
 ) {
-    val filteredCities = remember(searchQuery) {
-        if (searchQuery.isBlank()) PrayerTimesCalculator.CITIES
-        else PrayerTimesCalculator.CITIES.filter { it.nameFa.contains(searchQuery.trim()) }
-    }
-
     Column(modifier = Modifier.fillMaxSize()) {
         Row(verticalAlignment = Alignment.CenterVertically) {
             Icon(Icons.Default.LocationOn, contentDescription = null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(32.dp))
@@ -452,52 +440,14 @@ private fun CityStep(
 
         Spacer(modifier = Modifier.height(14.dp))
 
-        OutlinedTextField(
-            value = searchQuery,
-            onValueChange = onSearchQueryChange,
-            placeholder = { Text(if (isRtl) "جستجوی شهر (مثال: تهران، مشهد، اصفهان...)" else "Search city...") },
-            leadingIcon = { Icon(Icons.Default.Search, contentDescription = null) },
-            singleLine = true,
-            modifier = Modifier.fillMaxWidth(),
-            shape = RoundedCornerShape(12.dp)
-        )
-
-        Spacer(modifier = Modifier.height(10.dp))
-
-        LazyColumn(
+        com.example.ui.components.CityPickerContent(
+            selectedCityName = selectedCityName,
+            onSelectCity = { city -> onSelectCity(city.nameFa) },
+            isFa = isRtl,
             modifier = Modifier
                 .fillMaxWidth()
-                .weight(1f),
-            verticalArrangement = Arrangement.spacedBy(6.dp)
-        ) {
-            items(filteredCities) { city ->
-                val isSelected = city.nameFa == selectedCityName
-                Surface(
-                    color = if (isSelected) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.35f),
-                    shape = RoundedCornerShape(10.dp),
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .clickable { onSelectCity(city.nameFa) }
-                ) {
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(horizontal = 14.dp, vertical = 10.dp),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Text(
-                            text = city.nameFa,
-                            fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal,
-                            color = if (isSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface
-                        )
-                        if (isSelected) {
-                            Icon(Icons.Default.Check, contentDescription = null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(18.dp))
-                        }
-                    }
-                }
-            }
-        }
+                .weight(1f)
+        )
     }
 }
 

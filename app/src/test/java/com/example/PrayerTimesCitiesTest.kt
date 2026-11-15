@@ -18,6 +18,30 @@ class PrayerTimesCitiesTest {
     }
 
     @Test
+    fun everyCity_hasAProvince_andThereAre31() {
+        assertTrue(PrayerTimesCalculator.CITIES.all { it.province.isNotBlank() })
+        assertEquals(31, PrayerTimesCalculator.provinces().size)
+    }
+
+    @Test
+    fun provinceGrouping_coversEveryCityOnce() {
+        val grouped = PrayerTimesCalculator.citiesByProvince()
+        assertEquals(427, grouped.values.sumOf { it.size })
+        assertEquals(89, PrayerTimesCalculator.citiesInProvince("خراسان رضوی").size)
+        assertTrue(PrayerTimesCalculator.citiesInProvince("خراسان رضوی").any { it.nameFa == "مشهد" })
+        assertTrue(PrayerTimesCalculator.citiesInProvince("تهران").any { it.nameFa == "تهران" })
+    }
+
+    @Test
+    fun citySearch_matchesPersianArabicAndEnglishSpellings() {
+        assertTrue(PrayerTimesCalculator.searchCities("مشهد").any { it.nameFa == "مشهد" })
+        // Arabic ي in the query must still find the Persian-spelled city
+        assertTrue(PrayerTimesCalculator.searchCities("ايلام").any { it.nameFa == "ایلام" })
+        assertTrue(PrayerTimesCalculator.searchCities("Mashhad").any { it.nameFa == "مشهد" })
+        assertTrue(PrayerTimesCalculator.searchCities("شهر ناموجود").isEmpty())
+    }
+
+    @Test
     fun persianNames_areUnique() {
         val names = PrayerTimesCalculator.CITIES.map { it.nameFa }
         assertEquals(names.size, names.toSet().size)
