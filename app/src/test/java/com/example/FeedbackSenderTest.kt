@@ -55,5 +55,17 @@ class FeedbackSenderTest {
             )
         )
         assertEquals("STACK TRACE HERE", json.getString("crashLog"))
+        assertFalse(json.has("autoCrash"))
+    }
+
+    @Test
+    fun payload_marksAutomaticCrashReports() {
+        val json = JSONObject(
+            FeedbackSender.buildPayloadJson(
+                "", "", "1.1.0", "dev", null, "TRACE", autoCrash = true
+            )
+        )
+        assertTrue(json.getBoolean("autoCrash"))
+        assertEquals("TRACE", json.getString("crashLog"))
     }
 }

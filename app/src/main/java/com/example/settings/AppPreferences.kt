@@ -9,6 +9,7 @@ object AppPreferences {
     private const val KEY_APP_LANGUAGE = "app_language"
     private const val KEY_DARK_MODE = "is_dark_mode"
     private const val KEY_CALENDAR_VIEW_MODE = "calendar_view_mode"
+    private const val KEY_AUTO_CRASH_REPORT = "auto_crash_report"
 
     private fun getPrefs(context: Context): SharedPreferences {
         return context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
@@ -44,5 +45,14 @@ object AppPreferences {
 
     fun setCalendarViewMode(context: Context, mode: String) {
         getPrefs(context).edit().putString(KEY_CALENDAR_VIEW_MODE, mode).apply()
+    }
+
+    /** Automatic technical crash reports (default on; Settings switch). */
+    fun isAutoCrashReportEnabled(context: Context): Boolean {
+        return getPrefs(context).getBoolean(KEY_AUTO_CRASH_REPORT, true)
+    }
+
+    fun setAutoCrashReportEnabled(context: Context, enabled: Boolean) {
+        getPrefs(context).edit().putBoolean(KEY_AUTO_CRASH_REPORT, enabled).apply()
     }
 }

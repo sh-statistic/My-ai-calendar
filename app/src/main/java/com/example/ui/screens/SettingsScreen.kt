@@ -921,6 +921,36 @@ fun SettingsScreen(
                     )
                 }
 
+                // کلید ارسال خودکار گزارش خطای فنی (بدون اطلاعات شخصی کاربر)
+                var autoCrashReport by remember {
+                    mutableStateOf(com.example.settings.AppPreferences.isAutoCrashReportEnabled(context))
+                }
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text(
+                            text = strings.autoCrashReport,
+                            style = MaterialTheme.typography.bodyMedium,
+                            fontWeight = FontWeight.Bold
+                        )
+                        Text(
+                            text = strings.autoCrashReportHint,
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                    Switch(
+                        checked = autoCrashReport,
+                        onCheckedChange = {
+                            autoCrashReport = it
+                            com.example.settings.AppPreferences.setAutoCrashReportEnabled(context, it)
+                        }
+                    )
+                }
+
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.End,

@@ -130,6 +130,18 @@ class MainActivity : ComponentActivity() {
         // بازخوردهای در صف مانده (اگر باشند) با باز شدن برنامه دوباره برای ارسال مسلح می‌شوند
         com.example.feedback.FeedbackOutbox.scheduleFlush(this)
 
+        // ارسال خودکار گزارش خطای فنی: اگر برنامه قبلا خراب شده و کاربر این
+        // قابلیت را خاموش نکرده، گزارش ذخیره‌شده بدون هیچ دخالتی وارد صف
+        // ارسال می‌شود تا با همان مسیر بازخورد به دست توسعه‌دهنده برسد
+        if (com.example.settings.AppPreferences.isAutoCrashReportEnabled(this)) {
+            val appContext = applicationContext
+            Thread {
+                if (com.example.feedback.CrashLogStore.queueStoredReport(appContext)) {
+                    com.example.feedback.FeedbackOutbox.scheduleFlush(appContext)
+                }
+            }.start()
+        }
+
         setContent {
             val isDarkMode by viewModel.isDarkMode.collectAsState()
 
