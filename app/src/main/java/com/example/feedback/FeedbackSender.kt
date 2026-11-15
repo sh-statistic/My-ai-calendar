@@ -56,15 +56,18 @@ object FeedbackSender {
     fun deviceLabel(): String =
         "${Build.MANUFACTURER} ${Build.MODEL} (Android ${Build.VERSION.RELEASE})"
 
-    /** True only when the relay confirms at least one delivery channel worked. */
-    suspend fun send(context: Context, text: String, contact: String, photoJpeg: ByteArray?): Boolean =
+    /**
+     * Sends one queued feedback. True only when the relay confirms at least
+     * one delivery channel worked; the outbox keeps the entry otherwise.
+     */
+    suspend fun sendQueued(item: FeedbackOutbox.PendingFeedback, photoJpeg: ByteArray?): Boolean =
         withContext(Dispatchers.IO) {
             try {
                 val photoB64 = photoJpeg?.let {
                     android.util.Base64.encodeToString(it, android.util.Base64.NO_WRAP)
                 }
                 val payload = buildPayloadJson(
-                    text, contact, appVersionName(context), deviceLabel(), photoB64
+                    item.text, item.contact, item.appVersion, item.device, photoB64
                 )
                 val conn = URL(ENDPOINT).openConnection() as HttpURLConnection
                 conn.requestMethod = "POST"
@@ -162,8 +165,10 @@ object FeedbackSender {
         }
     }
 
-    // Draft: the typed text survives a failed send, a dismissed dialog and an
-    // app restart, so the user never loses a written feedback.
+    // Draft: the text being typed survives a dismissed dialog and an app
+    // restart. Once the user taps Send with a connection, the draft is
+    // cleared and the feedback itself lives in FeedbackOutbox until the
+    // relay confirms delivery.
 
     fun loadDraft(context: Context): Pair<String, String> {
         val prefs = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)

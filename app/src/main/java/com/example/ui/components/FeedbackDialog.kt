@@ -37,15 +37,21 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import com.example.feedback.FeedbackOutbox
 import com.example.feedback.FeedbackSender
 import com.example.ui.AppStrings
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 
 /**
  * In-app feedback form: the user writes a comment (optionally with a contact
  * and one photo) and it is relayed to the developer — no account, no sign-up,
- * nothing leaves the app except the message itself. The draft is kept on the
- * device until a send succeeds, so a failed send never loses the text.
+ * nothing leaves the app except the message itself. Tapping Send only needs
+ * a connection at that moment: the feedback is queued on the device and
+ * delivered in the background, retrying on its own until it goes through, so
+ * the user is never shown a failure or asked to resend. The typing draft is
+ * kept until the user taps Send.
  */
 @Composable
 fun FeedbackDialog(
@@ -58,7 +64,6 @@ fun FeedbackDialog(
     var text by remember { mutableStateOf(draft.first) }
     var contact by remember { mutableStateOf(draft.second) }
     var photoBytes by remember { mutableStateOf<ByteArray?>(null) }
-    var sending by remember { mutableStateOf(false) }
 
     val photoBitmap = remember(photoBytes) {
         photoBytes?.let { BitmapFactory.decodeByteArray(it, 0, it.size) }
@@ -80,13 +85,12 @@ fun FeedbackDialog(
     }
 
     AlertDialog(
-        onDismissRequest = { if (!sending) onDismiss() },
+        onDismissRequest = onDismiss,
         title = { Text(strings.feedbackTitle, fontWeight = FontWeight.Bold) },
         text = {
             Column {
                 OutlinedTextField(
                     value = text,
-                    enabled = !sending,
                     onValueChange = {
                         text = it
                         FeedbackSender.saveDraft(context, it, contact)
@@ -100,7 +104,6 @@ fun FeedbackDialog(
                 Spacer(modifier = Modifier.height(10.dp))
                 OutlinedTextField(
                     value = contact,
-                    enabled = !sending,
                     onValueChange = {
                         contact = it
                         FeedbackSender.saveDraft(context, text, it)
@@ -146,32 +149,41 @@ fun FeedbackDialog(
         },
         confirmButton = {
             Button(
-                enabled = !sending,
                 onClick = {
                     if (text.isBlank()) {
                         Toast.makeText(context, strings.feedbackEmpty, Toast.LENGTH_SHORT).show()
                         return@Button
                     }
-                    sending = true
+                    // The one moment the user hears about connectivity: with
+                    // no internet at all there is nothing to queue behind, so
+                    // the form stays open with the text intact.
+                    if (!FeedbackOutbox.isOnline(context)) {
+                        Toast.makeText(context, strings.feedbackNeedInternet, Toast.LENGTH_LONG).show()
+                        return@Button
+                    }
+                    // From here the user is done: the feedback is queued on
+                    // the device and delivered in the background, retrying on
+                    // its own until the relay confirms it. The queue write
+                    // (photo file + prefs commit) runs off the main thread.
+                    val queuedText = text
+                    val queuedContact = contact
+                    val queuedPhoto = photoBytes
                     scope.launch {
-                        val ok = FeedbackSender.send(context, text, contact, photoBytes)
-                        sending = false
-                        if (ok) {
-                            FeedbackSender.clearDraft(context)
-                            Toast.makeText(context, strings.feedbackSent, Toast.LENGTH_LONG).show()
-                            onDismiss()
-                        } else {
-                            FeedbackSender.saveDraft(context, text, contact)
-                            Toast.makeText(context, strings.feedbackFailed, Toast.LENGTH_LONG).show()
+                        withContext(Dispatchers.IO) {
+                            FeedbackOutbox.enqueue(context, queuedText, queuedContact, queuedPhoto)
+                            FeedbackOutbox.scheduleFlush(context)
                         }
+                        FeedbackSender.clearDraft(context)
+                        Toast.makeText(context, strings.feedbackThanks, Toast.LENGTH_LONG).show()
+                        onDismiss()
                     }
                 }
             ) {
-                Text(if (sending) strings.feedbackSending else strings.feedbackSend)
+                Text(strings.feedbackSend)
             }
         },
         dismissButton = {
-            TextButton(onClick = { if (!sending) onDismiss() }) {
+            TextButton(onClick = onDismiss) {
                 Text(strings.cancel)
             }
         }
