@@ -101,6 +101,7 @@ import com.example.data.EventEntity
 import com.example.data.NoteEntity
 import com.example.data.TaskEntity
 import com.example.ui.rememberAppStrings
+import kotlinx.coroutines.launch
 
 fun eventCategoryLabel(cat: String, isFa: Boolean): String = if (isFa) cat else when (cat) {
     "کاری" -> "Work"
