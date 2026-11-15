@@ -217,9 +217,8 @@ interface AppStrings {
     val feedbackPhotoAttached: String
     val feedbackRemovePhoto: String
     val feedbackSend: String
-    val feedbackSending: String
-    val feedbackSent: String
-    val feedbackFailed: String
+    val feedbackThanks: String
+    val feedbackNeedInternet: String
     val feedbackEmpty: String
     val feedbackPhotoFailed: String
     val selectCityForPrayerTimes: String
@@ -470,9 +469,8 @@ object FaStrings : AppStrings {
     override val feedbackPhotoAttached: String = "عکس پیوست شد"
     override val feedbackRemovePhoto: String = "حذف عکس"
     override val feedbackSend: String = "ارسال"
-    override val feedbackSending: String = "در حال ارسال..."
-    override val feedbackSent: String = "نظرت ثبت شد، ممنون!"
-    override val feedbackFailed: String = "ارسال نشد؛ متنت نگه داشته شد، بعدا دوباره تلاش کن"
+    override val feedbackThanks: String = "با تشکر از نظر شما"
+    override val feedbackNeedInternet: String = "لطفا ابتدا اینترنت وصل کنید"
     override val feedbackEmpty: String = "اول نظرت رو بنویس"
     override val feedbackPhotoFailed: String = "این عکس پیوست نشد"
     override val selectCityForPrayerTimes: String = "انتخاب شهر برای اوقات شرعی"
@@ -758,9 +756,8 @@ object EnStrings : AppStrings {
     override val feedbackPhotoAttached: String = "Photo attached"
     override val feedbackRemovePhoto: String = "Remove photo"
     override val feedbackSend: String = "Send"
-    override val feedbackSending: String = "Sending..."
-    override val feedbackSent: String = "Thanks! Your feedback was sent."
-    override val feedbackFailed: String = "Couldn't send; your text is saved, please try again later"
+    override val feedbackThanks: String = "Thank you for your feedback"
+    override val feedbackNeedInternet: String = "Please connect to the internet first"
     override val feedbackEmpty: String = "Write your feedback first"
     override val feedbackPhotoFailed: String = "Couldn't attach that photo"
     override val selectCityForPrayerTimes: String = "Select City for Prayer Times"

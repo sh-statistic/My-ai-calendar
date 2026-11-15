@@ -116,6 +116,9 @@ class MainActivity : ComponentActivity() {
         // راه‌اندازی استعلام خودکار و دوره‌ای پس‌زمینه با WorkManager حتی در صورت بسته بودن برنامه
         com.example.update.UpdateWorkScheduler.schedulePeriodicCheck(this)
 
+        // بازخوردهای در صف مانده (اگر باشند) با باز شدن برنامه دوباره برای ارسال مسلح می‌شوند
+        com.example.feedback.FeedbackOutbox.scheduleFlush(this)
+
         setContent {
             val isDarkMode by viewModel.isDarkMode.collectAsState()
 
