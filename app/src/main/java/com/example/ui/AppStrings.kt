@@ -210,6 +210,18 @@ interface AppStrings {
     val checkingForUpdate: String
     val checkNewVersion: String
     val shareAppWithOthers: String
+    val feedbackTitle: String
+    val feedbackHint: String
+    val feedbackContactHint: String
+    val feedbackAttachPhoto: String
+    val feedbackPhotoAttached: String
+    val feedbackRemovePhoto: String
+    val feedbackSend: String
+    val feedbackSending: String
+    val feedbackSent: String
+    val feedbackFailed: String
+    val feedbackEmpty: String
+    val feedbackPhotoFailed: String
     val selectCityForPrayerTimes: String
     fun daysOffsetLabel(offset: Int): String
 
@@ -451,6 +463,18 @@ object FaStrings : AppStrings {
     override val checkingForUpdate: String = "در حال بررسی..."
     override val checkNewVersion: String = "بررسی نسخه جدید"
     override val shareAppWithOthers: String = "ارسال نرم‌افزار به دیگران"
+    override val feedbackTitle: String = "ارسال نظر و پیشنهاد"
+    override val feedbackHint: String = "نظر، پیشنهاد یا اشکالی که دیدی بنویس"
+    override val feedbackContactHint: String = "راه تماس (اختیاری)"
+    override val feedbackAttachPhoto: String = "افزودن عکس"
+    override val feedbackPhotoAttached: String = "عکس پیوست شد"
+    override val feedbackRemovePhoto: String = "حذف عکس"
+    override val feedbackSend: String = "ارسال"
+    override val feedbackSending: String = "در حال ارسال..."
+    override val feedbackSent: String = "نظرت ثبت شد، ممنون!"
+    override val feedbackFailed: String = "ارسال نشد؛ متنت نگه داشته شد، بعدا دوباره تلاش کن"
+    override val feedbackEmpty: String = "اول نظرت رو بنویس"
+    override val feedbackPhotoFailed: String = "این عکس پیوست نشد"
     override val selectCityForPrayerTimes: String = "انتخاب شهر برای اوقات شرعی"
     override fun daysOffsetLabel(offset: Int): String = when {
         offset > 0 -> "+${formatDigits(offset.toString())} روز"
@@ -727,6 +751,18 @@ object EnStrings : AppStrings {
     override val checkingForUpdate: String = "Checking..."
     override val checkNewVersion: String = "Check for Updates"
     override val shareAppWithOthers: String = "Share App with Others"
+    override val feedbackTitle: String = "Send Feedback"
+    override val feedbackHint: String = "Write your comment, suggestion, or a bug you found"
+    override val feedbackContactHint: String = "Contact (optional)"
+    override val feedbackAttachPhoto: String = "Attach photo"
+    override val feedbackPhotoAttached: String = "Photo attached"
+    override val feedbackRemovePhoto: String = "Remove photo"
+    override val feedbackSend: String = "Send"
+    override val feedbackSending: String = "Sending..."
+    override val feedbackSent: String = "Thanks! Your feedback was sent."
+    override val feedbackFailed: String = "Couldn't send; your text is saved, please try again later"
+    override val feedbackEmpty: String = "Write your feedback first"
+    override val feedbackPhotoFailed: String = "Couldn't attach that photo"
     override val selectCityForPrayerTimes: String = "Select City for Prayer Times"
     override fun daysOffsetLabel(offset: Int): String = when {
         offset > 0 -> "+$offset days"

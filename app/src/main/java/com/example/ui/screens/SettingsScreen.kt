@@ -61,6 +61,7 @@ import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.InstallMobile
 import androidx.compose.material.icons.filled.SystemUpdate
+import androidx.compose.material.icons.filled.Feedback
 import androidx.compose.material.icons.filled.Share
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Checkbox
@@ -124,6 +125,7 @@ import com.example.ui.MainViewModel
 import com.example.ui.components.EditOccasionDialog
 import com.example.ui.components.JsonBackupDialog
 import com.example.ui.components.PairingInfoDialog
+import com.example.ui.components.FeedbackDialog
 import com.example.ui.components.ShareAppDialog
 import com.example.ui.rememberAppStrings
 
@@ -166,6 +168,7 @@ fun SettingsScreen(
     var showPairingDialog by remember { mutableStateOf(false) }
     var showBackupDialog by remember { mutableStateOf(false) }
     var showShareAppDialog by remember { mutableStateOf(false) }
+    var showFeedbackDialog by remember { mutableStateOf(false) }
     var backupExportFile by remember { mutableStateOf<java.io.File?>(null) }
     var isExportingBackup by remember { mutableStateOf(false) }
     var showFajrCityDialog by remember { mutableStateOf(false) }
@@ -896,6 +899,28 @@ fun SettingsScreen(
                     )
                 }
 
+                // دکمه ارسال نظر و پیشنهاد به توسعه‌دهنده
+                Button(
+                    onClick = { showFeedbackDialog = true },
+                    shape = RoundedCornerShape(12.dp),
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = MaterialTheme.colorScheme.secondary
+                    ),
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Icon(
+                        Icons.Default.Feedback,
+                        contentDescription = null,
+                        modifier = Modifier.size(18.dp)
+                    )
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text(
+                        text = strings.feedbackTitle,
+                        fontWeight = FontWeight.Bold,
+                        fontSize = 12.sp
+                    )
+                }
+
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.End,
@@ -1009,6 +1034,13 @@ fun SettingsScreen(
     if (showShareAppDialog) {
         ShareAppDialog(
             onDismiss = { showShareAppDialog = false }
+        )
+    }
+
+    if (showFeedbackDialog) {
+        FeedbackDialog(
+            strings = strings,
+            onDismiss = { showFeedbackDialog = false }
         )
     }
 }
