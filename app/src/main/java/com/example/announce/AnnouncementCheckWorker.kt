@@ -20,19 +20,18 @@ class AnnouncementCheckWorker(
                 is AnnouncementClient.LatestResult.Failed ->
                     if (runAttemptCount < 3) Result.retry() else Result.success()
                 is AnnouncementClient.LatestResult.Ok -> {
-                    val announcement = result.announcement
-                    if (AnnouncementStore.shouldShow(announcement, AnnouncementStore.lastSeenId(applicationContext))) {
-                        val fresh = announcement!!
-                        if (AnnouncementNotifier.canPost(applicationContext)) {
-                            // Mark seen BEFORE showing: a duplicate run or a
-                            // process death can then never show it twice.
-                            // But only when it can really be shown — while
-                            // notifications are off the announcement stays
-                            // unseen, so a later check shows it once they
-                            // are turned on instead of it being lost.
-                            AnnouncementStore.markSeen(applicationContext, fresh.id)
-                            AnnouncementNotifier.show(applicationContext, fresh)
-                        }
+                    // Several announcements can be live at once; show each
+                    // unseen one exactly once, oldest first. While
+                    // notifications cannot be posted, stop at the first
+                    // unseen one and leave it (and the rest) unseen, so a
+                    // later check shows them once posting is possible
+                    // instead of them being lost.
+                    val seen = AnnouncementStore.seenIds(applicationContext)
+                    for (fresh in result.announcements) {
+                        if (!AnnouncementStore.shouldShow(fresh, seen)) continue
+                        if (!AnnouncementNotifier.canPost(applicationContext)) break
+                        AnnouncementStore.markSeen(applicationContext, fresh.id)
+                        AnnouncementNotifier.show(applicationContext, fresh)
                     }
                     Result.success()
                 }

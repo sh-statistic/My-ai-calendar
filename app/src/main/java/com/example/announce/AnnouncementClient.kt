@@ -25,31 +25,48 @@ object AnnouncementClient {
     private const val VOTE_URL = "https://feedback.sh2103.shop/f/7pytoxb6dr1e-vote"
     const val MAX_OPTIONS = 3
 
-    /** Pure parser (unit-tested): relay JSON to an Announcement, or null on junk. */
-    fun parseLatest(json: String): Announcement? {
+    /** Pure parser (unit-tested): relay JSON to one announcement, or null on junk. */
+    fun parseOne(ann: JSONObject?): Announcement? {
+        if (ann == null) return null
+        val id = ann.optString("id")
+        val text = ann.optString("text")
+        if (id.isBlank() || text.isBlank()) return null
+        val options = mutableListOf<String>()
+        val arr = ann.optJSONArray("options")
+        if (arr != null) {
+            for (i in 0 until arr.length()) {
+                val option = arr.optString(i).trim()
+                if (option.isNotEmpty()) options.add(option)
+            }
+        }
+        return Announcement(id, text, options.take(MAX_OPTIONS))
+    }
+
+    /**
+     * Pure parser (unit-tested): relay JSON to the live announcements,
+     * oldest first. Prefers the "announcements" list; falls back to the
+     * legacy single "announcement" field.
+     */
+    fun parseAnnouncements(json: String): List<Announcement> {
         return try {
             val root = JSONObject(json)
-            val ann = root.optJSONObject("announcement") ?: return null
-            val id = ann.optString("id")
-            val text = ann.optString("text")
-            if (id.isBlank() || text.isBlank()) return null
-            val options = mutableListOf<String>()
-            val arr = ann.optJSONArray("options")
+            val arr = root.optJSONArray("announcements")
             if (arr != null) {
+                val out = mutableListOf<Announcement>()
                 for (i in 0 until arr.length()) {
-                    val option = arr.optString(i).trim()
-                    if (option.isNotEmpty()) options.add(option)
+                    parseOne(arr.optJSONObject(i))?.let { out.add(it) }
                 }
+                return out
             }
-            Announcement(id, text, options.take(MAX_OPTIONS))
+            listOfNotNull(parseOne(root.optJSONObject("announcement")))
         } catch (e: Exception) {
-            null
+            emptyList()
         }
     }
 
     /** Outcome of one poll of the relay: a failure is worth a retry, "no announcement" is not. */
     sealed class LatestResult {
-        data class Ok(val announcement: Announcement?) : LatestResult()
+        data class Ok(val announcements: List<Announcement>) : LatestResult()
         object Failed : LatestResult()
     }
 
@@ -60,9 +77,9 @@ object AnnouncementClient {
             conn.readTimeout = 15_000
             when {
                 conn.responseCode in 200..299 ->
-                    LatestResult.Ok(parseLatest(conn.inputStream.bufferedReader().readText()))
+                    LatestResult.Ok(parseAnnouncements(conn.inputStream.bufferedReader().readText()))
                 conn.responseCode in 500..599 -> LatestResult.Failed
-                else -> LatestResult.Ok(null)
+                else -> LatestResult.Ok(emptyList())
             }
         } catch (e: Exception) {
             LatestResult.Failed

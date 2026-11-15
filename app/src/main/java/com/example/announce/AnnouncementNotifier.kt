@@ -20,12 +20,18 @@ import com.example.settings.AppPreferences
 object AnnouncementNotifier {
 
     const val CHANNEL_ID = "announcements_channel"
-    // The 993x block is this feature's own: 9911/9912 already belong to the
-    // update reminder's alarm and content PendingIntents, and sharing a
-    // request code would merge the two notifications' tap intents.
-    const val NOTIFICATION_ID = 9931
-    private const val REQUEST_CODE_OPEN = 9932
-    private const val REQUEST_CODE_VOTE_BASE = 9940
+    // PendingIntent request codes and notification ids are derived per
+    // announcement (see below) from a high range: 9911/9912 belong to the
+    // update reminder, and several announcements can sit in the shade at
+    // the same time without overwriting or cross-wiring each other.
+
+    /** Stable per-announcement notification id, so announcements stack instead of replacing each other. */
+    fun notificationIdFor(id: String): Int = 100_000 + (id.hashCode() and 0x3FFFFF)
+
+    private fun openRequestCodeFor(id: String): Int = 3_000_000 + (id.hashCode() and 0xFFFFF)
+
+    private fun voteRequestCodeFor(id: String, index: Int): Int =
+        5_000_000 + (id.hashCode() and 0xFFFFF) * 4 + index
 
     fun show(context: Context, announcement: Announcement) {
         val notificationManager = context.getSystemService(Context.NOTIFICATION_SERVICE)
@@ -53,7 +59,7 @@ object AnnouncementNotifier {
         }
         val contentPendingIntent = PendingIntent.getActivity(
             context,
-            REQUEST_CODE_OPEN,
+            openRequestCodeFor(announcement.id),
             openIntent,
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
         )
@@ -77,7 +83,7 @@ object AnnouncementNotifier {
             }
             val votePendingIntent = PendingIntent.getBroadcast(
                 context,
-                REQUEST_CODE_VOTE_BASE + index,
+                voteRequestCodeFor(announcement.id, index),
                 voteIntent,
                 PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
             )
@@ -85,10 +91,10 @@ object AnnouncementNotifier {
         }
 
         try {
-            NotificationManagerCompat.from(context).notify(NOTIFICATION_ID, builder.build())
+            NotificationManagerCompat.from(context).notify(notificationIdFor(announcement.id), builder.build())
         } catch (e: SecurityException) {
-            // Notification permission not granted; the announcement is still
-            // marked seen by the caller, matching the update notifier's stance.
+            // Notification permission vanished between the check and the
+            // post; the caller has already marked it seen.
         }
     }
 

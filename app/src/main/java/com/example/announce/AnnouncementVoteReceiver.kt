@@ -23,7 +23,7 @@ class AnnouncementVoteReceiver : BroadcastReceiver() {
         val id = intent.getStringExtra(EXTRA_ANN_ID) ?: return
         val option = intent.getIntExtra(EXTRA_OPTION, -1)
         if (option < 0) return
-        NotificationManagerCompat.from(context).cancel(AnnouncementNotifier.NOTIFICATION_ID)
+        NotificationManagerCompat.from(context).cancel(AnnouncementNotifier.notificationIdFor(id))
         AnnouncementVoteWorker.enqueue(context, id, option)
     }
 }
