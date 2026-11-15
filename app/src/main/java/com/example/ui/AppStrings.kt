@@ -223,6 +223,8 @@ interface AppStrings {
     val feedbackPhotoFailed: String
     val feedbackCrashAttached: String
     val feedbackRemoveCrash: String
+    val autoCrashReport: String
+    val autoCrashReportHint: String
     val selectCityForPrayerTimes: String
     fun daysOffsetLabel(offset: Int): String
 
@@ -477,6 +479,8 @@ object FaStrings : AppStrings {
     override val feedbackPhotoFailed: String = "این عکس پیوست نشد"
     override val feedbackCrashAttached: String = "گزارش خطای فنی برنامه پیوست شد"
     override val feedbackRemoveCrash: String = "حذف گزارش"
+    override val autoCrashReport: String = "ارسال خودکار گزارش خطا"
+    override val autoCrashReportHint: String = "اگه برنامه خراب بشه، گزارش فنی خطا خودش فرستاده می‌شه؛ هیچ اطلاعات شخصی توش نیست"
     override val selectCityForPrayerTimes: String = "انتخاب شهر برای اوقات شرعی"
     override fun daysOffsetLabel(offset: Int): String = when {
         offset > 0 -> "+${formatDigits(offset.toString())} روز"
@@ -766,6 +770,8 @@ object EnStrings : AppStrings {
     override val feedbackPhotoFailed: String = "Couldn't attach that photo"
     override val feedbackCrashAttached: String = "The app's crash report is attached"
     override val feedbackRemoveCrash: String = "Remove report"
+    override val autoCrashReport: String = "Automatic crash reports"
+    override val autoCrashReportHint: String = "If the app crashes, its technical report is sent automatically; it contains no personal data"
     override val selectCityForPrayerTimes: String = "Select City for Prayer Times"
     override fun daysOffsetLabel(offset: Int): String = when {
         offset > 0 -> "+$offset days"

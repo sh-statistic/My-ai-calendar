@@ -31,6 +31,7 @@ class FeedbackOutboxTest {
         context.getSharedPreferences("feedback_outbox", Context.MODE_PRIVATE)
             .edit().clear().commit()
         File(context.filesDir, "feedback_outbox").deleteRecursively()
+        File(context.filesDir, "crash_reports").deleteRecursively()
     }
 
     @Test
@@ -111,5 +112,32 @@ class FeedbackOutboxTest {
         val loaded = FeedbackOutbox.loadAll(context)
         assertEquals(1, loaded.size)
         assertEquals("TRACE-123", loaded[0].crashLog)
+    }
+
+    @Test
+    fun queueStoredReport_movesReportIntoOutboxOnce() {
+        val dir = File(context.filesDir, "crash_reports").apply { mkdirs() }
+        File(dir, "last_crash.txt").writeText("REPORT-BODY")
+        assertTrue(com.example.feedback.CrashLogStore.queueStoredReport(context))
+        val loaded = FeedbackOutbox.loadAll(context)
+        assertEquals(1, loaded.size)
+        assertTrue(loaded[0].autoCrash)
+        assertEquals("REPORT-BODY", loaded[0].crashLog)
+        assertEquals("", loaded[0].text)
+        // Store consumed: a second call queues nothing new.
+        assertTrue(!com.example.feedback.CrashLogStore.queueStoredReport(context))
+        assertEquals(1, FeedbackOutbox.pendingCount(context))
+    }
+
+    @Test
+    fun queueStoredReport_dedupesIdenticalQueuedReport() {
+        // The same report already waits in the outbox (e.g. the user
+        // attached it to a feedback): no second entry, store still cleared.
+        FeedbackOutbox.enqueue(context, "کرش کرد", "", null, crashLog = "REPORT-BODY")
+        val dir = File(context.filesDir, "crash_reports").apply { mkdirs() }
+        File(dir, "last_crash.txt").writeText("REPORT-BODY")
+        assertTrue(com.example.feedback.CrashLogStore.queueStoredReport(context))
+        assertEquals(1, FeedbackOutbox.pendingCount(context))
+        assertTrue(!File(dir, "last_crash.txt").exists())
     }
 }

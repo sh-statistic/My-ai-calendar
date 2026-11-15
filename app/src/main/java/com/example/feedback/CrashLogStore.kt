@@ -86,6 +86,29 @@ object CrashLogStore {
     }
 
     /**
+     * Automatic reporting (Sadra's request, 2026-11-15): moves the stored
+     * report into the feedback outbox as a standalone entry, so the normal
+     * background flush delivers it with no user action at all. An identical
+     * report already waiting in the outbox is not queued twice (a crash
+     * loop must not spam), and the store is cleared either way — whichever
+     * path takes the report first owns it. Returns true when a stored
+     * report was found (queued now, or already queued identically).
+     * Callers run this off the main thread.
+     */
+    fun queueStoredReport(context: Context): Boolean {
+        val report = peek(context) ?: return false
+        val alreadyQueued = FeedbackOutbox.loadAll(context).any { it.crashLog == report }
+        if (!alreadyQueued) {
+            FeedbackOutbox.enqueue(
+                context, "", "", null,
+                crashLog = report, autoCrash = true
+            )
+        }
+        clear(context, report)
+        return true
+    }
+
+    /**
      * Drops the stored report once it has been queued with a feedback —
      * but only if the file still holds exactly that report, so a newer
      * crash written in the meantime is never deleted unseen.
