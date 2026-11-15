@@ -1265,7 +1265,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 try {
                     val file = File(path)
                     if (file.exists()) file.delete()
-                    val jsonFile = File(path.replace(".png", ".json"))
+                    val jsonFile = File(path.removeSuffix(".png") + ".json")
                     if (jsonFile.exists()) jsonFile.delete()
                 } catch (_: Exception) {}
             }
@@ -1298,7 +1298,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 try {
                     val file = File(note.drawingPath)
                     if (file.exists() && file.isFile) {
-                        val jsonFile = File(note.drawingPath.replace(".png", ".json"))
+                        val jsonFile = File(note.drawingPath.removeSuffix(".png") + ".json")
                         media += com.example.data.BackupArchive.MediaItem(
                             noteId = note.id,
                             kind = com.example.data.BackupArchive.KIND_DRAWING,
@@ -1470,7 +1470,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                     val sidecarText = syncData.noteDrawingSidecars?.get(note.id)
                     if (!sidecarText.isNullOrBlank()) {
                         try {
-                            File(targetFile.absolutePath.replace(".png", ".json")).writeText(sidecarText)
+                            File(targetFile.absolutePath.removeSuffix(".png") + ".json").writeText(sidecarText)
                         } catch (e: Exception) {
                             e.printStackTrace()
                         }
@@ -1702,6 +1702,13 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                         val updatedNotes = restoreDrawingFiles(rawSyncData)
                         val syncData = rawSyncData.copy(notes = updatedNotes)
                         repository.mergeSyncData(syncData, "پشتیبان اضطراری خودکار")
+                        // Restored events have no AlarmManager registrations; re-arm them
+                        // all. Guarded so an alarm problem can never fail the restore.
+                        try {
+                            EventAlarmScheduler.rearmAll(app, repository.allActiveEvents.first())
+                        } catch (e: Exception) {
+                            e.printStackTrace()
+                        }
                         val restoredMemento = mementoManager.importFromJson(syncData.mementoMoriJson)
                         if (restoredMemento > 0) {
                             _mementoRevision.value += 1

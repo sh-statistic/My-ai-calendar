@@ -630,7 +630,6 @@ object AppUpdateManager {
         return try { hasMeaningfulBackupContent(file.readText()) } catch (_: Exception) { false }
     }
 
-    private val safetyBackupFileNameRegex = Regex("""^MyCalendar_SafetyBackup( \(\d+\))?\.(json|zip)$""")
 
     /**
      * Copies a downloaded update APK into the public Downloads folder under a stable
