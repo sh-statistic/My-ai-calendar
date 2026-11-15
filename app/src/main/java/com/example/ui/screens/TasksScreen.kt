@@ -329,7 +329,7 @@ fun TasksScreen(
                 }
             }
 
-            // Header 2: Task Status Filters (Distinct from time scope)
+            // Header 2: Task Status Filters — هم‌رنگ نوار بالایی تا کل بالای صفحهٔ وظایف یکدست باشد، مثل بقیهٔ بخش‌ها
             Card(
                 colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
                 shape = RoundedCornerShape(bottomStart = 16.dp, bottomEnd = 16.dp),
