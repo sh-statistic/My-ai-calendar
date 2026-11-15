@@ -119,7 +119,6 @@ import androidx.compose.ui.text.style.TextDirection
 import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.example.prayer.PrayerTimesCalculator
 import com.example.sync.NetworkUtils
 import com.example.ui.MainViewModel
 import com.example.ui.components.EditOccasionDialog
@@ -985,38 +984,21 @@ fun SettingsScreen(
 
     if (showFajrCityDialog) {
         val fajrSettings by viewModel.fajrAlarmSettings.collectAsState()
-        val cities = PrayerTimesCalculator.CITIES
         AlertDialog(
             onDismissRequest = { showFajrCityDialog = false },
             title = { Text(strings.selectCityForPrayerTimes, fontWeight = FontWeight.Bold) },
             text = {
-                Column(
+                com.example.ui.components.CityPickerContent(
+                    selectedCityName = fajrSettings.cityName,
+                    onSelectCity = { city ->
+                        viewModel.selectCity(city)
+                        showFajrCityDialog = false
+                    },
+                    isFa = strings.isFa,
                     modifier = Modifier
                         .fillMaxWidth()
-                        .verticalScroll(rememberScrollState()),
-                    verticalArrangement = Arrangement.spacedBy(4.dp)
-                ) {
-                    cities.forEach { city ->
-                        val cityName = strings.cityName(city)
-                        Surface(
-                            color = if (fajrSettings.cityName == city.nameFa || fajrSettings.cityName == city.nameEn) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.surface,
-                            shape = RoundedCornerShape(8.dp),
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .clickable {
-                                    viewModel.selectCity(city)
-                                    showFajrCityDialog = false
-                                }
-                        ) {
-                            Text(
-                                text = cityName,
-                                modifier = Modifier.padding(10.dp),
-                                fontWeight = if (fajrSettings.cityName == city.nameFa || fajrSettings.cityName == city.nameEn) FontWeight.Bold else FontWeight.Normal,
-                                color = if (fajrSettings.cityName == city.nameFa || fajrSettings.cityName == city.nameEn) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface
-                            )
-                        }
-                    }
-                }
+                        .height(430.dp)
+                )
             },
             confirmButton = {
                 TextButton(onClick = { showFajrCityDialog = false }) { Text(strings.cancel) }
