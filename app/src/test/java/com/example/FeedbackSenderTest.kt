@@ -44,5 +44,16 @@ class FeedbackSenderTest {
         assertEquals(FeedbackSender.MAX_CONTACT_LENGTH, json.getString("contact").length)
         assertTrue(json.has("photoBase64"))
         assertEquals("QUJD", json.getString("photoBase64"))
+        assertFalse(json.has("crashLog"))
+    }
+
+    @Test
+    fun payload_includesCrashLogWhenProvided() {
+        val json = JSONObject(
+            FeedbackSender.buildPayloadJson(
+                "برنامه بسته شد", "", "1.1.0", "dev", null, "STACK TRACE HERE"
+            )
+        )
+        assertEquals("STACK TRACE HERE", json.getString("crashLog"))
     }
 }

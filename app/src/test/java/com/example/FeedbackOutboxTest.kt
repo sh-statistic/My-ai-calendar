@@ -104,4 +104,12 @@ class FeedbackOutboxTest {
         assertEquals(0, sent)
         assertEquals(2, FeedbackOutbox.pendingCount(context))
     }
+
+    @Test
+    fun enqueue_roundTripsCrashLog() {
+        FeedbackOutbox.enqueue(context, "کرش کرد", "", null, crashLog = "TRACE-123")
+        val loaded = FeedbackOutbox.loadAll(context)
+        assertEquals(1, loaded.size)
+        assertEquals("TRACE-123", loaded[0].crashLog)
+    }
 }
