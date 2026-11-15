@@ -127,6 +127,10 @@ class MainActivity : ComponentActivity() {
         // راه‌اندازی استعلام خودکار و دوره‌ای پس‌زمینه با WorkManager حتی در صورت بسته بودن برنامه
         com.example.update.UpdateWorkScheduler.schedulePeriodicCheck(this)
 
+        // اعلان‌های تعاملی سازنده: بررسی دوره‌ای و یک بررسی فوری هنگام باز شدن برنامه
+        com.example.announce.AnnouncementScheduler.schedulePeriodicCheck(this)
+        com.example.announce.AnnouncementScheduler.enqueueImmediateCheck(this)
+
         // بازخوردهای در صف مانده (اگر باشند) با باز شدن برنامه دوباره برای ارسال مسلح می‌شوند
         com.example.feedback.FeedbackOutbox.scheduleFlush(this)
 
