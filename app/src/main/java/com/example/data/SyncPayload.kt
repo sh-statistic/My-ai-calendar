@@ -14,6 +14,7 @@ data class SyncData(
     val notes: List<NoteEntity>,
     val mementoMoriJson: JSONObject? = null,
     val noteDrawingsBase64: Map<String, String>? = null, // key: note id, value: base64 drawing content
+    val noteDrawingSidecars: Map<String, String>? = null, // key: note id, value: whiteboard strokes JSON text
     val customOccasionsData: String? = null,
     val customOccasionsHiddenData: String? = null,
     val appPreferences: Map<String, Any?>? = null,
@@ -77,6 +78,10 @@ data class SyncData(
             val drawingB64 = noteDrawingsBase64?.get(n.id)
             if (!drawingB64.isNullOrBlank()) {
                 obj.put("drawingBase64", drawingB64)
+            }
+            val drawingSidecar = noteDrawingSidecars?.get(n.id)
+            if (!drawingSidecar.isNullOrBlank()) {
+                obj.put("drawingSidecar", drawingSidecar)
             }
             obj.put("updatedAt", n.updatedAt)
             obj.put("isDeleted", n.isDeleted)
@@ -163,6 +168,7 @@ data class SyncData(
 
             val notes = mutableListOf<NoteEntity>()
             val drawingsMap = mutableMapOf<String, String>()
+            val drawingSidecarsMap = mutableMapOf<String, String>()
             val notesArray = root.optJSONArray("notes")
             if (notesArray != null) {
                 for (i in 0 until notesArray.length()) {
@@ -171,6 +177,10 @@ data class SyncData(
                     val drawingB64 = if (obj.isNull("drawingBase64")) null else obj.optString("drawingBase64").takeIf { it.isNotBlank() }
                     if (drawingB64 != null) {
                         drawingsMap[noteId] = drawingB64
+                    }
+                    if (!obj.isNull("drawingSidecar")) {
+                        val sidecar = obj.optString("drawingSidecar")
+                        if (sidecar.isNotBlank()) drawingSidecarsMap[noteId] = sidecar
                     }
                     notes.add(
                         NoteEntity(
@@ -222,6 +232,7 @@ data class SyncData(
                 notes = notes,
                 mementoMoriJson = mementoMoriJson,
                 noteDrawingsBase64 = if (drawingsMap.isNotEmpty()) drawingsMap else null,
+                noteDrawingSidecars = if (drawingSidecarsMap.isNotEmpty()) drawingSidecarsMap else null,
                 customOccasionsData = customOccasionsData,
                 customOccasionsHiddenData = customOccasionsHiddenData,
                 appPreferences = appPreferences,

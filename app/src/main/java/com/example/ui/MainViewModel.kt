@@ -1313,55 +1313,6 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             }
         }
 
-        // 1b. Image & audio attachments of rich-content notes
-        for (note in baseSyncData.notes) {
-            if (!note.imagePath.isNullOrBlank()) {
-                try {
-                    val file = File(note.imagePath)
-                    if (file.exists() && file.isFile) {
-                        media += com.example.data.BackupArchive.MediaItem(note.id, com.example.data.BackupArchive.KIND_IMAGE, null, file)
-                    }
-                } catch (e: Exception) {
-                    e.printStackTrace()
-                }
-            }
-            if (!note.audioPath.isNullOrBlank()) {
-                try {
-                    val file = File(note.audioPath)
-                    if (file.exists() && file.isFile) {
-                        media += com.example.data.BackupArchive.MediaItem(note.id, com.example.data.BackupArchive.KIND_AUDIO, null, file)
-                    }
-                } catch (e: Exception) {
-                    e.printStackTrace()
-                }
-            }
-        }
-
-        // 1c. Inline block media (photos/drawings/voice inside the note text flow)
-        for (note in baseSyncData.notes) {
-            for (blockMedia in com.example.data.extractNoteBlockMedia(note.blocksJson)) {
-                val mediaPath = blockMedia.path ?: continue
-                try {
-                    val file = File(mediaPath)
-                    if (file.exists() && file.isFile) {
-                        val kind = when (blockMedia.kind) {
-                            "i" -> com.example.data.BackupArchive.KIND_BLOCK_IMAGE
-                            "a" -> com.example.data.BackupArchive.KIND_BLOCK_AUDIO
-                            else -> com.example.data.BackupArchive.KIND_BLOCK_DRAWING
-                        }
-                        val sidecarFile = if (blockMedia.kind == "d") {
-                            val jsonFile = File(mediaPath.replace(".png", ".json"))
-                            if (jsonFile.exists() && jsonFile.isFile) jsonFile else null
-                        } else null
-                        media += com.example.data.BackupArchive.MediaItem(note.id, kind, mediaPath, file, sidecarFile)
-                    }
-                } catch (e: Exception) {
-                    e.printStackTrace()
-                }
-            }
-        }
-
-
         // 2. Custom Occasions
         val (occData, occHiddenData) = PersianOccasionsHelper.exportCustomOccasionsRaw(app)
 
@@ -1514,6 +1465,16 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                         File(drawingsDir, "drawing_${note.id}.png")
                     }
                     targetFile.writeBytes(bytes)
+                    // The strokes sidecar rides along so the restored drawing
+                    // stays editable, not just a flat picture.
+                    val sidecarText = syncData.noteDrawingSidecars?.get(note.id)
+                    if (!sidecarText.isNullOrBlank()) {
+                        try {
+                            File(targetFile.absolutePath.replace(".png", ".json")).writeText(sidecarText)
+                        } catch (e: Exception) {
+                            e.printStackTrace()
+                        }
+                    }
                     note.copy(drawingPath = targetFile.absolutePath)
                 } catch (e: Exception) {
                     e.printStackTrace()
@@ -1622,25 +1583,12 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
 
             // 1. Restore drawing files and connect drawingPath
             val updatedNotes = restoreDrawingFiles(rawSyncData)
-            val notesWithAttachments = restoreAttachmentFiles(rawSyncData.copy(notes = updatedNotes))
-            val notesWithBlocks = restoreBlockFiles(rawSyncData.copy(notes = notesWithAttachments))
-            val syncData = rawSyncData.copy(notes = notesWithBlocks)
+            val syncData = rawSyncData.copy(notes = updatedNotes)
 
             // 2. Merge database records
             repository.mergeSyncData(syncData, "پشتیبان دستی JSON")
 
-            // 2b. Re-arm note reminders that came back with the backup
-            try {
-                for (note in syncData.notes) {
-                    if (note.reminderAt > System.currentTimeMillis() && !note.isDeleted && !note.isArchived) {
-                        com.example.alarm.NoteReminderScheduler.scheduleNoteReminder(app, note)
-                    }
-                }
-            } catch (e: Exception) {
-                e.printStackTrace()
-            }
-
-            // 2c. Restored events have no AlarmManager registrations; re-arm them all.
+            // 2b. Restored events have no AlarmManager registrations; re-arm them all.
             // Guarded separately so an alarm problem can never fail the restore itself.
             try {
                 EventAlarmScheduler.rearmAll(app, repository.allActiveEvents.first())

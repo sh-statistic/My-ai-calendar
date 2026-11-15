@@ -209,42 +209,19 @@ object BackupArchive {
      */
     fun toSyncData(data: ArchiveData, encodeBase64: (ByteArray) -> String): SyncData {
         val base = SyncData.fromJsonString(data.dataJson)
+        // This release's notes carry drawings only (no photos, voice or inline
+        // block media — those belong to the newer notes model). Other media
+        // kinds in a foreign archive are ignored rather than failing the read.
         val drawings = mutableMapOf<String, String>()
-        val images = mutableMapOf<String, String>()
-        val audios = mutableMapOf<String, String>()
-        val blockImages = mutableMapOf<String, MutableMap<String, String>>()
-        val blockDrawings = mutableMapOf<String, MutableMap<String, String>>()
-        val blockAudios = mutableMapOf<String, MutableMap<String, String>>()
         val drawingSidecars = mutableMapOf<String, String>()
-        val blockDrawingSidecars = mutableMapOf<String, MutableMap<String, String>>()
         for (item in data.media) {
-            val b64 = encodeBase64(item.bytes)
-            when (item.kind) {
-                KIND_DRAWING -> {
-                    drawings[item.noteId] = b64
-                    if (item.sidecarText != null) drawingSidecars[item.noteId] = item.sidecarText
-                }
-                KIND_IMAGE -> images[item.noteId] = b64
-                KIND_AUDIO -> audios[item.noteId] = b64
-                KIND_BLOCK_IMAGE -> blockImages.getOrPut(item.noteId) { mutableMapOf() }[item.blockKey ?: ""] = b64
-                KIND_BLOCK_DRAWING -> {
-                    blockDrawings.getOrPut(item.noteId) { mutableMapOf() }[item.blockKey ?: ""] = b64
-                    if (item.sidecarText != null) {
-                        blockDrawingSidecars.getOrPut(item.noteId) { mutableMapOf() }[item.blockKey ?: ""] = item.sidecarText
-                    }
-                }
-                KIND_BLOCK_AUDIO -> blockAudios.getOrPut(item.noteId) { mutableMapOf() }[item.blockKey ?: ""] = b64
-            }
+            if (item.kind != KIND_DRAWING) continue
+            drawings[item.noteId] = encodeBase64(item.bytes)
+            if (item.sidecarText != null) drawingSidecars[item.noteId] = item.sidecarText
         }
         return base.copy(
             noteDrawingsBase64 = drawings.ifEmpty { null },
-            noteImagesBase64 = images.ifEmpty { null },
-            noteAudiosBase64 = audios.ifEmpty { null },
-            noteBlockImagesBase64 = blockImages.ifEmpty { null },
-            noteBlockDrawingsBase64 = blockDrawings.ifEmpty { null },
-            noteBlockAudiosBase64 = blockAudios.ifEmpty { null },
-            noteDrawingSidecars = drawingSidecars.ifEmpty { null },
-            noteBlockDrawingSidecars = blockDrawingSidecars.ifEmpty { null }
+            noteDrawingSidecars = drawingSidecars.ifEmpty { null }
         )
     }
 
@@ -274,9 +251,9 @@ CONTENTS
                         appPreferences and the other preference fields
                                               ... the app settings
                       Reminders live ON their items, never separately:
-                      a note's reminder time is its "reminderAt" field
-                      (epoch milliseconds, 0 = no reminder), and an event's
-                      alarm rings at the event's own persianDate + startTime.
+                      an event's alarm rings at the event's own
+                      persianDate + startTime. (This version's notes
+                      carry no reminder field.)
                       Media files are NOT embedded in data.json; they are
                       separate files in this archive (see manifest.json).
 - manifest.json ..... A list mapping every media file in this archive to the
