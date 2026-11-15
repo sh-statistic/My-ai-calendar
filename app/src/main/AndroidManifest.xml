@@ -89,6 +89,11 @@
         </receiver>
 
         <receiver
+            android:name=".announce.AnnouncementVoteReceiver"
+            android:enabled="true"
+            android:exported="false" />
+
+        <receiver
             android:name=".update.UpdateReminderReceiver"
             android:enabled="true"
             android:exported="false">
